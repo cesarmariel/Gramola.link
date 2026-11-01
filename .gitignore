@@ -1,0 +1,17 @@
+node_modules/
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+# Ficheros locales con datos reales de despliegue (no versionar)
+deploy/deploy.env
+docs/PRIVADO.local.md
+# Canciones: nunca en el repo (tienen derechos); se suben al servidor aparte
+/web/songs/
+.perfil*/
+# Diseño: las capturas de referencia subidas a la herramienta no se versionan
+/diseno/uploads/
+/diseno/.thumbnail
+# Datos del servidor (récords)
+/server/data/

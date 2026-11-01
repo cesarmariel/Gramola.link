@@ -1,0 +1,128 @@
+/* Gramola · web del móvil (diseño: rojo #EC3013, papel #F3F2F2, tinta #201E1D, Archivo) */
+:root {
+  --bg: #f3f2f2; --ink: #201e1d; --red: #ec3013; --mute: #7d7979; --line: #201e1d; --soft: #d7d3d3;
+  --me: #ff4fa3;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font-family: 'Archivo', system-ui, sans-serif; overscroll-behavior: none; }
+body { min-height: 100dvh; }
+.screen { display: none; flex-direction: column; min-height: 100dvh; padding: max(16px, env(safe-area-inset-top)) 22px max(18px, env(safe-area-inset-bottom)); }
+.screen.on { display: flex; }
+.grow { flex: 1; min-height: 16px; }
+
+.bar { display: flex; align-items: center; justify-content: space-between; min-height: 44px; margin-bottom: 26px; }
+.logo { height: 22px; }
+.who { font-size: 13px; font-weight: 600; }
+.badge { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px;
+  background: var(--me); color: var(--ink); font-weight: 800; font-size: 18px; margin-bottom: 10px; }
+.badge::after { content: ''; position: absolute; left: 0; bottom: -12px; border-left: 14px solid var(--me); border-bottom: 12px solid transparent; }
+
+.big { font-weight: 300; font-size: 44px; line-height: 1.02; letter-spacing: -1.5px; margin: 8px 0 34px; }
+.big b { font-weight: 800; color: var(--red); letter-spacing: -1px; }
+.mid { font-weight: 300; font-size: 34px; line-height: 1.05; letter-spacing: -1px; margin: 4px 0 14px; }
+.step { font-size: 12px; font-weight: 800; letter-spacing: 1.4px; text-transform: uppercase; margin: 0 0 6px; }
+.step.red { color: var(--red); }
+.txt { font-size: 15px; line-height: 1.4; margin: 0 0 14px; }
+.lbl { display: block; font-size: 12px; font-weight: 800; letter-spacing: 1.4px; text-transform: uppercase; margin: 14px 0 8px; }
+.field { width: 100%; font: inherit; font-size: 20px; padding: 12px 14px; border: 2px solid var(--ink); background: #fff; color: var(--ink); border-radius: 0; outline: none; }
+.field:focus { box-shadow: 0 0 0 3px rgba(236,48,19,.25); }
+.code { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.code input { width: 100%; aspect-ratio: 1; font: inherit; font-size: 34px; font-weight: 800; text-align: center; text-transform: uppercase;
+  border: 2px solid var(--ink); background: #fff; color: var(--ink); border-radius: 0; outline: none; padding: 0; }
+.code input:focus { border-color: var(--red); }
+.code input.bad { border-color: var(--red); color: var(--red); }
+.hint { font-size: 13px; color: var(--mute); margin: 10px 0 0; }
+.err { color: var(--red); font-size: 14px; font-weight: 600; min-height: 20px; margin: 10px 0 0; }
+.err:not(:empty)::before { content: ''; display: inline-block; width: 10px; height: 10px; background: var(--red); margin-right: 8px; }
+
+.cta { display: flex; justify-content: space-between; align-items: center; width: 100%; border: 0; border-radius: 0; background: var(--red); color: #fff;
+  font: inherit; font-size: 18px; font-weight: 800; padding: 18px 18px; margin-top: 18px; }
+.cta.dark { background: var(--ink); }
+.cta:active { transform: translateY(1px); filter: brightness(.95); }
+.cta:disabled { opacity: .45; }
+.ghost { border: 2px solid var(--ink); background: transparent; color: var(--ink); font: inherit; font-weight: 600; font-size: 15px; padding: 12px; }
+.foot { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; color: var(--mute); margin-top: 14px; }
+.foot img { height: 12px; }
+
+/* Elegir color */
+.colors { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin-top: 10px; }
+.colors button { position: relative; aspect-ratio: 1; border: 0; border-radius: 0; font: inherit; font-size: 13px; font-weight: 600; color: var(--ink);
+  display: flex; align-items: flex-end; padding: 8px; }
+.colors button.taken { opacity: .45; }
+.colors button.taken::after { content: ''; position: absolute; inset: 0;
+  background: linear-gradient(to top right, transparent calc(50% - 1px), var(--ink) 50%, transparent calc(50% + 1px)); }
+.colors button.sel { outline: 4px solid var(--ink); outline-offset: -4px; z-index: 1; }
+
+/* Micro bloqueado */
+.steps { list-style: none; padding: 0; margin: 4px 0 0; border-top: 2px solid var(--ink); counter-reset: s; }
+.steps li { counter-increment: s; padding: 14px 0; border-bottom: 2px solid var(--ink); font-size: 15px; font-weight: 600; }
+.steps li::before { content: counter(s, decimal-leading-zero); color: var(--red); font-weight: 800; margin-right: 14px; }
+
+/* Esperando */
+hr { border: 0; border-top: 2px solid var(--ink); width: 100%; margin: 14px 0; }
+.waiting { display: flex; align-items: center; gap: 10px; font-size: 18px; margin: 0 0 10px; }
+.eq { display: inline-flex; align-items: flex-end; gap: 3px; height: 18px; }
+.eq i { width: 5px; background: var(--red); animation: eq 0.9s ease-in-out infinite; }
+.eq i:nth-child(2) { animation-delay: -.3s; } .eq i:nth-child(3) { animation-delay: -.6s; }
+@keyframes eq { 0%,100% { height: 5px; } 50% { height: 18px; } }
+.pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+.pad button { border: 2px solid var(--ink); background: #fff; font: inherit; font-weight: 800; font-size: 20px; padding: 14px 0; border-radius: 0; }
+.pad button.ok { background: var(--ink); color: #fff; }
+.pad button:active { background: var(--red); color: #fff; border-color: var(--red); }
+
+/* Cantando: solo el micro */
+.screen.sing { padding-bottom: 0; overflow: hidden; }
+.mic { position: relative; flex: 1; display: flex; align-items: flex-end; justify-content: center; margin: 0 -22px; transform: rotate(180deg); }
+.mic img { width: min(100%, 62dvh); display: block; transition: transform .08s linear; transform-origin: 50% 100%; }
+/* Rejilla del cuerpo = vúmetro (medido sobre la imagen 753×1175: x 38,5–61,8 %, y 59–85 %) */
+.vu { position: absolute; bottom: 0; left: 50%; width: min(100%, 62dvh); transform: translateX(-50%); aspect-ratio: 753 / 1175; pointer-events: none; }
+.vu i { position: absolute; left: 40.5%; width: 19%; height: 1.05%; border-radius: 2px; background: var(--me); opacity: 0; box-shadow: 0 0 10px var(--me); transition: opacity .06s; }
+
+.tip { font-size: 13px; line-height: 1.4; border-left: 4px solid var(--ink); padding: 8px 12px; background: #fff; margin: 0 0 12px; }
+.tip.warn { border-color: var(--red); }
+.pad[hidden] { display: none; }
+.cta[hidden] { display: none; }
+
+/* Instalar / escanear / cámara */
+.ghost.wide { width: 100%; margin-top: 10px; }
+.screen.cam { padding: 0; background: #000; position: relative; overflow: hidden; }
+.cam video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.cam-frame { position: absolute; left: 50%; top: 44%; width: 68vw; height: 68vw; max-width: 340px; max-height: 340px; transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 9999px rgba(0,0,0,.55); border: 4px solid var(--red); }
+.cam-txt { position: absolute; left: 0; right: 0; top: calc(44% + min(34vw, 170px) + 22px); text-align: center; color: #fff; font-weight: 800; font-size: 18px; margin: 0; }
+.cam-cancel { position: absolute; left: 22px; right: 22px; bottom: max(22px, env(safe-area-inset-bottom)); width: auto; }
+.share { display: inline-block; width: 18px; height: 18px; border: 2px solid var(--ink); border-top: 0; position: relative; vertical-align: -3px; margin: 0 2px; }
+.share::before { content: '↑'; position: absolute; left: 50%; top: -9px; transform: translateX(-50%); font-weight: 800; font-size: 14px; }
+
+/* Probar el micro */
+.tuner { background: #fff; border: 2px solid var(--ink); padding: 18px 18px 14px; margin: 8px 0 14px; text-align: center; }
+.t-note { font-size: 72px; font-weight: 800; letter-spacing: -2px; line-height: 1; }
+.t-hz { font-size: 15px; color: var(--mute); margin: 6px 0 14px; font-variant-numeric: tabular-nums; }
+.t-scale { position: relative; height: 26px; background: var(--soft); }
+.t-mid { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; background: var(--ink); }
+.t-needle { position: absolute; top: -4px; bottom: -4px; width: 6px; margin-left: -3px; background: var(--red); left: 50%; transition: left .08s linear; }
+.t-labels { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; margin-top: 6px; }
+.t-row { display: flex; align-items: center; gap: 12px; margin: 6px 0; font-size: 14px; font-weight: 600; }
+.t-row span { width: 70px; }
+.t-bar { flex: 1; height: 12px; background: var(--soft); }
+.t-bar i { display: block; height: 12px; width: 0; background: var(--ink); transition: width .08s linear; }
+
+/* Foto del jugador */
+.me-photo { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+.me-photo .ph { width: 64px; height: 64px; flex-shrink: 0; background: #fff center / cover no-repeat; border: 2px solid var(--ink); display: flex; align-items: center; justify-content: center; }
+.me-photo .ph span { font-size: 10px; font-weight: 600; color: var(--mute); text-align: center; }
+.me-photo .ph.has span { display: none; }
+.me-photo .ph-txt { flex: 1; display: flex; flex-direction: column; font-size: 13px; line-height: 1.3; }
+.me-photo .ph-txt b { font-size: 15px; }
+.me-photo .ghost { padding: 10px 12px; white-space: nowrap; }
+.selfie .sf-box { position: absolute; left: 50%; top: 42%; width: min(78vw, 56vh, 380px); aspect-ratio: 1; transform: translate(-50%, -50%);
+  overflow: hidden; outline: 4px solid #fff; box-shadow: 0 0 0 100vmax rgba(0,0,0,.72); }
+.selfie .sf-box video, .selfie .sf-box img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.selfie .sf-box img { transform: none; }
+.selfie .sf-txt { top: calc(42% + min(39vw, 28vh, 190px) + 22px); }
+.selfie .sf-bar { position: absolute; left: 22px; right: 22px; bottom: max(22px, env(safe-area-inset-bottom)); display: flex; gap: 10px; }
+.selfie .sf-bar .cta { flex: 1; }
+
+/* Móvil en horizontal mientras se canta: se contrarrota la pantalla del micro para que el dibujo siga «pegado» al móvil */
+html.rot #s-sing.on { position: fixed; top: 50%; left: 50%; width: 100vh; height: 100vw; min-height: 0; transform: translate(-50%, -50%) rotate(var(--rot)); }
+html.rot .mic img, html.rot .vu { width: min(100%, 62vw); }

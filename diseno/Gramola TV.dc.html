@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/modernist-649315b9-d2b6-4507-8c29-728d7b5c4b73/styles.css">
+<script src="_ds/modernist-649315b9-d2b6-4507-8c29-728d7b5c4b73/_ds_bundle.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;600;800&amp;display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:var(--font-body)}
+a{color:var(--color-accent-700)}a:hover{color:var(--color-accent-600)}
+@keyframes mbPop{0%{transform:translateY(40px);opacity:0}100%{transform:translateY(0);opacity:1}}
+@keyframes mbToast{0%{transform:translateX(-40px);opacity:0}8%{transform:translateX(0);opacity:1}88%{opacity:1}100%{opacity:0}}
+@keyframes mbEq{0%,100%{height:8px}50%{height:32px}}
+</style>
+<style>@keyframes gPulse{0%,100%{opacity:1}50%{opacity:.35}}</style>
+</helmet>
+<div style="position:fixed;inset:0;background:#000;overflow:hidden">
+<div style="position:absolute;left:50%;top:50%;width:1920px;height:1080px;overflow:hidden;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body);transform:{{ scaleT }}">
+<canvas ref="{{ bgRef }}" width="1920" height="1080" style="position:absolute;inset:0;width:1920px;height:1080px"></canvas>
+
+<div style="position:absolute;inset:0;opacity:{{ tOp }};transform:{{ tTf }};transition:{{ tTr }};filter:{{ tFl }}">
+<sc-if value="{{ isSplash }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="TV-00 Nuvola" style="position:absolute;inset:0;background:#0e0f0f;overflow:hidden">
+  <div style="position:absolute;inset:0;background:var(--color-accent);clip-path:{{ spClip }};transition:clip-path 1100ms cubic-bezier(.7,0,.2,1)"></div>
+  <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:{{ spOp }};transform:{{ spTf }};transition:opacity {{ spOpMs }}ms cubic-bezier(.2,.8,.2,1),transform 4000ms cubic-bezier(.2,.8,.2,1)">
+    <div style="position:relative;height:190px">
+      <img src="assets/nuvola/nuvola-original.png" alt="nuvola" style="display:block;height:190px;width:auto;opacity:{{ spOrigOp }};transition:opacity 700ms ease-in-out">
+      <img src="assets/nuvola/nuvola-blanco.png" alt="" style="position:absolute;left:0;top:0;display:block;height:190px;width:auto;opacity:{{ spWhiteOp }};transition:opacity 700ms ease-in-out 250ms">
+    </div>
+  </div>
+</div>
+</sc-if>
+<sc-if value="{{ isWelcome }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="TV-01b Bienvenida" onClick="{{ onKeyOk }}" style="position:absolute;inset:0;padding:54px 96px;box-sizing:border-box;display:flex;flex-direction:column;cursor:pointer;color:var(--color-text)">
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:36px;padding-top:40px">
+    <div style="font-size:280px;font-weight:800;line-height:.8;letter-spacing:-0.05em">gram<svg viewBox="0 0 100 100" style="display:inline-block;width:.66em;height:.66em;margin:0 -.03em 0 .01em;vertical-align:-.06em;color:var(--color-accent)"><circle cx="50" cy="50" r="38" fill="none" stroke="currentColor" stroke-width="14"></circle><path d="M30 38h40M27 50h46M30 62h40" stroke="currentColor" stroke-width="8"></path></svg>la</div>
+    <div style="font-size:40px;font-weight:300;letter-spacing:-0.01em">Karaoke en casa. Tu móvil es el micro.</div>
+  </div>
+  <div style="display:flex;justify-content:center;padding-bottom:48px">{{ pressEl }}</div>
+  <div style="display:flex;justify-content:space-between;align-items:center;border-top:2px solid var(--color-text);padding-top:20px;font-size:28px;font-weight:600">
+    <img src="assets/nuvola/nuvola-tinta.png" alt="nuvola" style="display:block;height:44px;width:auto;position:relative;top:-7px">
+    
+    <span style="color:var(--color-neutral-700)">Versión 1.0.0</span>
+  </div>
+</div>
+</sc-if>
+<sc-if value="{{ isBoot }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="TV-01 Arranque" onClick="{{ onKeyOk }}" style="position:absolute;inset:0;padding:54px 96px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;background:var(--color-accent);color:#fff">
+  <div style="position:absolute;inset:54px 96px;display:flex;flex-direction:column;justify-content:space-between;opacity:{{ bootOp }};transition:opacity 800ms cubic-bezier(.2,.8,.2,1)">
+  <div style="display:flex;justify-content:space-between;font-size:28px;font-weight:800;color:var(--color-text);letter-spacing:.08em;text-transform:uppercase"><span>Karaoke en casa</span><span>{{ webHost }}</span></div>
+  <div style="display:flex;flex-direction:column;gap:48px">
+    
+    <div style="font-size:300px;font-weight:800;line-height:.8;letter-spacing:-0.05em">gram<svg viewBox="0 0 100 100" style="display:inline-block;width:.66em;height:.66em;margin:0 -.03em 0 .01em;vertical-align:-.06em"><circle cx="50" cy="50" r="38" fill="none" stroke="currentColor" stroke-width="14"></circle><path d="M30 38h40M27 50h46M30 62h40" stroke="currentColor" stroke-width="8"></path></svg>la</div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:16px;color:var(--color-text)">
+    <div style="display:flex;justify-content:space-between;font-size:32px;font-weight:800"><span>Cargando canciones…</span><span style="font-variant-numeric:tabular-nums">{{ bootW }} %</span></div>
+    <div style="height:8px;background:rgba(32,30,29,0.25)"><div style="height:8px;background:var(--color-text);width:{{ bootW }}%"></div></div>
+  </div>
+  </div>
+</div>
+</sc-if>
+<sc-if value="{{ isLobby }}" hint-placeholder-val="{{ true }}">
+<div data-screen-label="TV-02 Sala" style="position:absolute;inset:0;padding:54px 96px;box-sizing:border-box;display:flex;flex-direction:column">
+  <div style="display:flex;align-items:center;justify-content:space-between;height:96px;border-bottom:2px solid var(--color-text)">
+    <div style="display:flex;align-items:center;gap:20px">
+      
+      <div style="font-size:52px;font-weight:800;line-height:1;letter-spacing:-0.03em">gram<svg viewBox="0 0 100 100" style="display:inline-block;width:.66em;height:.66em;margin:0 -.03em 0 .01em;vertical-align:-.06em"><circle cx="50" cy="50" r="38" fill="none" stroke="currentColor" stroke-width="14"></circle><path d="M30 38h40M27 50h46M30 62h40" stroke="currentColor" stroke-width="8"></path></svg>la</div>
+    </div>
+    <div style="font-size:28px;font-weight:600;letter-spacing:.08em;text-transform:uppercase">Sala {{ room }} · <span style="color:var(--color-accent-700)">Abierta</span></div>
+  </div>
+  <div style="flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 800px">
+    <div style="padding:48px 64px 40px 0;display:flex;flex-direction:column;justify-content:space-between;border-right:2px solid var(--color-text)">
+      <div style="font-size:132px;font-weight:300;line-height:.92;letter-spacing:-0.04em">Tu móvil<br>es el <span style="font-weight:800;color:var(--color-accent)">micro.</span></div>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:32px">
+        <div style="border-top:2px solid var(--color-text);padding-top:16px;display:flex;flex-direction:column;gap:8px"><span style="font-size:28px;font-weight:800;color:var(--color-accent-700)">01</span><span style="font-size:32px;font-weight:600;line-height:1.15">Escanea el QR con la cámara</span></div>
+        <div style="border-top:2px solid var(--color-text);padding-top:16px;display:flex;flex-direction:column;gap:8px"><span style="font-size:28px;font-weight:800;color:var(--color-accent-700)">02</span><span style="font-size:32px;font-weight:600;line-height:1.15">Pon tu nombre y activa el micro</span></div>
+        <div style="border-top:2px solid var(--color-text);padding-top:16px;display:flex;flex-direction:column;gap:8px"><span style="font-size:28px;font-weight:800;color:var(--color-accent-700)">03</span><span style="font-size:32px;font-weight:600;line-height:1.15">Pulsa OK cuando estéis todos</span></div>
+      </div>
+    </div>
+    <div style="padding:40px 0 40px 64px;display:flex;flex-direction:column;justify-content:space-between">
+      <div style="display:flex;flex-direction:column">
+        <span style="font-size:28px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--color-neutral-700)">Código de sala</span>
+        <span style="font-size:176px;font-weight:800;line-height:.9;letter-spacing:-0.02em">{{ room }}</span>
+      </div>
+      <div style="display:flex;gap:32px;align-items:flex-end">
+        <div style="background:#fff;padding:20px;flex-shrink:0;box-shadow:var(--shadow-md)"><canvas ref="{{ qrRef }}" width="250" height="250" style="width:250px;height:250px;display:block"></canvas></div>
+        <div style="display:flex;flex-direction:column;gap:4px;padding-bottom:8px"><span style="font-size:28px;color:var(--color-neutral-700)">o entra en</span><span style="font-size:36px;font-weight:800">{{ microHost }}</span></div>
+      </div>
+    </div>
+  </div>
+  <div style="border-top:2px solid var(--color-text);padding-top:16px;display:flex;flex-direction:column;gap:16px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:28px;font-weight:800;letter-spacing:.08em;text-transform:uppercase">Jugadores</span><span style="font-size:28px;font-weight:600;color:var(--color-neutral-700)">{{ lobbyCountText }}</span></div>
+    <div style="display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:12px">
+      <sc-for list="{{ lobbySlots }}" as="p" hint-placeholder-count="8">
+        <div style="height:132px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;padding:0 0 16px;transition:transform 450ms cubic-bezier(.2,.8,.2,1),background 450ms ease-out;transform:{{ p.t }};opacity:{{ p.op }};background:{{ p.bg }};border:2px solid {{ p.bc }}">
+          <div style="height:12px;background:{{ p.color }}"></div>
+          <div style="display:flex;align-items:center;gap:12px;padding:0 16px">
+            <span style="font-size:32px;line-height:1;color:{{ p.shapeColor }}">{{ p.shape }}</span>
+            <span style="font-size:32px;font-weight:800;line-height:1;color:{{ p.nameColor }}">{{ p.name }}</span>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;height:72px">
+    
+    <div style="display:flex;gap:40px;align-items:center">
+      <div onClick="{{ onAddPlayer }}" style="display:flex;align-items:center;gap:12px;cursor:pointer"><div style="width:48px;height:48px;border:2px solid var(--color-text);box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800">Y</div><span style="font-size:28px;font-weight:600">Simular jugador</span></div>
+      <div onClick="{{ onStart }}" style="display:flex;align-items:center;gap:12px;cursor:pointer"><div style="width:48px;height:48px;background:var(--color-text);color:var(--color-bg);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800">OK</div><span style="font-size:28px;font-weight:800">Empezar</span></div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isMenu }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="TV-03 Menú principal" style="position:absolute;inset:0;padding:54px 96px;box-sizing:border-box;display:flex;flex-direction:column">
+  <div style="display:flex;align-items:center;justify-content:space-between;height:96px;border-bottom:2px solid var(--color-text)">
+    <div style="display:flex;align-items:center;gap:20px">
+      
+      <div style="font-size:52px;font-weight:800;line-height:1;letter-spacing:-0.03em">gram<svg viewBox="0 0 100 100" style="display:inline-block;width:.66em;height:.66em;margin:0 -.03em 0 .01em;vertical-align:-.06em"><circle cx="50" cy="50" r="38" fill="none" stroke="currentColor" stroke-width="14"></circle><path d="M30 38h40M27 50h46M30 62h40" stroke="currentColor" stroke-width="8"></path></svg>la</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <sc-for list="{{ connected }}" as="p" hint-placeholder-count="4">
+        <div style="width:52px;height:52px;display:flex;align-items:center;justify-content:center;font-size:26px;line-height:1;color:var(--color-text);background:{{ p.color }}">{{ p.shape }}</div>
+      </sc-for>
+      <span style="font-size:28px;font-weight:600;margin-left:12px">Sala {{ room }}</span>
+    </div>
+  </div>
+  <div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:12px">
+    <span style="font-size:28px;font-weight:800;color:var(--color-accent-700);letter-spacing:.08em">{{ hero.num }} / 07</span>
+    <div style="font-size:184px;font-weight:300;line-height:.9;letter-spacing:-0.045em">{{ hero.name }}</div>
+    <div style="font-size:40px;font-weight:400;color:var(--color-neutral-800);max-width:1100px">{{ hero.desc }}</div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border:2px solid var(--color-text);background:#fff">
+    <sc-for list="{{ tiles }}" as="m" hint-placeholder-count="7">
+      <div onClick="{{ m.click }}" style="height:260px;padding:24px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;position:relative;transition:transform 150ms ease-out,box-shadow 150ms ease-out,background 150ms ease-out;border-right:{{ m.br }};background:{{ m.bg }};color:{{ m.fg }};transform:{{ m.t }};box-shadow:{{ m.s }};z-index:{{ m.z }}">
+        <span style="font-size:28px;font-weight:800;opacity:.75">{{ m.num }}</span>
+        <div style="display:flex;flex-direction:column;gap:4px"><span style="font-size:36px;font-weight:800;line-height:1.05">{{ m.name }}</span><span style="font-size:28px;font-weight:400;line-height:1.1;opacity:.8">{{ m.short }}</span></div>
+      </div>
+    </sc-for>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;height:80px">
+    <img src="assets/nuvola/nuvola-tinta.png" alt="nuvola" style="display:block;height:32px;width:auto;opacity:0.7">
+    <div style="display:flex;gap:40px;align-items:center">
+      <div onClick="{{ onBack }}" style="display:flex;align-items:center;gap:12px;cursor:pointer"><div style="width:48px;height:48px;border:2px solid var(--color-text);box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800">←</div><span style="font-size:28px;font-weight:600">Volver</span></div>
+      <div onClick="{{ onOk }}" style="display:flex;align-items:center;gap:12px;cursor:pointer"><div style="width:48px;height:48px;background:var(--color-text);color:var(--color-bg);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800">OK</div><span style="font-size:28px;font-weight:800">Elegir</span></div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isSongs }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="TV-04 Selección de canción" style="position:absolute;inset:0;padding:54px 96px;box-sizing:border-box;display:flex;flex-direction:column">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;padding-bottom:20px;border-bottom:2px solid var(--color-text)">
+    <div style="font-size:96px;font-weight:300;line-height:.9;letter-spacing:-0.04em">Canciones</div>
+    <div style="font-size:28px;font-weight:600;color:var(--color-neutral-700)">{{ songCountText }}</div>
+  </div>
+  <div style="display:flex;margin-top:24px;border:2px solid var(--color-text);align-self:flex-start">
+    <sc-for list="{{ filters }}" as="f" hint-placeholder-count="8">
+      <div onClick="{{ f.click }}" style="height:60px;padding:0 24px;box-sizing:border-box;display:flex;align-items:center;font-size:28px;font-weight:600;cursor:pointer;white-space:nowrap;border-right:2px solid var(--color-text);transition:background 150ms ease-out;background:{{ f.bg }};color:{{ f.fg }};outline:{{ f.ol }};outline-offset:-6px">{{ f.label }}</div>
+    </sc-for>
+  </div>
+  <sc-if value="{{ hasSongs }}" hint-placeholder-val="{{ true }}">
+    <div style="position:relative;flex:1;min-height:0;margin:24px -96px 0;overflow:hidden">
+      <sc-for list="{{ covers }}" as="s" hint-placeholder-count="5">
+        <div onClick="{{ s.click }}" style="position:absolute;top:50%;overflow:hidden;cursor:pointer;transition:left 250ms cubic-bezier(.2,.8,.2,1),width 250ms cubic-bezier(.2,.8,.2,1),height 250ms cubic-bezier(.2,.8,.2,1),margin-top 250ms cubic-bezier(.2,.8,.2,1),opacity 250ms ease-out,box-shadow 150ms ease-out;left:{{ s.left }}px;width:{{ s.w }}px;height:{{ s.w }}px;margin-top:{{ s.mt }}px;opacity:{{ s.op }};z-index:{{ s.z }};box-shadow:{{ s.s }};background:{{ s.bg }};outline:{{ s.ol }};outline-offset:-6px">
+          <div style="position:absolute;right:0;bottom:0;width:58%;height:46%;background:{{ s.blk }}"></div>
+          <div style="position:absolute;left:6%;top:3%;font-weight:800;line-height:1;letter-spacing:-0.05em;font-size:{{ s.fs }}px;color:{{ s.fg }}">{{ s.ini }}</div>
+          <sc-if value="{{ s.duo }}"><div style="position:absolute;left:0;bottom:0;padding:4px 14px;background:var(--color-text);color:var(--color-bg);font-size:28px;font-weight:800">Dúo</div></sc-if>
+        </div>
+      </sc-for>
+    </div>
+    <div style="margin-top:auto;border-top:2px solid var(--color-text);display:grid;grid-template-columns:minmax(0,1.6fr) repeat(4,minmax(0,1fr))">
+      <div style="padding:20px 24px 0 0;display:flex;flex-direction:column;min-width:0"><span style="font-size:56px;font-weight:800;line-height:1;letter-spacing:-0.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ cur.title }}</span><span style="font-size:32px;color:var(--color-neutral-700);white-space:nowrap">{{ cur.artist }}</span></div>
+      <div style="padding:20px 24px 0;border-left:2px solid var(--color-text);display:flex;flex-direction:column;gap:4px"><span style="font-size:28px;color:var(--color-neutral-700)">Duración · Año</span><span style="font-size:36px;font-weight:800">{{ cur.durYear }}</span></div>
+      <div style="padding:20px 24px 0;border-left:2px solid var(--color-text);display:flex;flex-direction:column;gap:4px"><span style="font-size:28px;color:var(--color-neutral-700)">Idioma</span><span style="font-size:36px;font-weight:800">{{ cur.lang }}</span></div>
+      <div style="padding:20px 24px 0;border-left:2px solid var(--color-text);display:flex;flex-direction:column;gap:4px"><span style="font-size:28px;color:var(--color-neutral-700)">Dificultad</span><div style="display:flex;gap:6px;height:36px;align-items:center"><sc-for list="{{ cur.diff }}" as="d" hint-placeholder-count="3"><div style="width:28px;height:28px;background:{{ d.c }}"></div></sc-for></div></div>
+      <div style="padding:20px 0 0 24px;border-left:2px solid var(--color-text);display:flex;flex-direction:column;gap:4px;min-width:0"><span style="font-size:28px;color:var(--color-neutral-700)">Récord</span><span style="font-size:36px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ cur.record }}</span></div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+    <div style="margin-top:40px;flex:1;border-top:2px solid var(--color-text);padding-top:48px;display:flex;flex-direction:column;gap:16px">
+      <div style="font-size:96px;font-weight:300;line-height:1;letter-spacing:-0.04em">Aún no hay canciones.</div>
+      <div style="font-size:36px;color:var(--color-neutral-800);max-width:1100px;text-wrap:pretty">Con estos filtros no sale ninguna. Quita alguno, borra la búsqueda o añade canciones desde el ordenador.</div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ searchOpen }}" hint-placeholder-val="{{ false }}">
+  <div data-screen-label="TV-04b Búsqueda" style="position:absolute;inset:0;z-index:20;background:rgba(32,30,29,0.55)">
+    <div style="position:absolute;left:96px;bottom:134px;width:1000px;background:var(--color-bg);box-shadow:var(--shadow-lg);padding:32px;box-sizing:border-box;display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:28px;font-weight:800;letter-spacing:.08em;text-transform:uppercase">Buscar canción o artista</span><span style="font-size:28px;font-weight:600;color:var(--color-neutral-700)">{{ searchCount }}</span></div>
+      <div style="height:88px;border:2px solid var(--color-text);background:#fff;display:flex;align-items:center;padding:0 24px;font-size:48px;font-weight:300;color:{{ qColor }}">{{ qShow }}<span style="width:3px;height:48px;background:var(--color-accent);margin-left:4px"></span></div>
+      <div style="display:grid;grid-template-columns:repeat(10,minmax(0,1fr));border-left:2px solid var(--color-text);border-top:2px solid var(--color-text)">
+        <sc-for list="{{ kbKeys }}" as="k" hint-placeholder-count="40"><div onClick="{{ k.click }}" style="height:72px;border-right:2px solid var(--color-text);border-bottom:2px solid var(--color-text);display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:800;cursor:pointer;position:relative;transition:transform 120ms ease-out;background:{{ k.bg }};color:{{ k.fg }};transform:{{ k.t }};box-shadow:{{ k.s }};z-index:{{ k.z }}">{{ k.label }}</div></sc-for>
+      </div>
+      <div style="display:grid;grid-template-columns:2fr 2fr 1fr;border:2px solid var(--color-text)"><sc-for list="{{ kbAct }}" as="k" hint-placeholder-count="3"><div onClick="{{ k.click }}" style="height:72px;display:flex;align-items:center;padding:0 20px;font-size:28px;font-weight:800;cursor:pointer;white-space:nowrap;border-right:{{ k.br }};background:{{ k.bg }};color:{{ k.fg }}">{{ k.label }}</div></sc-for></div>
+    </div>
+  </div>
+  </sc-if>
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;height:80px">
+    <div style="display:flex;align-items:center;gap:14px;opacity:{{ eqOp }}">{{ eqEl }}<span style="font-size:28px;font-weight:600">Sonando avance</span></div>
+    <div style="display:flex;gap:40px;align-items:center">
+      <div style="display:flex;align-items:center;gap:12px"><div style="width:48px;height:48px;border:2px solid var(--color-text);box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800">✛</div><span style="font-size:28px;font-weight:600">Moverse</span></div>
+      <div style="display:flex;align-items:center;gap:12px"><div style="min-width:48px;height:48px;padding:0 8px;border:2px solid var(--color-text);box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800">L R</div><span style="font-size:28px;font-weight:600">Orden</span></div>
+      <div onClick="{{ onBack }}" style="display:flex;align-items:center;gap:12px;cursor:pointer"><div style="width:48px;height:48px;border:2px solid var(--color-text);box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800">←</div><span style="font-size:28px;font-weight:600">Volver</span></div>
+      <div onClick="{{ onOk }}" style="display:flex;align-items:center;gap:12px;cursor:pointer"><div style="width:48px;height:48px;background:var(--color-text);color:var(--color-bg);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800">OK</div><span style="font-size:28px;font-weight:800">Cantar</span></div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isSetup }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="TV-05 Preparar partida" style="position:absolute;inset:0;padding:54px 96px;box-sizing:border-box;display:flex;flex-direction:column">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;padding-bottom:20px;border-bottom:2px solid var(--color-text)">
+    <div style="font-size:96px;font-weight:300;line-height:.9;letter-spacing:-0.04em;white-space:nowrap;flex-shrink:0">Preparar partida</div>
+    <div style="display:flex;align-items:center;gap:20px">
+      <div style="display:flex;flex-direction:column;align-items:flex-end"><span style="font-size:32px;font-weight:800;line-height:1.1">{{ cur.title }}</span><span style="font-size:28px;color:var(--color-neutral-700)">{{ cur.artist }}</span></div>
+      <div style="width:80px;height:80px;position:relative;overflow:hidden;background:{{ cur.bg }}"><div style="position:absolute;right:0;bottom:0;width:58%;height:46%;background:{{ cur.blk }}"></div></div>
+    </div>
+  </div>
+  <div style="flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 480px">
+    <div style="padding:24px 48px 0 0;border-right:2px solid var(--color-text);display:flex;flex-direction:column">
+      <div style="display:grid;grid-template-columns:12px 260px 380px minmax(0,1fr);column-gap:24px;padding-bottom:12px;font-size:28px;font-weight:600;color:var(--color-neutral-700)"><span></span><span>Jugador</span><span>{{ setupColLabel }}</span><span>Dificultad</span></div>
+      <sc-for list="{{ setupRows }}" as="r" hint-placeholder-count="4">
+        <div onClick="{{ r.click }}" style="display:grid;grid-template-columns:12px 260px 380px minmax(0,1fr);column-gap:24px;align-items:center;height:72px;border-top:2px solid var(--color-text);cursor:pointer;transition:background 150ms ease-out;background:{{ r.bg }};box-shadow:{{ r.s }};opacity:{{ r.op }}">
+          <div style="height:100%;background:{{ r.color }}"></div>
+          <div style="display:flex;align-items:center;gap:12px"><span style="font-size:32px;line-height:1">{{ r.shape }}</span><span style="font-size:32px;font-weight:800">{{ r.name }}</span></div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <sc-if value="{{ r.isToggle }}" hint-placeholder-val="{{ true }}"><div style="display:flex;align-items:center;gap:12px"><div style="width:32px;height:32px;box-sizing:border-box;border:2px solid var(--color-text);background:{{ r.chk }}"></div><span style="font-size:28px;font-weight:600">{{ r.onText }}</span></div></sc-if>
+            <sc-if value="{{ r.isSide }}" hint-placeholder-val="{{ false }}"><div style="display:flex;border:2px solid var(--color-text)"><sc-for list="{{ r.sides }}" as="d" hint-placeholder-count="3"><div style="width:120px;height:48px;display:flex;align-items:center;padding:0 14px;box-sizing:border-box;font-size:28px;font-weight:600;white-space:nowrap;border-right:{{ d.br }};background:{{ d.bg }};color:{{ d.fg }}">{{ d.label }}</div></sc-for></div></sc-if>
+          </div>
+          <div style="display:flex;border:2px solid var(--color-text);align-self:center;justify-self:start">
+            <sc-for list="{{ r.diffs }}" as="d" hint-placeholder-count="3"><div style="width:150px;height:48px;display:flex;align-items:center;padding:0 16px;box-sizing:border-box;font-size:28px;font-weight:600;border-right:{{ d.br }};background:{{ d.bg }};color:{{ d.fg }}">{{ d.label }}</div></sc-for>
+          </div>
+        </div>
+      </sc-for>
+      <div onClick="{{ onSetupStart }}" style="margin-top:auto;height:96px;display:flex;align-items:center;justify-content:space-between;padding:0 32px;box-sizing:border-box;cursor:pointer;transition:background 150ms ease-out,transform 150ms ease-out;background:{{ startBtn.bg }};color:{{ startBtn.fg }};transform:{{ startBtn.t }};box-shadow:{{ startBtn.s }}"><span style="font-size:44px;font-weight:800;white-space:nowrap">¡A cantar!</span><span style="font-size:32px;font-weight:600;white-space:nowrap">{{ startBtn.label }} →</span></div>
+    </div>
+    <div style="padding:24px 0 0 48px;display:flex;flex-direction:column">
+      <span style="font-size:28px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding-bottom:12px">Margen de afinación</span>
+      <div style="border-top:2px solid var(--color-text);padding:16px 0;display:flex;flex-direction:column;gap:4px"><span style="font-size:36px;font-weight:800">Fácil · ±2 semitonos</span><span style="font-size:28px;color:var(--color-neutral-800)">Para calentar la voz.</span></div>
+      <div style="border-top:2px solid var(--color-text);padding:16px 0;display:flex;flex-direction:column;gap:4px"><span style="font-size:36px;font-weight:800">Normal · ±1 semitono</span><span style="font-size:28px;color:var(--color-neutral-800)">Lo justo para una fiesta.</span></div>
+      <div style="border-top:2px solid var(--color-text);border-bottom:2px solid var(--color-text);padding:16px 0;display:flex;flex-direction:column;gap:4px"><span style="font-size:36px;font-weight:800">Difícil · ±½ semitono</span><span style="font-size:28px;color:var(--color-neutral-800)">Sin piedad.</span></div>
+    </div>
+  </div>
+  <div style="display:flex;justify-content:flex-end;align-items:flex-end;height:80px">
+    <div style="display:flex;gap:40px;align-items:center">
+      <div style="display:flex;align-items:center;gap:12px"><div style="width:48px;height:48px;border:2px solid var(--color-text);box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800">↕</div><span style="font-size:28px;font-weight:600">Jugador</span></div>
+      <div style="display:flex;align-items:center;gap:12px"><div style="width:48px;height:48px;border:2px solid var(--color-text);box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800">↔</div><span style="font-size:28px;font-weight:600">Dificultad</span></div>
+      <div onClick="{{ onBack }}" style="display:flex;align-items:center;gap:12px;cursor:pointer"><div style="width:48px;height:48px;border:2px solid var(--color-text);box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800">←</div><span style="font-size:28px;font-weight:600">Volver</span></div>
+      <div style="display:flex;align-items:center;gap:12px"><div style="width:48px;height:48px;background:var(--color-text);color:var(--color-bg);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800">OK</div><span style="font-size:28px;font-weight:800">{{ setupOkLabel }}</span></div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isCount }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="TV-06 Cuenta atrás" style="position:absolute;inset:0;background:var(--color-accent);color:#fff;padding:54px 96px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between">
+  <div style="font-size:28px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding-bottom:16px;border-bottom:2px solid #fff">{{ countKicker }}</div>
+  <div style="display:grid;grid-template-columns:480px minmax(0,1fr) 420px;gap:64px;align-items:end">
+    <div style="width:480px;height:480px;position:relative;overflow:hidden;background:{{ cur.bg }}">
+      <div style="position:absolute;right:0;bottom:0;width:58%;height:46%;background:{{ cur.blk }}"></div>
+      <div style="position:absolute;left:28px;top:16px;font-size:180px;font-weight:800;line-height:1;letter-spacing:-0.05em;color:{{ cur.fg }}">{{ cur.ini }}</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;min-width:0"><div style="font-size:96px;font-weight:800;line-height:.95;letter-spacing:-0.03em">{{ cur.title }}</div><div style="font-size:44px;font-weight:300">{{ cur.artist }}</div></div>
+    <div style="height:480px;display:flex;align-items:flex-end;justify-content:flex-start;overflow:hidden">{{ countEl }}</div>
+  </div>
+  <div style="border-top:2px solid #fff;padding-top:20px;font-size:36px;font-weight:400"><span style="font-weight:800">Consejo — </span>{{ tip }}</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isSing }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="{{ singLabel }}" style="position:absolute;inset:0">
+  {{ videoEl }}
+  <canvas ref="{{ singRef }}" width="1920" height="1080" style="position:absolute;inset:0;width:1920px;height:1080px"></canvas>
+  <sc-if value="{{ notDuel }}" hint-placeholder-val="{{ true }}">
+  <div style="position:absolute;left:96px;top:54px;display:flex;align-items:center;gap:24px;color:{{ hudFg }}">
+    <div style="width:110px;height:110px;flex-shrink:0;position:relative;overflow:hidden;background:{{ cur.bg }}"><div style="position:absolute;right:0;bottom:0;width:58%;height:46%;background:{{ cur.blk }}"></div></div>
+    <div style="display:flex;flex-direction:column;min-width:0;max-width:{{ titleMax }}px"><div style="font-size:40px;font-weight:800;line-height:1.05;letter-spacing:-0.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ cur.title }}</div><div style="font-size:28px;font-weight:400;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ cur.artist }}</div></div>
+  </div>
+  <div style="position:absolute;right:96px;top:54px;display:flex;gap:8px">
+    <sc-for list="{{ scoreCells }}" as="p" hint-placeholder-count="1">
+      <div style="height:110px;display:flex;background:#fff;color:var(--color-text);box-shadow:var(--shadow-md);width:{{ p.w }}px">
+        <div style="width:12px;flex-shrink:0;background:{{ p.color }}"></div>
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;padding:0 12px;line-height:1">
+          <div style="display:flex;align-items:center;gap:6px;font-weight:800;white-space:nowrap;overflow:hidden;font-size:{{ p.nfs }}px;padding:{{ p.pad }}"><span>{{ p.shape }}</span><span>{{ p.name }}</span></div>
+          <span style="font-weight:300;letter-spacing:-0.03em;font-variant-numeric:tabular-nums;font-size:{{ p.fs }}px">{{ p.score }}</span>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+  </sc-if>
+  <sc-if value="{{ isDuel }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;left:96px;top:54px;height:110px;width:420px;display:flex;background:#fff;color:var(--color-text);box-shadow:var(--shadow-md)">
+      <div style="width:16px;flex-shrink:0;background:{{ duelL.color }}"></div>
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;padding:0 20px;line-height:1"><span style="font-size:28px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ duelL.name }}</span><span style="font-size:60px;font-weight:300;letter-spacing:-0.03em;font-variant-numeric:tabular-nums">{{ duelL.score }}</span></div>
+    </div>
+    <div style="position:absolute;right:96px;top:54px;height:110px;width:420px;display:flex;flex-direction:row-reverse;background:#fff;color:var(--color-text);box-shadow:var(--shadow-md)">
+      <div style="width:16px;flex-shrink:0;background:{{ duelR.color }}"></div>
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;align-items:flex-end;padding:0 20px;line-height:1"><span style="font-size:28px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ duelR.name }}</span><span style="font-size:60px;font-weight:300;letter-spacing:-0.03em;font-variant-numeric:tabular-nums">{{ duelR.score }}</span></div>
+    </div>
+  </sc-if>
+  <div onClick="{{ onToggleVariant }}" style="position:absolute;right:96px;display:flex;align-items:center;gap:12px;cursor:pointer;white-space:nowrap;bottom:{{ vt.b }}px;color:{{ vt.c }}">
+    <div style="width:44px;height:44px;border:2px solid currentColor;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800">V</div>
+    <span style="font-size:28px;font-weight:600">{{ variantLabel }}</span>
+  </div>
+  <sc-if value="{{ isJukebox }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;right:96px;top:54px;height:56px;padding:0 20px;display:flex;align-items:center;background:var(--color-bg);color:var(--color-text);font-size:28px;font-weight:800">Jukebox · sin puntos</div>
+    <div style="position:absolute;left:96px;right:96px;bottom:54px;border-top:2px solid var(--color-bg);padding-top:16px;display:flex;flex-direction:column;gap:12px;color:var(--color-bg)">
+      <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:28px;font-weight:800;letter-spacing:.08em;text-transform:uppercase">A continuación</span><div style="display:flex;gap:32px"><div onClick="{{ onKeyR }}" style="display:flex;align-items:center;gap:12px;cursor:pointer"><div style="min-width:48px;height:48px;padding:0 8px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;border:2px solid var(--color-bg);color:var(--color-bg)">R</div><span style="font-size:28px;font-weight:600;color:var(--color-bg);white-space:nowrap">Saltar</span></div><div style="display:flex;align-items:center;gap:12px"><div style="min-width:48px;height:48px;padding:0 8px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;border:2px solid var(--color-bg);color:var(--color-bg)">≡</div><span style="font-size:28px;font-weight:600;color:var(--color-bg);white-space:nowrap">Pausa</span></div></div></div>
+      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px">
+        <sc-for list="{{ jq }}" as="q" hint-placeholder-count="4"><div style="display:flex;gap:16px;align-items:center;min-width:0"><div style="width:72px;height:72px;flex-shrink:0;position:relative;overflow:hidden;background:{{ q.bg }}"><div style="position:absolute;right:0;bottom:0;width:58%;height:46%;background:{{ q.blk }}"></div></div><div style="display:flex;flex-direction:column;min-width:0"><span style="font-size:28px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ q.title }}</span><span style="font-size:28px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ q.artist }}</span></div></div></sc-for>
+      </div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ paused }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="TV-11 Pausa" style="position:absolute;inset:0;background:rgba(32,30,29,0.6);display:flex;align-items:center;justify-content:center">
+      <div style="width:760px;background:var(--color-bg);box-shadow:var(--shadow-lg);padding:48px;box-sizing:border-box;display:flex;flex-direction:column">
+        <div style="font-size:96px;font-weight:300;line-height:1;letter-spacing:-0.04em;padding-bottom:24px;border-bottom:2px solid var(--color-text)">{{ pauseTitle }}</div>
+        <sc-if value="{{ notPA }}" hint-placeholder-val="{{ true }}"><sc-for list="{{ pauseItems }}" as="o" hint-placeholder-count="4">
+          <div onClick="{{ o.click }}" style="height:88px;padding:0 24px;box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;font-size:40px;font-weight:800;cursor:pointer;border-bottom:2px solid var(--color-text);transition:background 150ms ease-out;background:{{ o.bg }};color:{{ o.fg }}"><span>{{ o.label }}</span><span style="font-size:32px">{{ o.arrow }}</span></div>
+        </sc-for></sc-if>
+        <sc-if value="{{ isPA }}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-direction:column">
+          <sc-for list="{{ paRows }}" as="r" hint-placeholder-count="3"><div onClick="{{ r.click }}" style="height:88px;padding:0 24px;border-bottom:2px solid var(--color-text);display:flex;align-items:center;justify-content:space-between;gap:24px;cursor:pointer;background:{{ r.bg }}"><span style="font-size:32px;font-weight:800;white-space:nowrap;color:{{ r.fg }}">{{ r.label }}</span><div style="display:flex;align-items:center;gap:12px"><div style="display:flex;gap:4px"><sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="10"><div style="width:20px;height:28px;background:{{ c.c }}"></div></sc-for></div><span style="font-size:28px;font-weight:600;min-width:96px;text-align:right;color:{{ r.fg }}">{{ r.val }}</span></div></div></sc-for>
+          <span style="font-size:28px;color:var(--color-neutral-700);padding:16px 24px 0">↕ opción · ↔ ajustar · B volver</span>
+        </div></sc-if>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{ isResults }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="TV-12 Resultados" style="position:absolute;inset:0;padding:54px 96px;box-sizing:border-box;display:flex;flex-direction:column">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;padding-bottom:20px;border-bottom:2px solid var(--color-text)">
+    <div style="font-size:96px;font-weight:300;line-height:.9;letter-spacing:-0.04em">Resultados</div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end"><span style="font-size:32px;font-weight:800;line-height:1.1">{{ cur.title }}</span><span style="font-size:28px;color:var(--color-neutral-700)">{{ cur.artist }}</span></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:24px;padding:28px 0">
+    <span style="font-size:72px;font-weight:800;line-height:1;letter-spacing:-0.03em">{{ res.head }}</span>
+    <sc-if value="{{ res.record }}" hint-placeholder-val="{{ false }}"><span style="padding:8px 20px;background:var(--color-accent);color:#fff;font-size:36px;font-weight:800">Nuevo récord</span></sc-if>
+  </div>
+  <div style="display:flex;flex-direction:column;border-bottom:2px solid var(--color-text)">
+    <sc-for list="{{ res.rows }}" as="r" hint-placeholder-count="4">
+      <div style="display:grid;grid-template-columns:64px 12px 560px minmax(0,1fr) 240px 280px;column-gap:24px;align-items:center;border-top:2px solid var(--color-text);background:#fff;height:{{ res.rowH }}px">
+        <span style="font-size:56px;font-weight:300;line-height:1;padding-left:16px">{{ r.pos }}</span>
+        <div style="align-self:stretch;background:{{ r.color }}"></div>
+        <div style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:36px;font-weight:800;line-height:1.05;white-space:nowrap">{{ r.shape }} {{ r.name }}</span><span style="font-size:28px;color:var(--color-neutral-700);white-space:nowrap">{{ r.stats }}</span></div>
+        <div style="height:36px;background:var(--color-neutral-200);position:relative"><div style="position:absolute;left:0;top:0;bottom:0;border-right:2px solid var(--color-text);width:{{ r.pct }}%;background:{{ r.color }}"></div></div>
+        <span style="font-weight:300;letter-spacing:-0.03em;text-align:right;font-variant-numeric:tabular-nums;line-height:1;font-size:{{ res.fs }}px">{{ r.score }}</span>
+        <div style="display:flex;flex-direction:column;gap:8px;padding-right:16px"><div style="display:flex;gap:4px"><sc-for list="{{ r.lv }}" as="l" hint-placeholder-count="6"><div style="width:20px;height:20px;background:{{ l.c }}"></div></sc-for></div><span style="font-size:28px;font-weight:800;line-height:1;white-space:nowrap">{{ r.rank }}</span></div>
+      </div>
+    </sc-for>
+  </div>
+  <div style="margin-top:auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:2px solid var(--color-text)">
+    <sc-for list="{{ resItems }}" as="o" hint-placeholder-count="3">
+      <div onClick="{{ o.click }}" style="height:96px;padding:0 32px;box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;font-size:40px;font-weight:800;cursor:pointer;border-right:{{ o.br }};transition:background 150ms ease-out;background:{{ o.bg }};color:{{ o.fg }}"><span>{{ o.label }}</span><span>{{ o.arrow }}</span></div>
+    </sc-for>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isParty }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="{{ partyLabel }}" style="position:absolute;inset:0">
+<sc-if value="{{ pTeams }}" hint-placeholder-val="{{ true }}">
+<div style="position:absolute;inset:0;padding:54px 96px;box-sizing:border-box;display:flex;flex-direction:column">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;padding-bottom:20px;border-bottom:2px solid var(--color-text);flex-shrink:0"><div style="font-size:96px;font-weight:300;line-height:.9;letter-spacing:-0.04em;white-space:nowrap">Pasa el micro</div><div style="font-size:28px;font-weight:600;color:var(--color-neutral-700);white-space:nowrap">Formad equipos · {{ teamCountText }}</div></div>
+  <div style="flex:1;min-height:0;display:flex;gap:24px;padding:32px 0 16px">
+    <sc-for list="{{ teamCols }}" as="t" hint-placeholder-count="2">
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;border:2px solid var(--color-text);background:rgba(255,255,255,0.55)">
+        <div style="height:120px;flex-shrink:0;padding:0 24px;display:flex;flex-direction:column;justify-content:center;background:{{ t.color }};color:{{ t.fg }}"><span style="font-size:28px;font-weight:800">{{ t.num }}</span><span style="font-size:48px;font-weight:800;line-height:1;white-space:nowrap">{{ t.name }}</span></div>
+        <div style="display:flex;flex-direction:column;gap:12px;padding:20px">
+          <sc-for list="{{ t.players }}" as="p" hint-placeholder-count="2">
+            <div onClick="{{ p.click }}" style="height:80px;display:flex;align-items:stretch;border:2px solid var(--color-text);cursor:pointer;transition:transform 150ms ease-out,background 150ms ease-out;background:{{ p.bg }};color:{{ p.fg }};transform:{{ p.t }};box-shadow:{{ p.s }}"><div style="width:12px;flex-shrink:0;background:{{ p.color }}"></div><div style="display:flex;align-items:center;gap:12px;padding:0 20px;font-size:36px;font-weight:800;white-space:nowrap"><span>{{ p.shape }}</span><span>{{ p.name }}</span></div><div style="margin-left:auto;display:flex;align-items:center;padding-right:20px;font-size:32px;font-weight:800">{{ p.arrows }}</div></div>
+          </sc-for>
+          <sc-if value="{{ t.empty }}" hint-placeholder-val="{{ false }}"><div style="height:80px;border:2px dashed var(--color-neutral-500);display:flex;align-items:center;padding:0 20px;font-size:28px;color:var(--color-neutral-700)">Sin jugadores</div></sc-if>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;height:80px;flex-shrink:0"><span></span><div style="display:flex;gap:40px;align-items:center"><div style="display:flex;align-items:center;gap:12px"><div style="min-width:48px;height:48px;padding:0 8px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;border:2px solid var(--color-text);color:var(--color-text)">↕</div><span style="font-size:28px;font-weight:600;color:var(--color-text);white-space:nowrap">Jugador</span></div><div style="display:flex;align-items:center;gap:12px"><div style="min-width:48px;height:48px;padding:0 8px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;border:2px solid var(--color-text);color:var(--color-text)">↔</div><span style="font-size:28px;font-weight:600;color:var(--color-text);white-space:nowrap">Cambiar de equipo</span></div><div onClick="{{ onKeyX }}" style="display:flex;align-items:center;gap:12px;cursor:pointer"><div style="min-width:48px;height:48px;padding:0 8px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;border:2px solid var(--color-text);color:var(--color-text)">X</div><span style="font-size:28px;font-weight:600;color:var(--color-text);white-space:nowrap">Añadir equipo</span></div><div onClick="{{ onKeyY }}" style="display:flex;align-items:center;gap:12px;cursor:pointer"><div style="min-width:48px;height:48px;padding:0 8px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;border:2px solid var(--color-text);color:var(--color-text)">Y</div><span style="font-size:28px;font-weight:600;color:var(--color-text);white-space:nowrap">Quitar equipo</span></div><div onClick="{{ onKeyBack }}" style="display:flex;align-items:center;gap:12px;cursor:pointer"><div style="min-width:48px;height:48px;padding:0 8px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;border:2px solid var(--color-text);color:var(--color-text)">←</div><span style="font-size:28px;font-weight:600;color:var(--color-text);white-space:nowrap">Volver</span></div><div onClick="{{ onKeyOk }}" style="display:flex;align-items:center;gap:12px;cursor:pointer"><div style="min-width:48px;height:48px;padding:0 8px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;background:var(--color-text);color:var(--color-bg)">OK</div><span style="font-size:28px;font-weight:800;color:var(--color-text);white-space:nowrap">Ruleta</span></div></div></div>
+</div>
+</sc-if>
+<sc-if value="{{ pRoul }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;padding:54px 96px;box-sizing:border-box;display:flex;flex-direction:column">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;padding-bottom:20px;border-bottom:2px solid var(--color-text);flex-shrink:0"><div style="font-size:96px;font-weight:300;line-height:.9;letter-spacing:-0.04em;white-space:nowrap">Ruleta de retos</div><div style="font-size:28px;font-weight:600;color:var(--color-neutral-700);white-space:nowrap">{{ roundText }}</div></div>
+  <div style="flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:24px;padding:32px 0 16px">
+    <sc-for list="{{ chCards }}" as="c" hint-placeholder-count="8">
+      <div style="border:2px solid var(--color-text);padding:28px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;transition:transform 120ms ease-out,background 120ms ease-out;background:{{ c.bg }};color:{{ c.fg }};transform:{{ c.t }};box-shadow:{{ c.s }};z-index:{{ c.z }}">
+        <span style="font-size:28px;font-weight:800">{{ c.num }}</span>
+        <div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:44px;font-weight:800;line-height:1">{{ c.name }}</span><span style="font-size:28px;line-height:1.2">{{ c.desc }}</span></div>
+      </div>
+    </sc-for>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;height:80px;flex-shrink:0"><span style="font-size:32px;font-weight:800">{{ roulHint }}</span><div style="display:flex;gap:40px;align-items:center"><div onClick="{{ onKeyBack }}" style="display:flex;align-items:center;gap:12px;cursor:pointer"><div style="min-width:48px;height:48px;padding:0 8px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;border:2px solid var(--color-text);color:var(--color-text)">←</div><span style="font-size:28px;font-weight:600;color:var(--color-text);white-space:nowrap">Equipos</span></div><div onClick="{{ onKeyOk }}" style="display:flex;align-items:center;gap:12px;cursor:pointer"><div style="min-width:48px;height:48px;padding:0 8px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;background:var(--color-text);color:var(--color-bg)">OK</div><span style="font-size:28px;font-weight:800;color:var(--color-text);white-space:nowrap">Girar</span></div></div></div>
+</div>
+</sc-if>
+<sc-if value="{{ pTurn }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;padding:54px 96px;box-sizing:border-box;display:flex;flex-direction:column;background:var(--color-accent);color:#fff">
+  <div style="display:flex;justify-content:space-between;padding-bottom:20px;border-bottom:2px solid var(--color-text);font-size:28px;font-weight:800;color:var(--color-text);letter-spacing:.08em;text-transform:uppercase;flex-shrink:0"><span>Pasa el micro</span><span>{{ roundText }}</span></div>
+  <div style="flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 560px;gap:64px;align-items:center">
+    <div style="display:flex;flex-direction:column;gap:8px;min-width:0"><span style="font-size:56px;font-weight:300;color:var(--color-text)">Le toca a</span><span style="font-size:260px;font-weight:800;line-height:.85;letter-spacing:-0.05em;white-space:nowrap">{{ turnName }}</span><div style="display:flex;align-items:center;gap:20px;margin-top:32px"><div style="width:40px;height:40px;box-sizing:border-box;border:2px solid var(--color-text);background:{{ turnColor }}"></div><span style="font-size:56px;font-weight:300;color:var(--color-text)">del equipo <span style="font-weight:800">{{ turnTeam }}</span></span></div></div>
+    <div style="background:#fff;color:var(--color-text);padding:40px;min-height:560px;box-sizing:border-box;box-shadow:var(--shadow-lg);display:flex;flex-direction:column;justify-content:space-between"><span style="font-size:28px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--color-accent-700)">Reto {{ chNum }}</span><div style="display:flex;flex-direction:column;gap:16px"><span style="font-size:72px;font-weight:800;line-height:.95;letter-spacing:-0.03em">{{ chName }}</span><span style="font-size:32px;line-height:1.25">{{ chDesc }}</span></div></div>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;height:80px;flex-shrink:0"><span></span><div style="display:flex;gap:40px;align-items:center"><div onClick="{{ onKeyBack }}" style="display:flex;align-items:center;gap:12px;cursor:pointer"><div style="min-width:48px;height:48px;padding:0 8px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;border:2px solid var(--color-text);color:var(--color-text)">←</div><span style="font-size:28px;font-weight:600;color:var(--color-text);white-space:nowrap">Otro reto</span></div><div onClick="{{ onKeyOk }}" style="display:flex;align-items:center;gap:12px;cursor:pointer"><div style="min-width:48px;height:48px;padding:0 8px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;background:var(--color-text);color:#fff">OK</div><span style="font-size:28px;font-weight:800;color:var(--color-text);white-space:nowrap">¡A cantar!</span></div></div></div>
+</div>
+</sc-if>
+<sc-if value="{{ pBoard }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;padding:54px 96px;box-sizing:border-box;display:flex;flex-direction:column">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;padding-bottom:20px;border-bottom:2px solid var(--color-text);flex-shrink:0"><div style="font-size:96px;font-weight:300;line-height:.9;letter-spacing:-0.04em;white-space:nowrap">Marcador</div><div style="font-size:28px;font-weight:600;color:var(--color-neutral-700);white-space:nowrap">{{ roundText }}</div></div>
+  <div style="display:flex;flex-direction:column;margin-top:32px;border-bottom:2px solid var(--color-text)">
+    <sc-for list="{{ boardRows }}" as="r" hint-placeholder-count="2">
+      <div style="display:grid;grid-template-columns:64px 12px 420px minmax(0,1fr) 300px;column-gap:24px;align-items:center;height:128px;border-top:2px solid var(--color-text);background:{{ r.bg }}">
+        <span style="font-size:56px;font-weight:300;line-height:1;padding-left:16px">{{ r.pos }}</span>
+        <div style="align-self:stretch;background:{{ r.color }}"></div>
+        <div style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:40px;font-weight:800;line-height:1.05;white-space:nowrap">{{ r.name }}</span><span style="font-size:28px;color:var(--color-neutral-700);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.players }}</span></div>
+        <div style="height:36px;background:var(--color-neutral-200);position:relative"><div style="position:absolute;left:0;top:0;bottom:0;border-right:2px solid var(--color-text);width:{{ r.pct }}%;background:{{ r.color }}"></div></div>
+        <span style="font-size:72px;font-weight:300;letter-spacing:-0.03em;text-align:right;padding-right:16px;font-variant-numeric:tabular-nums">{{ r.score }}</span>
+      </div>
+    </sc-for>
+  </div>
+  <div style="margin-top:40px;font-size:44px;font-weight:300;line-height:1.2">{{ boardLast }}</div>
+  <div style="flex:1"></div>
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;height:80px;flex-shrink:0"><span></span><div style="display:flex;gap:40px;align-items:center"><div onClick="{{ onKeyOk }}" style="display:flex;align-items:center;gap:12px;cursor:pointer"><div style="min-width:48px;height:48px;padding:0 8px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;background:var(--color-text);color:var(--color-bg)">OK</div><span style="font-size:28px;font-weight:800;color:var(--color-text);white-space:nowrap">{{ boardCta }}</span></div></div></div>
+</div>
+</sc-if>
+<sc-if value="{{ pChamps }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;padding:54px 96px;box-sizing:border-box;display:flex;flex-direction:column;color:#fff">
+  <div style="display:flex;justify-content:space-between;padding-bottom:20px;border-bottom:2px solid var(--color-text);font-size:28px;font-weight:800;color:var(--color-text);letter-spacing:.08em;text-transform:uppercase;flex-shrink:0"><span>Pasa el micro</span><span>Final</span></div>
+  <div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:12px">
+    <span style="font-size:56px;font-weight:300;color:var(--color-text)">Campeones</span>
+    <span style="font-size:240px;font-weight:800;line-height:.85;letter-spacing:-0.05em;white-space:nowrap">{{ champName }}</span>
+    <span style="font-size:72px;font-weight:300;color:var(--color-text)">{{ champScore }} puntos</span>
+    <div style="display:flex;gap:12px;margin-top:24px">
+      <sc-for list="{{ champPlayers }}" as="p" hint-placeholder-count="2"><div style="height:72px;display:flex;background:#fff;color:var(--color-text)"><div style="width:12px;background:{{ p.color }}"></div><div style="display:flex;align-items:center;gap:10px;padding:0 20px;font-size:32px;font-weight:800"><span>{{ p.shape }}</span><span>{{ p.name }}</span></div></div></sc-for>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border:2px solid var(--color-text);width:900px">
+    <sc-for list="{{ champOpts }}" as="o" hint-placeholder-count="2"><div onClick="{{ o.click }}" style="height:96px;padding:0 32px;display:flex;align-items:center;justify-content:space-between;font-size:40px;font-weight:800;cursor:pointer;border-right:{{ o.br }};background:{{ o.bg }};color:{{ o.fg }}"><span>{{ o.label }}</span><span>{{ o.arrow }}</span></div></sc-for>
+  </div>
+</div>
+</sc-if>
+</div>
+</sc-if>
+<sc-if value="{{ isRecords }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="{{ recLabel }}" style="position:absolute;inset:0;padding:54px 96px;box-sizing:border-box;display:flex;flex-direction:column">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;padding-bottom:20px;border-bottom:2px solid var(--color-text);flex-shrink:0"><div style="font-size:96px;font-weight:300;line-height:.9;letter-spacing:-0.04em;white-space:nowrap">Salón de la fama</div><div style="font-size:28px;font-weight:600;color:var(--color-neutral-700);white-space:nowrap">Sala {{ room }}</div></div>
+  <div style="display:flex;align-items:center;gap:16px;margin-top:24px;flex-shrink:0">
+    <div onClick="{{ onKeyL }}" style="width:48px;height:48px;border:2px solid var(--color-text);box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;cursor:pointer">L</div>
+    <div style="display:flex;border:2px solid var(--color-text)"><sc-for list="{{ recTabs }}" as="t" hint-placeholder-count="4"><div onClick="{{ t.click }}" style="height:60px;padding:0 28px;display:flex;align-items:center;font-size:28px;font-weight:600;cursor:pointer;white-space:nowrap;border-right:{{ t.br }};background:{{ t.bg }};color:{{ t.fg }}">{{ t.label }}</div></sc-for></div>
+    <div onClick="{{ onKeyR }}" style="width:48px;height:48px;border:2px solid var(--color-text);box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;cursor:pointer">R</div>
+  </div>
+  <sc-if value="{{ recIsTable }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex;flex-direction:column;margin-top:32px;border-bottom:2px solid var(--color-text)">
+      <div style="display:grid;grid-template-columns:64px 12px minmax(0,1.3fr) minmax(0,0.7fr) minmax(0,1fr);column-gap:24px;padding-bottom:12px;font-size:28px;font-weight:600;color:var(--color-neutral-700)"><span></span><span></span><sc-for list="{{ recHead }}" as="h" hint-placeholder-count="3"><span>{{ h.l }}</span></sc-for></div>
+      <sc-for list="{{ recRows }}" as="r" hint-placeholder-count="6">
+        <div style="display:grid;grid-template-columns:64px 12px minmax(0,1.3fr) minmax(0,0.7fr) minmax(0,1fr);column-gap:24px;align-items:center;height:92px;border-top:2px solid var(--color-text);background:{{ r.bg }}">
+          <span style="font-size:44px;font-weight:300;padding-left:16px">{{ r.pos }}</span><div style="align-self:stretch;background:{{ r.color }}"></div>
+          <span style="font-size:36px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.a }}</span><span style="font-size:48px;font-weight:300;letter-spacing:-0.03em;font-variant-numeric:tabular-nums">{{ r.b }}</span><span style="font-size:32px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.c }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </sc-if>
+  <sc-if value="{{ recIsRanks }}" hint-placeholder-val="{{ false }}">
+    <div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:24px;margin-top:40px">
+      <sc-for list="{{ ranks }}" as="r" hint-placeholder-count="6">
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div style="height:260px;border:2px solid var(--color-text);background:#fff;padding:24px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:flex-end;gap:8px"><sc-for list="{{ r.bars }}" as="b" hint-placeholder-count="6"><div style="height:20px;width:{{ b.w }}%;background:{{ b.c }}"></div></sc-for></div>
+          <div style="display:flex;flex-direction:column;gap:4px;border-top:2px solid var(--color-text);padding-top:12px"><span style="font-size:28px;font-weight:800;color:var(--color-accent-700)">{{ r.num }}</span><span style="font-size:36px;font-weight:800;line-height:1.05">{{ r.name }}</span><span style="font-size:28px;color:var(--color-neutral-700)">{{ r.range }}</span></div>
+        </div>
+      </sc-for>
+    </div>
+  </sc-if>
+  <div style="flex:1"></div>
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;height:80px;flex-shrink:0"><img src="assets/nuvola/nuvola-tinta.png" alt="nuvola" style="display:block;height:32px;width:auto;opacity:0.7"><div style="display:flex;gap:40px;align-items:center"><div style="display:flex;align-items:center;gap:12px"><div style="min-width:48px;height:48px;padding:0 8px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;border:2px solid var(--color-text);color:var(--color-text)">L R</div><span style="font-size:28px;font-weight:600;color:var(--color-text);white-space:nowrap">Pestaña</span></div><div onClick="{{ onKeyBack }}" style="display:flex;align-items:center;gap:12px;cursor:pointer"><div style="min-width:48px;height:48px;padding:0 8px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;border:2px solid var(--color-text);color:var(--color-text)">←</div><span style="font-size:28px;font-weight:600;color:var(--color-text);white-space:nowrap">Volver</span></div></div></div>
+</div>
+</sc-if>
+<sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="TV-17 Ajustes" style="position:absolute;inset:0;padding:54px 96px;box-sizing:border-box;display:flex;flex-direction:column">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;padding-bottom:20px;border-bottom:2px solid var(--color-text);flex-shrink:0"><div style="font-size:96px;font-weight:300;line-height:.9;letter-spacing:-0.04em;white-space:nowrap">Ajustes</div><div style="font-size:28px;font-weight:600;color:var(--color-neutral-700);white-space:nowrap">Sala {{ room }}</div></div>
+  <div style="flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 520px">
+    <div style="padding:24px 48px 0 0;border-right:2px solid var(--color-text);display:flex;flex-direction:column">
+      <sc-for list="{{ setRows }}" as="r" hint-placeholder-count="9">
+        <div onClick="{{ r.click }}" style="display:grid;grid-template-columns:12px 500px minmax(0,1fr);column-gap:24px;align-items:center;height:72px;border-top:2px solid var(--color-text);cursor:pointer;background:{{ r.bg }}">
+          <div style="height:100%;background:{{ r.bar }}"></div>
+          <span style="font-size:32px;font-weight:800;white-space:nowrap">{{ r.label }}</span>
+          <div style="display:flex;align-items:center;gap:16px;min-width:0">
+            <sc-if value="{{ r.isSeg }}" hint-placeholder-val="{{ true }}"><div style="display:flex;border:2px solid var(--color-text)"><sc-for list="{{ r.opts }}" as="o" hint-placeholder-count="3"><div style="height:48px;padding:0 18px;display:flex;align-items:center;font-size:28px;font-weight:600;white-space:nowrap;border-right:{{ o.br }};background:{{ o.bg }};color:{{ o.fg }}">{{ o.label }}</div></sc-for></div></sc-if>
+            <sc-if value="{{ r.isBar }}" hint-placeholder-val="{{ false }}"><div style="display:flex;gap:4px"><sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="10"><div style="width:28px;height:28px;background:{{ c.c }}"></div></sc-for></div><span style="font-size:32px;font-weight:300;min-width:44px">{{ r.val }}</span></sc-if>
+            <sc-if value="{{ r.isAct }}" hint-placeholder-val="{{ false }}"><span style="font-size:32px;font-weight:300;white-space:nowrap">{{ r.val }}</span><span style="font-size:28px;font-weight:800;color:var(--color-accent-700);white-space:nowrap">OK · {{ r.cta }}</span></sc-if>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="padding:24px 0 0 48px;display:flex;flex-direction:column;gap:16px">
+      <span style="font-size:28px;font-weight:800;letter-spacing:.08em;color:var(--color-accent-700)">{{ setNum }}</span>
+      <span style="font-size:56px;font-weight:300;line-height:1;letter-spacing:-0.03em">{{ setTitle }}</span>
+      <span style="font-size:32px;line-height:1.3;color:var(--color-neutral-800);text-wrap:pretty">{{ setHelp }}</span>
+    </div>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;height:80px;flex-shrink:0"><span></span><div style="display:flex;gap:40px;align-items:center"><div style="display:flex;align-items:center;gap:12px"><div style="min-width:48px;height:48px;padding:0 8px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;border:2px solid var(--color-text);color:var(--color-text)">↕</div><span style="font-size:28px;font-weight:600;color:var(--color-text);white-space:nowrap">Opción</span></div><div style="display:flex;align-items:center;gap:12px"><div style="min-width:48px;height:48px;padding:0 8px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;border:2px solid var(--color-text);color:var(--color-text)">↔</div><span style="font-size:28px;font-weight:600;color:var(--color-text);white-space:nowrap">Cambiar</span></div><div onClick="{{ onKeyBack }}" style="display:flex;align-items:center;gap:12px;cursor:pointer"><div style="min-width:48px;height:48px;padding:0 8px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;border:2px solid var(--color-text);color:var(--color-text)">←</div><span style="font-size:28px;font-weight:600;color:var(--color-text);white-space:nowrap">Volver</span></div><div onClick="{{ onKeyOk }}" style="display:flex;align-items:center;gap:12px;cursor:pointer"><div style="min-width:48px;height:48px;padding:0 8px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;background:var(--color-text);color:var(--color-bg)">OK</div><span style="font-size:28px;font-weight:800;color:var(--color-text);white-space:nowrap">Elegir</span></div></div></div>
+</div>
+</sc-if>
+<sc-if value="{{ isCalib }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="TV-18 Calibración del retraso" style="position:absolute;inset:0;padding:54px 96px;box-sizing:border-box;display:flex;flex-direction:column">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;padding-bottom:20px;border-bottom:2px solid var(--color-text);flex-shrink:0"><div style="font-size:96px;font-weight:300;line-height:.9;letter-spacing:-0.04em;white-space:nowrap">Calibrar el micro</div><div style="font-size:28px;font-weight:600;color:var(--color-neutral-700);white-space:nowrap">Guardado · {{ calSaved }}</div></div>
+  <div style="flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 560px">
+    <div style="padding:40px 48px 0 0;border-right:2px solid var(--color-text);display:flex;flex-direction:column;gap:32px">
+      <span style="font-size:44px;font-weight:300;line-height:1.15;min-height:102px;text-wrap:pretty">{{ calStatus }}</span>
+      <div style="display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px">
+        <sc-for list="{{ calCells }}" as="b" hint-placeholder-count="8">
+          <div style="height:240px;border:2px solid var(--color-text);position:relative;transition:background 80ms linear;background:{{ b.bg }}">
+            <div style="position:absolute;top:0;bottom:0;left:50%;width:2px;background:{{ b.ln }}"></div>
+            <sc-if value="{{ b.hasMark }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:64px;bottom:64px;width:8px;margin-left:-4px;left:{{ b.ml }}%;background:{{ b.mc }}"></div></sc-if>
+            <span style="position:absolute;left:12px;bottom:8px;font-size:28px;font-weight:800;color:{{ b.ln }}">{{ b.num }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display:flex;gap:40px;font-size:28px;font-weight:600"><span style="display:flex;align-items:center;gap:12px"><span style="width:2px;height:32px;background:var(--color-text)"></span>Pitido</span><span style="display:flex;align-items:center;gap:12px"><span style="width:8px;height:32px;background:var(--color-accent)"></span>Tu «pa»</span></div>
+    </div>
+    <div style="padding:40px 0 0 48px;display:flex;flex-direction:column;gap:20px">
+      <div style="display:flex;flex-direction:column"><span style="font-size:28px;font-weight:600;color:var(--color-neutral-700)">Retraso</span><span style="font-size:120px;font-weight:300;line-height:1;letter-spacing:-0.04em">{{ calManual }}</span></div>
+      <div style="height:48px;position:relative;box-sizing:border-box;border:2px solid {{ calSlBc }};background:#fff"><div style="position:absolute;left:0;top:0;bottom:0;background:var(--color-neutral-300);width:{{ calPct }}%"></div><div style="position:absolute;top:-8px;bottom:-8px;width:16px;margin-left:-8px;background:var(--color-text);left:{{ calPct }}%"></div></div>
+      <div style="display:flex;justify-content:space-between;font-size:28px;color:var(--color-neutral-700)"><span>0 ms</span><span>400 ms</span></div>
+      <div style="display:flex;flex-direction:column;border-top:2px solid var(--color-text);margin-top:8px">
+        <sc-for list="{{ calOpts }}" as="o" hint-placeholder-count="4"><div onClick="{{ o.click }}" style="height:76px;padding:0 24px;border-bottom:2px solid var(--color-text);display:flex;align-items:center;justify-content:space-between;font-size:36px;font-weight:800;cursor:pointer;background:{{ o.bg }};color:{{ o.fg }}"><span>{{ o.label }}</span><span style="font-size:28px">{{ o.hint }}</span></div></sc-for>
+      </div>
+    </div>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;height:80px;flex-shrink:0"><span></span><div style="display:flex;gap:40px;align-items:center"><div style="display:flex;align-items:center;gap:12px"><div style="min-width:48px;height:48px;padding:0 8px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;border:2px solid var(--color-text);color:var(--color-text)">↕</div><span style="font-size:28px;font-weight:600;color:var(--color-text);white-space:nowrap">Opción</span></div><div style="display:flex;align-items:center;gap:12px"><div style="min-width:48px;height:48px;padding:0 8px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;border:2px solid var(--color-text);color:var(--color-text)">↔</div><span style="font-size:28px;font-weight:600;color:var(--color-text);white-space:nowrap">Ajustar</span></div><div onClick="{{ onKeyBack }}" style="display:flex;align-items:center;gap:12px;cursor:pointer"><div style="min-width:48px;height:48px;padding:0 8px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;border:2px solid var(--color-text);color:var(--color-text)">←</div><span style="font-size:28px;font-weight:600;color:var(--color-text);white-space:nowrap">Volver</span></div><div onClick="{{ onKeyOk }}" style="display:flex;align-items:center;gap:12px;cursor:pointer"><div style="min-width:48px;height:48px;padding:0 8px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;background:var(--color-text);color:var(--color-bg)">OK</div><span style="font-size:28px;font-weight:800;color:var(--color-text);white-space:nowrap">Elegir</span></div></div></div>
+</div>
+</sc-if>
+</div>
+<div style="position:absolute;inset:0;z-index:55;pointer-events:none;overflow:hidden">
+  <div style="position:absolute;inset:0;background:var(--color-accent);display:flex;align-items:center;justify-content:center;transform:{{ cvTf }};transition:{{ cvTr }}"><span style="font-size:180px;font-weight:800;letter-spacing:-0.035em;line-height:1;color:#fff;opacity:{{ cvLogoOp }};transition:opacity 200ms ease-out">gram<svg viewBox="0 0 100 100" style="display:inline-block;width:.66em;height:.66em;margin:0 -.03em 0 .01em;vertical-align:-.06em"><circle cx="50" cy="50" r="38" fill="none" stroke="currentColor" stroke-width="14"></circle><path d="M30 38h40M27 50h46M30 62h40" stroke="currentColor" stroke-width="8"></path></svg>la</span></div>
+  <div style="position:absolute;inset:0;background:{{ ovBg }};opacity:{{ ovOp }};clip-path:{{ ovClip }};transform:{{ ovTf }};transition:{{ ovTr }}"></div>
+  <sc-for list="{{ cvBars }}" as="b" hint-placeholder-count="0"><div style="position:absolute;left:0;width:1920px;top:{{ b.top }}px;height:{{ b.h }}px;background:{{ b.bg }};transform:{{ b.tf }};transition:{{ b.tr }}"></div></sc-for>
+</div>
+<sc-if value="{{ hasErr }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="TV-19 Aviso" style="position:absolute;inset:0;z-index:60;background:rgba(32,30,29,0.72)">
+  <div style="position:absolute;left:96px;bottom:134px;width:1040px;background:#fff;color:var(--color-text);box-shadow:var(--shadow-lg);display:flex;flex-direction:column">
+    <div style="height:16px;background:var(--color-accent)"></div>
+    <div style="padding:40px 48px 48px;display:flex;flex-direction:column;gap:20px">
+      <span style="font-size:28px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--color-accent-700)">{{ err.kicker }}</span>
+      <span style="font-size:72px;font-weight:300;line-height:1;letter-spacing:-0.03em">{{ err.title }}</span>
+      <span style="font-size:36px;line-height:1.3;color:var(--color-neutral-800);text-wrap:pretty">{{ err.body }}</span>
+      <div onClick="{{ onKeyOk }}" style="margin-top:16px;align-self:flex-start;height:88px;min-width:440px;padding:0 24px 0 28px;box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:32px;background:var(--color-accent);color:#fff;font-size:36px;font-weight:800;cursor:pointer"><span>{{ err.cta }}</span><span style="height:44px;padding:0 10px;display:flex;align-items:center;background:#fff;color:var(--color-text);font-size:20px">OK</span></div>
+    </div>
+  </div>
+</div>
+</sc-if>
+<sc-if value="{{ safe }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;left:96px;top:54px;right:96px;bottom:54px;border:2px dashed var(--color-accent);pointer-events:none;z-index:80"></div><div style="position:absolute;left:104px;top:60px;z-index:80;pointer-events:none;font-size:20px;font-weight:800;color:var(--color-accent-700)">Zona segura · 5 %</div></sc-if>
+<div style="position:absolute;left:96px;bottom:150px;display:flex;flex-direction:column;align-items:flex-start;gap:8px;pointer-events:none;z-index:50">{{ toastEl }}</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;jumpTo&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;—&quot;,&quot;TV-01 Arranque&quot;,&quot;TV-01b Bienvenida&quot;,&quot;TV-02 Sala (0)&quot;,&quot;TV-02 Sala (1)&quot;,&quot;TV-02 Sala (4)&quot;,&quot;TV-02 Sala (8)&quot;,&quot;TV-03 Menú&quot;,&quot;TV-04 Canciones&quot;,&quot;TV-04 Lista vacía&quot;,&quot;TV-04b Búsqueda&quot;,&quot;TV-05 Preparar&quot;,&quot;TV-06 Cuenta atrás&quot;,&quot;TV-07 Canto 1&quot;,&quot;TV-08 Canto 2&quot;,&quot;TV-08 Canto 6&quot;,&quot;TV-09 Dúo&quot;,&quot;TV-10 Duelo&quot;,&quot;TV-11 Pausa&quot;,&quot;TV-11 Pausa · audio&quot;,&quot;TV-12 Resultados 1&quot;,&quot;TV-12 Resultados 4&quot;,&quot;TV-12 Empate&quot;,&quot;TV-13 Rangos&quot;,&quot;TV-14a Equipos&quot;,&quot;TV-14b Ruleta&quot;,&quot;TV-14c Turno&quot;,&quot;TV-14d Marcador&quot;,&quot;TV-14e Campeones&quot;,&quot;TV-15 Jukebox&quot;,&quot;TV-16 Récords&quot;,&quot;TV-17 Ajustes&quot;,&quot;TV-18 Calibración&quot;,&quot;TV-19 Sin conexión&quot;,&quot;TV-19 Sala perdida&quot;,&quot;TV-19 Canción&quot;,&quot;TV-19 Sala llena&quot;,&quot;TV-19 Micro&quot;],&quot;default&quot;:&quot;—&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Navegación&quot;},&quot;startScreen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Arranque&quot;,&quot;Sala&quot;],&quot;default&quot;:&quot;Arranque&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Navegación&quot;},&quot;transition&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Auto&quot;,&quot;Zoom&quot;,&quot;Barras&quot;,&quot;Cortina&quot;,&quot;Deslizar&quot;,&quot;Fundido&quot;,&quot;Seco&quot;],&quot;default&quot;:&quot;Auto&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Navegación&quot;},&quot;showSafeArea&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Navegación&quot;},&quot;lobbyPlayers&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[0,1,4,8],&quot;default&quot;:4,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Sala&quot;},&quot;singVariant&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;A&quot;,&quot;B&quot;,&quot;C&quot;],&quot;default&quot;:&quot;C&quot;,&quot;tsType&quot;:&quot;'A'|'B'|'C'&quot;,&quot;section&quot;:&quot;Canto&quot;},&quot;videoUrl&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Canto&quot;},&quot;videoDim&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;min&quot;:0,&quot;max&quot;:0.6,&quot;step&quot;:0.05,&quot;default&quot;:0.12,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Canto&quot;},&quot;showTrail&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Canto&quot;},&quot;resultsPreview&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;—&quot;,&quot;1 jugador&quot;,&quot;4 jugadores&quot;,&quot;Empate&quot;],&quot;default&quot;:&quot;—&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Resultados&quot;},&quot;errorPreview&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;—&quot;,&quot;Sin conexión&quot;,&quot;Sala perdida&quot;,&quot;Canción no disponible&quot;,&quot;Sala llena&quot;,&quot;Micro desconectado&quot;],&quot;default&quot;:&quot;—&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Avisos&quot;}}">
+const C={bg:'#f3f2f2',ink:'#201e1d',red:'#ec3013',red5:'#ff563c',n2:'#eae7e7',n3:'#d7d3d3',n5:'#9b9797',n6:'#7d7979',gold:'#F2C230',goldD:'#9A7400'};
+const PLAYERS=[['Marta','#FF4FA3','●'],['Oriol','#3FD0FF','▲'],['Ana','#FFD23F','■'],['Jordi','#7CFF6B','◆'],['Aitana','#B38CFF','★'],['Hugo','#FF8A3D','⬢'],['Nerea','#4FFFD8','♥'],['Dani','#FF5A5A','ϟ']];
+const SONGS=[
+{title:'Luces de medianoche',artist:'Los Satélites de Marzo',dur:'3:24',year:2019,lang:'Castellano',diff:2,duo:false,rec:'9.120 · Marta',plays:42,cv:['#201e1d','#ec3013','#f3f2f2']},
+{title:'Verano en la azotea',artist:'Carmen Vela',dur:'2:58',year:2003,lang:'Castellano',diff:1,duo:true,rec:'7.480 · Oriol',plays:31,cv:['#F2C230','#ec3013','#201e1d']},
+{title:'Corazón de neón',artist:'Brisa Polar',dur:'3:41',year:1987,lang:'Castellano',diff:3,duo:false,rec:'8.305 · Ana',plays:57,cv:['#2FA9D6','#201e1d','#201e1d']},
+{title:'Ciudad de papel',artist:'Hugo y los Faros',dur:'4:05',year:1996,lang:'Castellano',diff:2,duo:false,rec:'6.990 · Jordi',plays:18,cv:['#d7d3d3','#201e1d','#201e1d']},
+{title:'Nit de revetlla',artist:'Mar Endins',dur:'3:12',year:2011,lang:'Català',diff:2,duo:true,rec:'8.760 · Aitana',plays:24,cv:['#ec3013','#F2C230','#f3f2f2']},
+{title:'El último tren',artist:'La Orquesta Imposible',dur:'3:50',year:1984,lang:'Castellano',diff:1,duo:false,rec:'—',plays:9,cv:['#2E6B55','#eae7e7','#f3f2f2']}];
+SONGS.forEach((s,i)=>s.genre=['Pop','Pop','Rock','Indie','Rumba','Bolero'][i]);
+const FILTERS=['Orden','Idioma','Década','Género','Solo dúos'];
+const ORDERS=['A–Z','Artista','Década','Más cantadas'],LANGS=['Todos','Castellano','Català'],DECS=['Todas','60','80','90','00','10'],GENS=['Todos','Pop','Rock','Indie','Rumba','Bolero'];
+const KB="1234567890QWERTYUIOPASDFGHJKLÑZXCVBNM-'.";
+const norm=t=>t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+const TIPS=['Acerca el móvil a la boca, pero sin taparlo.','Las notas doradas valen el doble.','Si no te sabes la letra, tararea: puntúa el tono.','En Ajustes puedes calibrar el retraso del micro.'];
+const MODES=[['Cantar','Solo o todos','Solo o todos a la vez. Cada móvil, una voz.'],['Duelo','Cara a cara','Dos jugadores o dos equipos, frente a frente.'],['Dúo','A dos voces','Canciones a dos voces: cada uno canta su parte.'],['Pasa el micro','Equipos y retos','Por equipos y con retos. Gana el más valiente.'],['Jukebox','Sin puntos','La letra en grande y sin puntuación. Para cantar todos.'],['Récords','Salón de la fama','Las mejores puntuaciones de la casa.'],['Ajustes','Audio y sala','Audio, retraso del micro y gestión de la sala.']];
+const DIFFS=[['Fácil',2],['Normal',1],['Difícil',0.5]];
+const SPEC=[
+{n:[['Se ',4,1],['en',5,1],['cien',7,1],['den ',7,2],['las ',5,1],['lu',4,1],['ces ',2,2],['de ',4,1],['la ',5,1],['ciu',4,1],['dad',2,4]]},
+{n:[['y ',2,1],['tu ',4,1],['voz ',5,2],['me ',7,1],['lle',9,1],['va ',7,2],['has',5,1],['ta ',4,1],['el ',5,1],['mar',4,4]]},
+{gap:14,n:[['¡E',9,2,'free'],['oh! ',7,2,'free'],['bai',7,1],['la ',9,1],['con',10,1],['mi',9,1],['go',7,4]]},
+{n:[['Lu',7,1],['ces ',9,2],['de ',10,1],['me',12,1],['dia',10,1],['no',9,2,'gold'],['che',7,4,'gold']]},
+{n:[['Di',5,1,'rap'],['lo, ',5,1,'rap'],['di',5,1,'rap'],['lo, ',5,1,'rap'],['na',6,1,'rap'],['die ',6,1,'rap'],['nos ',6,1,'rap'],['pa',4,1,'rap'],['ra',4,2,'rap']]},
+{n:[['Can',4,1],['ta ',5,1],['con',7,1],['mi',9,1],['go ',7,2],['has',5,1],['ta el ',4,1],['a',5,1],['ma',7,1],['ne',9,2,'gold'],['cer',12,6,'gold']]}];
+const SL=0.04,PPS=380;
+const TEAMS=[['Los Graves','#201e1d','#fff'],['Las Agudas','#ec3013','#fff'],['Falsete','#F2C230','#201e1d'],['Vibrato','#2FA9D6','#201e1d']];
+const CHALL=[['Solo el estribillo','Puntúa solo la parte más pegadiza.'],['Sin ver la letra','La letra desaparece. De memoria.'],['Canta más agudo','Una octava arriba, si te atreves.'],['A dúo con el rival','Compartes micro con el otro equipo.'],['Aguanta la nota','Gana quien sostenga más la última.'],['Con acento','El equipo rival elige el acento.'],['Susurrando','Ni un grito: la tele se queda en voz baja.'],['Bailando','Si dejas de moverte, pierdes la racha.']];
+const RANGE=['Menos de 3.000','3.000 – 4.999','5.000 – 6.499','6.500 – 7.999','8.000 – 9.199','9.200 o más'];
+const REC2=[['Marta','42 canciones','9.120 · Luces de medianoche'],['Oriol','37 canciones','8.410 · Verano en la azotea'],['Ana','29 canciones','8.305 · Corazón de neón'],['Jordi','21 canciones','6.990 · Ciudad de papel'],['Aitana','15 canciones','8.760 · Nit de revetlla'],['Hugo','8 canciones','5.230 · El último tren']];
+const REC3=[['Marta','×31','Corazón de neón'],['Ana','×27','Luces de medianoche'],['Oriol','×22','Verano en la azotea'],['Aitana','×19','Nit de revetlla'],['Jordi','×14','Ciudad de papel'],['Dani','×11','El último tren']];
+const SET_ROWS=[{k:'diff',label:'Dificultad por defecto',type:'seg',opts:['Fácil','Normal','Difícil'],help:'La que se propone a cada jugador al preparar la partida. Fácil admite ±2 semitonos; Normal, ±1; Difícil, ±½.'},{k:'delay',label:'Retraso del micro',type:'act',help:'Lo que tarda tu voz en viajar del móvil a la tele. Pulsa OK para medirlo cantando.'},{k:'music',label:'Volumen de la música',type:'bar',help:'Volumen de la canción en la tele.'},{k:'fx',label:'Volumen de los efectos',type:'bar',help:'Pitidos, aplausos y la cuenta atrás.'},{k:'trail',label:'Estela de la voz',type:'seg',opts:['Oculta','Visible'],help:'La línea que dibuja tu tono sobre el carril de notas.'},{k:'lyr',label:'Tamaño de la letra',type:'seg',opts:['Normal','Grande'],help:'Grande aumenta la letra un 12 % para salones amplios o teles pequeñas.'},{k:'lang',label:'Idioma',type:'seg',opts:['Castellano','Català'],help:'Idioma de la interfaz en la tele y en los móviles.'},{k:'kick',label:'Expulsar jugador',type:'act',help:'Saca de la sala al último que entró. Podrá volver con el código.'},{k:'code',label:'Nuevo código de sala',type:'act',help:'Genera un código nuevo. Todos los móviles tendrán que volver a entrar.'}];
+const ERRS={server:['Sin conexión','No llegamos al servidor','La tele no alcanza el servidor. Revisa la wifi; la partida sigue donde estaba.','Reintentar'],lost:['Reconectando','La tele ha perdido la sala','Buscando la sala {room}… Los móviles volverán a entrar solos.','Reintentar ahora'],song:['Canción','No se puede cargar «El último tren»','El archivo no responde. Elige otra y vuelve a probar más tarde.','Elegir otra'],full:['Sala llena','Ya hay 8 jugadores','Para que entre alguien más, otro tiene que salir desde Ajustes.','Entendido'],mic:['Micro','Nerea ha perdido el micro','Su ficha se queda atenuada. Vuelve sola en cuanto su móvil reconecte.','Seguir']};
+const PAD_MAP={0:'ok',1:'back',2:'x',3:'y',4:'lb',5:'rb',8:'v',9:'menu',12:'u',13:'d',14:'l',15:'r'};
+const DUO_PARTS=[[0],[1],[0],[1],[0,1],[0,1]];
+const MODE_KICK={sing:'Prepárate',duel:'Duelo · Prepárate',duo:'Dúo · Prepárate'};
+const STOP=['de','el','la','en','los','las','y'];
+const ini=t=>t.split(' ').filter(w=>!STOP.includes(w.toLowerCase())).slice(0,2).map(w=>w[0]).join('').toUpperCase();
+const RANKS=[[3000,'Cantante de ducha'],[5000,'Aficionado'],[6500,'Promesa'],[8000,'Estrella'],[9200,'Leyenda'],[1e9,'Mito']];
+const rankIdx=s=>RANKS.findIndex(r=>s<r[0]);
+const fmt=n=>String(n).replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+const SHADOW='0 12px 32px rgba(45,43,43,0.3)';
+function rgba(hex,a){const n=parseInt(hex.slice(1),16);return `rgba(${n>>16},${(n>>8)&255},${n&255},${a})`;}
+function buildChart(skills,duo){const B=0.34,K=skills.length;let cur=2.8;const phrases=[],notes=[];
+  SPEC.forEach((ph,pi)=>{const parts=duo?DUO_PARTS[pi]:[0,1];const p={notes:[],start:cur,parts};ph.n.forEach(([s,pt,b,ty])=>{const n={s,p:pt,start:cur,dur:b*B*0.92,type:ty||'n',i:notes.length,q:[],off:[],parts};
+    for(let k=0;k<K;k++){const r=Math.random();n.q[k]=r<skills[k]?'good':r<skills[k]+0.2?'partial':'miss';n.off[k]=(Math.random()<.5?-1:1)*(1.8+Math.random());}
+    if(n.type!=='free')n.sl=Array.from({length:K},()=>new Array(Math.max(1,Math.ceil(n.dur/SL))).fill(0));p.notes.push(n);notes.push(n);cur+=b*B;});p.end=cur;phrases.push(p);cur+=(ph.gap||3)*B;});
+  const unitP=[0,1].map(q=>{let tot=0;notes.forEach(n=>{if(n.sl&&n.parts.includes(q))tot+=Math.max(1,Math.ceil(n.dur/SL))*(n.type==='gold'?2:1)});return 10000/tot;});
+  return {notes,phrases,duration:cur+1.2,unitP};}
+const cellW=n=>n===1?420:n===2?360:n<=4?260:Math.floor((1120-8*(n-1))/n);
+const PREVIEWS={'1 jugador':{rows:[[1,8940,93,'3/4',14]],record:true},'4 jugadores':{rows:[[1,8940,93,'3/4',14],[0,7310,81,'2/4',9],[2,5120,64,'1/4',6],[3,2480,38,'0/4',3]],record:false},'Empate':{rows:[[0,7650,85,'2/4',11],[1,7650,84,'3/4',10],[2,6010,71,'1/4',7]],record:false}};
+
+const TR={Seco:{out:0,in:0},Fundido:{out:180,in:360},Deslizar:{out:200,in:380},Zoom:{out:200,in:420},Cortina:{out:320,in:420},Barras:{out:420,in:460},Apagón:{out:450,in:650},Iris:{out:520,in:520},Barrido:{out:420,in:420},Suave:{out:650,in:1000}};
+class Component extends DCLogic {
+  state={ord:0,lng:0,dec:0,gen:0,duoOnly:false,query:'',search:{open:false,f:0},pauseAudio:false,paF:0,justJ:null,tr:'idle',trDir:1,trM:'Zoom',screen:this.props.startScreen==='Sala'?'lobby':'splash',splashIn:false,splashRed:false,bootK:0,room:'MOKA',err:null,errBusy:false,party:null,recTab:0,setF:0,jq:[1,2,3,4],settings:{diff:1,delay:110,music:8,fx:6,trail:this.props.showTrail===false?0:1,lyr:0,lang:0},calib:{phase:'idle',beat:-1,ms:110,manual:110,f:0,marks:[]},scale:this.calcScale(),count:this.props.lobbyPlayers??4,menuF:0,zone:'grid',filterF:1,filter:0,songF:0,songSel:0,countN:3,tip:TIPS[0],paused:false,pauseF:0,scores:[0],toasts:[],variant:null,mode:'sing',teamScores:[0,0],setup:[],setupF:0,singers:[],results:null,resT:0,resF:0};
+  calcScale(){const w=window.innerWidth,h=window.innerHeight;return w&&h?Math.min(w/1920,h/1080):1;}
+  componentDidMount(){
+    this.onResize=()=>this.setState({scale:this.calcScale()});window.addEventListener('resize',this.onResize);this.onResize();
+    this.ro=new ResizeObserver(this.onResize);this.ro.observe(document.documentElement);
+    this.onKeyH=e=>this.onKey(e);window.addEventListener('keydown',this.onKeyH);
+    this.parts=[];this.conf=[];
+    const mk=(col)=>{const st=document.createElement('canvas');st.width=st.height=16;const sc=st.getContext('2d');sc.strokeStyle=col;sc.lineWidth=3;sc.beginPath();for(let k=-16;k<32;k+=8){sc.moveTo(k,16);sc.lineTo(k+16,0);}sc.stroke();return st;};
+    this.stripeL=mk('rgba(32,30,29,0.35)');this.stripeD=mk('rgba(243,242,242,0.4)');
+    let last=performance.now(),hud=0;
+    const loop=ts=>{this.raf=requestAnimationFrame(loop);try{const dt=Math.min(0.05,(ts-last)/1000);last=ts;this.T=ts/1000;
+      if(innerWidth!==this._w||innerHeight!==this._h){this._w=innerWidth;this._h=innerHeight;this.onResize();}
+      if(this.bgC)this.drawBg(this.bgC.getContext('2d'),dt);
+      this.pollPad(ts);
+      if(this.state.screen==='splash'){if(!this.splashT)this.splashT=ts;const e=ts-this.splashT;if(e>120&&!this.state.splashIn)this.setState({splashIn:true});if(e>1700&&!this.state.splashRed)this.setState({splashRed:true});if(e>3300&&!this.state.splashOut)this.setState({splashOut:true});if(e>4100&&this.trTo!=='boot'){this.splashT=0;this.bootT=ts+700;this.go('boot',{bootK:0,splashIn:false,splashRed:false,splashOut:false,bootIn:false},()=>requestAnimationFrame(()=>requestAnimationFrame(()=>this.setState({bootIn:true}))));}}
+      if(this.state.screen==='boot'){const k=Math.max(0,Math.min(1,(ts-this.bootT)/2600));if(k-this.state.bootK>0.02||k>=1)this.setState({bootK:k});if(k>=1&&this.trTo!=='welcome')this.go('welcome');}
+      if(this.state.screen==='sing'&&this.chart){this.update(dt);if(this.singC&&this.chart)this.drawSing(this.singC.getContext('2d'));
+        hud+=dt;if(hud>0.1&&this.chart){hud=0;this.setState({scores:this.disp.map(Math.round),teamScores:this.teamAvg(this.disp).map(Math.round)});}}
+      if(this.state.screen==='results'&&this.state.resT<1){hud+=dt;if(hud>0.033){hud=0;const k=Math.min(1,(this.T-this.resStart)/2.2);this.setState({resT:1-Math.pow(1-k,3)});}}
+      }catch(e){console.error('loop',e);}};
+    this.raf=requestAnimationFrame(loop);
+    this.applyPreview();this.bootT=performance.now();window.gramolaIr=n=>this.jump(n);window.__g=this;if(this.props.jumpTo&&this.props.jumpTo!=='—')setTimeout(()=>this.jump(this.props.jumpTo),0);try{navigator.gamepadInputEmulation='gamepad';}catch(e){}if(this.props.errorPreview)this.applyErr();
+  }
+  ff(sec){for(let i=0;i<sec/0.05;i++)this.update(0.05);this.disp=this.score.slice();}
+  previewRes(key){const p=PREVIEWS[key];const rows=p.rows.map(([pi,score,prec,gold,streak])=>{const P=PLAYERS[pi];return {name:P[0],color:P[1],shape:P[2],score,prec,gold,streak,bestPh:Math.min(100,prec+9)};});this.setState({mode:'sing',err:null});this.showResults(rows,p.record,0);}
+  jump(n){const J=this;if(!n||n==='—')return;clearInterval(J.cTimer);clearInterval(J.bTimer);clearTimeout(J.spT);J.chart=null;J.conf=[];
+    const base={err:null,errBusy:false,paused:false,pauseAudio:false,search:{open:false,f:0},query:'',dec:0,lng:0,gen:0,duoOnly:false,zone:'grid',songF:0,ord:0};
+    const mk=(k,mode)=>PLAYERS.slice(0,k).map((p,i)=>({name:p[0],color:p[1],shape:p[2],tol:1,team:mode==='duel'?i%2:0,part:mode==='duo'?i%2:0}));
+    const sing=(k,mode,after)=>J.setState({...base,count:Math.max(k,4),mode,singers:mk(k,mode),songSel:mode==='duo'?1:0},()=>{J.startSing();J.ff(9.6);after&&after();});
+    const party=(step,extra)=>J.setState({...base,count:4},()=>{J.partyNew();J.P({step,ch:1,spin:1,round:2,turn:1,scores:[7420,9310,0,0],last:{name:'Ana',pts:7420,t:0},...extra});if(step==='champs')J.conf=J.makeConf();});
+    const E={'Sin conexión':'server','Sala perdida':'lost','Canción':'song','Sala llena':'full','Micro':'mic'};
+    if(n==='TV-01 Arranque'){J.splashT=0;return J.setState({...base,screen:'splash',splashIn:false,splashRed:false,splashOut:false,bootIn:true,bootK:0});}
+    if(n==='TV-01b Bienvenida')return J.setState({...base,screen:'welcome'});
+    let m=n.match(/^TV-02 Sala \((\d)\)$/);if(m)return J.go('lobby',{...base,count:+m[1]});
+    if(n==='TV-03 Menú')return J.go('menu',{...base,menuF:0,count:4});
+    if(n==='TV-04 Canciones')return J.go('songs',{...base,mode:'sing',songF:1});
+    if(n==='TV-04 Lista vacía')return J.go('songs',{...base,mode:'sing',dec:1,zone:'filters',filterF:3});
+    if(n==='TV-04b Búsqueda')return J.go('songs',{...base,mode:'sing',query:'luc',search:{open:true,f:22}});
+    if(n==='TV-05 Preparar')return J.setState({...base,mode:'sing',count:4,setup:[]},()=>J.startSetup());
+    if(n==='TV-06 Cuenta atrás'){J.setState({...base,mode:'sing',count:4,songSel:0});J.beginCount({singers:mk(4,'sing'),mode:'sing'});clearInterval(J.cTimer);return;}
+    if(n==='TV-07 Canto 1')return sing(1,'sing');if(n==='TV-08 Canto 2')return sing(2,'sing');if(n==='TV-08 Canto 6')return sing(6,'sing');
+    if(n==='TV-09 Dúo')return sing(2,'duo');if(n==='TV-10 Duelo')return sing(2,'duel');
+    if(n==='TV-11 Pausa')return sing(1,'sing',()=>J.setState({paused:true,pauseF:0}));
+    if(n==='TV-11 Pausa · audio')return sing(1,'sing',()=>J.setState({paused:true,pauseAudio:true,paF:0}));
+    if(n==='TV-12 Resultados 1')return J.previewRes('1 jugador');if(n==='TV-12 Resultados 4')return J.previewRes('4 jugadores');if(n==='TV-12 Empate')return J.previewRes('Empate');
+    if(n==='TV-13 Rangos')return J.go('records',{...base,recTab:3});if(n==='TV-16 Récords')return J.go('records',{...base,recTab:0});
+    if(n==='TV-14a Equipos')return party('teams',{round:1,turn:0,scores:[0,0,0,0],spin:-1,last:null});if(n==='TV-14b Ruleta')return party('roulette');if(n==='TV-14c Turno')return party('turn');
+    if(n==='TV-14d Marcador')return party('board');if(n==='TV-14e Campeones')return party('champs',{round:4,scores:[21400,24950,0,0]});
+    if(n==='TV-15 Jukebox')return J.setState({...base,mode:'jukebox',singers:[],songSel:0,jq:[1,2,3,4]},()=>{J.startSing();J.ff(9.6);});
+    if(n==='TV-17 Ajustes')return J.go('settings',{...base,setF:1});
+    if(n==='TV-18 Calibración')return J.go('calib',{...base,calib:{phase:'done',beat:-1,ms:120,manual:120,f:2,marks:[112,131,118,104,126,122,109,121]}});
+    m=n.match(/^TV-19 (.+)$/);if(m)return J.go('lobby',{...base,count:4,err:E[m[1]]});}
+  pollPad(ts){let pads=[];try{pads=navigator.getGamepads?[...navigator.getGamepads()]:[];}catch(e){return;}const p=pads.find(Boolean);if(!p){this.padOn=false;return;}if(!this.padOn){this.padOn=true;this.toast('Mando conectado');}
+    const B=p.buttons.map(b=>b.pressed),ax=p.axes||[],pv=this.prevB||[];if(!this.padKeys)for(const i in PAD_MAP){if(B[i]&&!pv[i]&&!(i>=12))this.act(PAD_MAP[i]);}
+    const dp=[12,13,14,15].find(i=>B[i]);const st=Math.abs(ax[0]||0)>Math.abs(ax[1]||0)?((ax[0]||0)<-0.5?'l':(ax[0]||0)>0.5?'r':null):((ax[1]||0)<-0.5?'u':(ax[1]||0)>0.5?'d':null);const d=dp!=null?(this.padKeys?null:PAD_MAP[dp]):st;
+    if(d){if(this.holdDir!==d){this.holdDir=d;this.holdT=ts+380;this.act(d);}else if(ts>this.holdT){this.holdT=ts+110;this.act(d);}}else this.holdDir=null;this.prevB=B;}
+  applyErr(){const m={'Sin conexión':'server','Sala perdida':'lost','Canción no disponible':'song','Sala llena':'full','Micro desconectado':'mic'};this.setState({err:m[this.props.errorPreview]||null,errBusy:false});}
+  errAct(){const e=this.state.err;if(this.state.errBusy)return;if(e==='server'||e==='lost'){this.setState({errBusy:true});setTimeout(()=>{this.setState({err:null,errBusy:false});this.toast('Conexión recuperada');},1600);}else{this.setState({err:null});if(e==='song')this.go('songs');}}
+  componentWillUnmount(){clearInterval(this.bTimer);clearTimeout(this.spT);this.ro&&this.ro.disconnect();cancelAnimationFrame(this.raf);window.removeEventListener('resize',this.onResize);window.removeEventListener('keydown',this.onKeyH);(clearTimeout(this.cWait),clearInterval(this.cTimer));}
+  componentDidUpdate(prev,ps){if(ps&&ps.screen!==this.state.screen&&!this.trVia&&this.state.tr!=='pre')this.enter();if(prev.lobbyPlayers!==this.props.lobbyPlayers&&this.props.lobbyPlayers!=null)this.setState({count:this.props.lobbyPlayers});
+    if(prev.resultsPreview!==this.props.resultsPreview)this.applyPreview();if(prev.errorPreview!==this.props.errorPreview)this.applyErr();if(prev.jumpTo!==this.props.jumpTo)this.jump(this.props.jumpTo);if(prev.showTrail!==this.props.showTrail)this.setState(s=>({settings:{...s.settings,trail:this.props.showTrail===false?0:1}}));}
+  applyPreview(){const p=PREVIEWS[this.props.resultsPreview];if(!p)return;
+    const rows=p.rows.map(([pi,score,prec,gold,streak])=>{const P=PLAYERS[pi];return {name:P[0],color:P[1],shape:P[2],score,prec,gold,streak,bestPh:Math.min(100,prec+9)};});
+    this.showResults(rows,p.record,0);}
+  bgRef=el=>{this.bgC=el};
+  singRef=el=>{this.singC=el};
+  qrRef=el=>{if(!el||el._d)return;el._d=1;const c=el.getContext('2d'),N=25,S=250,s=S/N;let seed=7;const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;
+    c.fillStyle='#fff';c.fillRect(0,0,S,S);c.fillStyle=C.ink;const fin=(x,y)=>(x>=0&&x<7&&y>=0&&y<7);
+    for(let y=0;y<N;y++)for(let x=0;x<N;x++){const inF=fin(x,y)||fin(x-(N-7),y)||fin(x,y-(N-7));const sep=(x<8&&y<8)||(x>N-9&&y<8)||(x<8&&y>N-9);if(inF){const fx=x>=N-7?x-(N-7):x,fy=y>=N-7?y-(N-7):y;const d=Math.max(Math.abs(fx-3),Math.abs(fy-3));if(d!==2)c.fillRect(x*s,y*s,s+.5,s+.5);}else if(!sep&&rnd()<.5)c.fillRect(x*s,y*s,s+.5,s+.5);}};
+  toast(text){const id=Math.random();this.setState(s=>({toasts:[...s.toasts,{id,text}].slice(-3)}));setTimeout(()=>this.setState(s=>({toasts:s.toasts.filter(t=>t.id!==id)})),3000);}
+  songsList(){const s=this.state;let l=SONGS.slice();const q=norm(s.query||'');if(q)l=l.filter(x=>norm(x.title+' '+x.artist).includes(q));
+    if(s.lng)l=l.filter(x=>x.lang===LANGS[s.lng]);if(s.dec){const y0={'60':1960,'80':1980,'90':1990,'00':2000,'10':2010}[DECS[s.dec]];l=l.filter(x=>x.year>=y0&&x.year<y0+10);}if(s.gen)l=l.filter(x=>x.genre===GENS[s.gen]);if(s.duoOnly)l=l.filter(x=>x.duo);
+    const o=ORDERS[s.ord],cmp=(a,b)=>a.localeCompare(b,'es');if(o==='A–Z')l.sort((a,b)=>cmp(a.title,b.title));else if(o==='Artista')l.sort((a,b)=>cmp(a.artist,b.artist));else if(o==='Década')l.sort((a,b)=>a.year-b.year);else l.sort((a,b)=>b.plays-a.plays);return l;}
+  searchKey(a){const f=this.state.search.f,KN=KB.length;let nf=f;const col=f<KN?f%10:(f===KN?1:f===KN+1?5:8);
+    if(a==='l'){nf=f<KN?(f%10?f-1:f):Math.max(KN,f-1);}else if(a==='r'){nf=f<KN?(f%10<9?f+1:f):Math.min(KN+2,f+1);}
+    else if(a==='u'){if(f>=KN)nf=30+col;else if(f>=10)nf=f-10;}else if(a==='d'){if(f<30)nf=f+10;else if(f<KN)nf=KN+(col<4?0:col<8?1:2);}
+    else if(a==='ok'){if(f<KN)return this.typeQ(KB[f]);if(f===KN)return this.typeQ(' ');if(f===KN+1)return this.typeQ(null);return this.closeSearch();}
+    else if(a==='x')return this.typeQ(null);else if(a==='y')return this.typeQ(' ');else if(a==='back'||a==='menu')return this.closeSearch();
+    this.setState({search:{...this.state.search,f:nf}});}
+  typeQ(ch){let q=this.state.query||'';q=ch==null?q.slice(0,-1):(q+ch.toLowerCase()).slice(0,24);this.setState({query:q,songF:0});}
+  closeSearch(){this.setState({search:{open:false,f:0}},()=>this.setState({zone:this.songsList().length?'grid':'filters'}));}
+  paKey(a){const s=this.state,st=s.settings,f=s.paF;if(a==='u')return this.setState({paF:Math.max(0,f-1)});if(a==='d')return this.setState({paF:Math.min(2,f+1)});if(a==='back'||a==='ok'||a==='menu')return this.setState({pauseAudio:false});
+    if(a==='l'||a==='r'){const d=a==='r'?1:-1;if(f===0)this.setState({settings:{...st,music:Math.max(0,Math.min(10,st.music+d))}});else if(f===1)this.setState({settings:{...st,fx:Math.max(0,Math.min(10,st.fx+d))}});else this.setState({settings:{...st,delay:Math.max(0,Math.min(400,st.delay+d*10))}});}}
+
+  setState(u,cb){if(u&&typeof u==='object'&&u.screen&&u.screen!==this.state.screen&&!this._inGo){const {screen,...rest}=u;return this.go(screen,rest,cb);}return super.setState(u,cb);}
+  cDelayed(fn,ms){clearTimeout(this.cWait);const h={};this.cWait=setTimeout(()=>{this.cTimer=setInterval(fn,ms);},TR.Suave.out+TR.Suave.in+250);return undefined;}
+  pickMode(from,to){if(from==='splash')return 'Seco';if(to==='count'||to==='sing'||from==='sing'||from==='count')return 'Suave';const p=this.props.transition;if(p&&p!=='Auto'&&TR[p])return p;return 'Zoom';}
+  go(screen,extra,cb){const from=this.state.screen,M=this.pickMode(from,screen);
+    const set=(o,c)=>{this._inGo=true;try{super.setState(o,c);}finally{this._inGo=false;}};
+    if(M==='Seco'||screen===from||this.trTo===screen){if(this.trTo!==screen)set({screen,...extra,trM:M},cb);return;}
+    if(this.state.tr==='out'){clearTimeout(this.trT);}
+    const O=['splash','boot','welcome','lobby','menu','songs','setup','count','sing','results','party','records','settings','calib'];const dir=O.indexOf(screen)>=O.indexOf(this.state.screen)?1:-1;
+    this.trTo=screen;super.setState({tr:'out',trDir:dir,trM:M});clearTimeout(this.trT);this.trT=setTimeout(()=>{this.trTo=null;this.trVia=true;set({screen,...extra,tr:'pre'},()=>{this.enter();cb&&cb();});},TR[M].out);}
+  trMode(){return TR[this.state.trM]?this.state.trM:'Zoom';}
+  enter(){this.trVia=false;if(this.trMode()==='Seco'){this.setState({tr:'idle'});return;}if(this.state.tr!=='pre')this.setState({tr:'pre'});requestAnimationFrame(()=>requestAnimationFrame(()=>{this.setState({tr:'in'});clearTimeout(this.trI);this.trI=setTimeout(()=>this.setState({tr:'idle'}),TR[this.trMode()].in+60);}));}
+  isOff(i){return this.state.count===8&&i===6;}
+  addPlayer(){if(this.state.count>=8){this.setState({err:'full'});return;}const p=PLAYERS[this.state.count],ji=this.state.count;this.setState({count:ji+1,justJ:ji});clearTimeout(this.jT);this.jT=setTimeout(()=>this.setState({justJ:null}),650);this.toast(p[0]+' se ha unido');if(this.state.count+1===8)setTimeout(()=>this.toast('Nerea se ha desconectado'),700);}
+  startSetup(){const l=this.songsList();if(!l.length)return;const song=l[Math.min(this.state.songF,l.length-1)];
+    const prev=this.state.setup;const setup=Array.from({length:this.state.count},(_,i)=>prev[i]&&prev.length===this.state.count?prev[i]:{on:!this.isOff(i),diff:this.state.settings.diff,side:i%2===0?0:2});
+    this.setState({screen:'setup',songSel:SONGS.indexOf(song),setup,setupF:0});}
+  singersFromSetup(){const m=this.state.mode;return this.state.setup.map((s,i)=>{if(this.isOff(i))return null;if(m==='sing'?!s.on:s.side===1)return null;const side=m==='sing'?0:(s.side===0?0:1);return {name:PLAYERS[i][0],color:PLAYERS[i][1],shape:PLAYERS[i][2],tol:DIFFS[s.diff][1],team:side,part:m==='duo'?side:0};}).filter(Boolean);}
+  teams(){const S=this.state.singers;return [0,1].map(t=>{const ks=S.map((s,k)=>s.team===t?k:-1).filter(k=>k>=0);const m=ks.map(k=>S[k]);return {ks,color:m[0]?m[0].color:C.n5,name:m.length===1?m[0].name:m.map(x=>x.name).join(' · ')};});}
+  teamAvg(arr){if(this.state.mode!=='duel')return [0,0];return this.teams().map(t=>t.ks.length?t.ks.reduce((a,k)=>a+arr[k],0)/t.ks.length:0);}
+  startCount(){const singers=this.singersFromSetup(),m=this.state.mode;if(!singers.length){this.toast('Activa al menos a un jugador');return;}if(m!=='sing'&&!(singers.some(s=>s.team===0)&&singers.some(s=>s.team===1))){this.toast(m==='duel'?'Hace falta al menos uno en cada equipo':'Hace falta al menos uno en cada parte');return;}(clearTimeout(this.cWait),clearInterval(this.cTimer));
+    this.setState({screen:'count',singers,countN:3,tip:TIPS[Math.floor(Math.random()*TIPS.length)]});
+    this.cTimer=this.cDelayed(()=>{if(this.state.countN<=1){(clearTimeout(this.cWait),clearInterval(this.cTimer));this.startSing();}else this.setState({countN:this.state.countN-1});},1000);}
+  startSing(){const S=this.state.singers,K=S.length;this.chart=buildChart(S.map((_,k)=>k===0?0.72:0.5+Math.random()*0.32),this.state.mode==='duo');this.tug=0.5;this.leader=0;this.laneOf=null;this.now=0;
+    this.score=new Array(K).fill(0);this.disp=new Array(K).fill(0);this.hist=S.map(()=>[]);this.lastP=new Array(K).fill(null);this.sung=new Array(K).fill(null);this.hit=new Array(K).fill(false);
+    this.combo=new Array(K).fill(0);this.best=new Array(K).fill(0);this.goldHit=new Array(K).fill(0);this.parts=[];this.pops=[];this.lastEnd=null;
+    this.setState({screen:'sing',paused:false,scores:new Array(K).fill(0),teamScores:[0,0],pauseF:0});}
+  finishSing(){if(this.state.mode==='jukebox'){this.jukeNext();return;}if(this.state.mode==='party'){const pts=Math.round(this.score[0]),p=this.state.party,sc=p.scores.slice();sc[p.turn]+=pts;this.chart=null;this.go('party',{party:{...p,scores:sc,step:'board',last:{name:this.state.singers[0].name,pts,t:p.turn}}});return;}const ch=this.chart,S=this.state.singers;const goldN=ch.notes.filter(n=>n.type==='gold').length;
+    const rows=S.map((s,k)=>{let h=0,t=0;ch.notes.forEach(n=>{if(n.sl){h+=n.sl[k].reduce((a,b)=>a+b,0);t+=n.sl[k].length;}});return {name:s.name,color:s.color,shape:s.shape,score:Math.round(this.score[k]),prec:Math.round(100*h/t),gold:this.goldHit[k]+'/'+goldN,streak:this.best[k],bestPh:Math.round(100*Math.max(0,...ch.phrases.filter(p=>p.parts.includes(s.part)).map(p=>{let a=0,b=0;p.notes.forEach(n=>{if(n.sl){a+=n.sl[k].reduce((x,y)=>x+y,0);b+=n.sl[k].length;}});return b?a/b:0;})))};});
+    rows.sort((a,b)=>b.score-a.score);let head=null;if(this.state.mode==='duel'){const T=this.teams(),av=this.teamAvg(this.score).map(Math.round);head=av[0]===av[1]?'Empate.':'Gana '+T[av[0]>av[1]?0:1].name+'.';}const song=SONGS[this.state.songSel];const recN=parseInt((song.rec.split(' ')[0]||'0').replace('.',''))||0;
+    this.chart=null;this.showResults(rows,rows[0].score>recN,this.state.songSel,head);}
+  showResults(rows,record,songSel,head){this.resStart=this.T||performance.now()/1000;
+    if(record)this.conf=Array.from({length:140},()=>({x:Math.random()*1920,y:-Math.random()*1080,vy:180+Math.random()*260,vx:-40+Math.random()*80,r:Math.random()*6,vr:-4+Math.random()*8,w:10+Math.random()*14,h:6+Math.random()*8,c:[C.red,C.ink,C.gold,'#fff'][Math.floor(Math.random()*4)]}));else this.conf=[];
+    this.setState({screen:'results',results:{rows,record,head},songSel,resT:0,resF:0,paused:false});}
+  pauseAct(i){if(i===0)this.setState({paused:false});else if(i===1)this.startSing();else if(i===2)this.setState({pauseAudio:true,paF:0});else{this.chart=null;const m=this.state.mode;if(m==='party')this.go('party',{paused:false});else if(m==='jukebox')this.go('menu',{paused:false});else this.go('songs',{paused:false});}}
+  resAct(i){this.conf=[];if(i===0)this.go('songs',{zone:'grid'});else if(i===1){if(!this.state.singers.length)this.setState({singers:this.singersFromSetup().length?this.singersFromSetup():[{name:'Oriol',color:PLAYERS[1][1],shape:PLAYERS[1][2],tol:1}]},()=>this.startSing());else this.startSing();}else this.go('menu');}
+  menuAct(i){if(i<=2){const mode=['sing','duel','duo'][i];this.go('songs',{zone:'grid',mode,songF:0,duoOnly:mode==='duo'});}else if(i===3)this.partyNew();else if(i===4)this.setState({mode:'jukebox',songSel:0,singers:[],jq:[1,2,3,4]},()=>this.startSing());else if(i===5)this.go('records',{recTab:0});else this.go('settings',{setF:0});}
+  jukeNext(){const q=this.state.jq;this.setState({songSel:q[0],jq:[...q.slice(1),this.state.songSel]},()=>this.startSing());}
+  beginCount(extra){(clearTimeout(this.cWait),clearInterval(this.cTimer));this.setState({screen:'count',countN:3,tip:TIPS[Math.floor(Math.random()*TIPS.length)],...extra});this.cTimer=this.cDelayed(()=>{if(this.state.countN<=1){(clearTimeout(this.cWait),clearInterval(this.cTimer));this.startSing();}else this.setState({countN:this.state.countN-1});},1000);}
+  P(u){this.setState(s=>({party:{...s.party,...u}}));}
+  partyNew(){if(this.state.count<2){this.toast('Pasa el micro necesita al menos 2 jugadores');return;}this.conf=[];this.go('party',{mode:'party',party:{step:'teams',nT:2,tOf:Array.from({length:8},(_,i)=>i%2),pf:0,round:1,rounds:4,scores:[0,0,0,0],turn:0,ch:0,spin:-1,spinning:false,last:null,cf:0}});}
+  teamIds(p,t){return [...Array(this.state.count).keys()].filter(i=>p.tOf[i]===t);}
+  turnPlayer(p){const ids=this.teamIds(p,p.turn);return ids[Math.floor((p.round-1)/p.nT)%ids.length];}
+  partyMove(i,d){const p=this.state.party,t=p.tOf.slice();t[i]=(t[i]+(d>0?1:p.nT-1))%p.nT;this.P({tOf:t});}
+  spin(){const p=this.state.party,start=p.spin<0?0:p.spin,target=Math.floor(Math.random()*8),S=16+((target-start+8)%8);this.P({spinning:true});let i=0;
+    const step=()=>{i++;this.P({spin:(start+i)%8});if(i>=S){this.P({spinning:false,ch:target});this.spT=setTimeout(()=>{if(this.state.screen==='party')this.P({step:'turn'});},900);return;}this.spT=setTimeout(step,40+9*i);};this.spT=setTimeout(step,40);}
+  partyGo(){const p=this.state.party,P0=PLAYERS[this.turnPlayer(p)];this.beginCount({mode:'party',singers:[{name:P0[0],color:P0[1],shape:P0[2],tol:DIFFS[this.state.settings.diff][1],team:0,part:0}],songSel:Math.floor(Math.random()*SONGS.length)});}
+  makeConf(){return Array.from({length:140},()=>({x:Math.random()*1920,y:-Math.random()*1080,vy:180+Math.random()*260,vx:-40+Math.random()*80,r:Math.random()*6,vr:-4+Math.random()*8,w:10+Math.random()*14,h:6+Math.random()*8,c:[C.ink,C.gold,'#fff','#fff'][Math.floor(Math.random()*4)]}));}
+  partyKey(a){const p=this.state.party,n=this.state.count;
+    if(p.step==='teams'){if(a==='u')this.P({pf:Math.max(0,p.pf-1)});else if(a==='d')this.P({pf:Math.min(n-1,p.pf+1)});else if(a==='l'||a==='r')this.partyMove(p.pf,a==='r'?1:-1);
+      else if(a==='x'){if(p.nT<4)this.P({nT:p.nT+1});else this.toast('Máximo 4 equipos');}
+      else if(a==='y'){if(p.nT>2){const nT=p.nT-1;this.P({nT,tOf:p.tOf.map(t=>t>=nT?nT-1:t)});}else this.toast('Mínimo 2 equipos');}
+      else if(a==='ok'){if(![...Array(p.nT).keys()].every(t=>this.teamIds(p,t).length)){this.toast('Cada equipo necesita al menos un jugador');return;}this.P({step:'roulette'});}else if(a==='back')this.go('menu');}
+    else if(p.step==='roulette'){if(p.spinning)return;if(a==='ok')this.spin();else if(a==='back')this.P({step:'teams'});}
+    else if(p.step==='turn'){if(a==='ok')this.partyGo();else if(a==='back')this.P({step:'roulette'});}
+    else if(p.step==='board'){if(a==='ok'){if(p.round>=p.rounds){this.conf=this.makeConf();this.P({step:'champs',cf:0});}else this.P({round:p.round+1,turn:(p.turn+1)%p.nT,step:'roulette'});}}
+    else if(p.step==='champs'){if(a==='l'||a==='r')this.P({cf:1-p.cf});else if(a==='ok'){this.conf=[];if(p.cf===0)this.partyNew();else this.go('menu');}}}
+  setKey(a){const s=this.state,f=s.setF,r=SET_ROWS[f],st=s.settings;
+    if(a==='u')return this.setState({setF:Math.max(0,f-1)});if(a==='d')return this.setState({setF:Math.min(SET_ROWS.length-1,f+1)});if(a==='back')return this.go('menu');
+    const put=(k,v)=>this.setState({settings:{...st,[k]:v}});
+    if(r.type==='seg'){const m=r.opts.length;if(a==='l')put(r.k,Math.max(0,st[r.k]-1));else if(a==='r')put(r.k,Math.min(m-1,st[r.k]+1));else if(a==='ok')put(r.k,(st[r.k]+1)%m);}
+    else if(r.type==='bar'){if(a==='l')put(r.k,Math.max(0,st[r.k]-1));else if(a==='r')put(r.k,Math.min(10,st[r.k]+1));}
+    else if(a==='ok'){if(r.k==='delay')this.go('calib',{calib:{phase:'idle',beat:-1,ms:st.delay,manual:st.delay,f:0,marks:[]}});
+      else if(r.k==='kick'){if(!s.count)return this.toast('No hay nadie en la sala');this.toast(PLAYERS[s.count-1][0]+' ha salido de la sala');this.setState({count:s.count-1});}
+      else{const L='ABCDEFGHJKLMNPRSTUVXYZ';const code=Array.from({length:4},()=>L[Math.floor(Math.random()*L.length)]).join('');this.setState({room:code});this.toast('Nuevo código '+code+': los móviles deben volver a entrar');}}}
+  calKey(a){const c=this.state.calib;if(c.phase==='measure'||c.phase==='test'){if(a==='back'){clearInterval(this.bTimer);this.setState({calib:{...c,phase:'idle',beat:-1}});}return;}
+    if(a==='u')this.setState({calib:{...c,f:Math.max(0,c.f-1)}});else if(a==='d')this.setState({calib:{...c,f:Math.min(3,c.f+1)}});
+    else if((a==='l'||a==='r')&&c.f===1)this.setState({calib:{...c,manual:Math.max(0,Math.min(400,c.manual+(a==='r'?10:-10)))}});
+    else if(a==='ok'){if(c.f===0)this.beats('measure');else if(c.f===2)this.beats('test');else if(c.f===3){this.setState({settings:{...this.state.settings,delay:c.manual}});this.toast('Retraso guardado: '+c.manual+' ms');this.go('settings');}}
+    else if(a==='back')this.go('settings');}
+  beats(phase){clearInterval(this.bTimer);if(!this.trueLat)this.trueLat=105+Math.round(Math.random()*30);const c0=this.state.calib;this.setState({calib:{...c0,phase,beat:-1,marks:[]}});let b=0;
+    this.bTimer=setInterval(()=>{const c=this.state.calib;if(b>=8){clearInterval(this.bTimer);
+        if(phase==='measure'){const v=Math.round(this.trueLat/5)*5;this.setState({calib:{...c,phase:'done',beat:-1,ms:v,manual:v,f:2}});this.toast('Retraso medido: '+v+' ms');}
+        else{const avg=Math.round(c.marks.reduce((x,y)=>x+y,0)/c.marks.length);this.setState({calib:{...c,phase:'done',beat:-1,f:avg<=20&&avg>=-20?3:1}});this.toast(Math.abs(avg)<=20?'Sincronizado: voz y música van a la vez':'Aún hay '+avg+' ms de desfase: ajusta a mano');}return;}
+      const off=phase==='measure'?this.trueLat+(Math.random()*40-20):(this.trueLat-c.manual)+(Math.random()*16-8);this.setState({calib:{...c,beat:b,marks:[...c.marks,Math.round(off)]}});b++;},600);}
+  filterAct(i){const s=this.state;if(i===0)return this.setState({search:{open:true,f:0}});const up={songF:0};if(i===1)up.ord=(s.ord+1)%ORDERS.length;else if(i===2)up.lng=(s.lng+1)%LANGS.length;else if(i===3)up.dec=(s.dec+1)%DECS.length;else if(i===4)up.gen=(s.gen+1)%GENS.length;else up.duoOnly=!s.duoOnly;this.setState(up);}
+  setupToggle(i){if(this.isOff(i)){this.toast(PLAYERS[i][0]+' no tiene el micro conectado');return;}const m=this.state.mode;this.setState(s=>({setup:s.setup.map((r,j)=>j!==i?r:m==='sing'?{...r,on:!r.on}:{...r,side:r.side===0?2:r.side===2?1:0})}));}
+  setupDiff(i,d){this.setState(s=>({setup:s.setup.map((r,j)=>j===i?{...r,diff:Math.max(0,Math.min(2,r.diff+d))}:r)}));}
+  onKey(e){const map={ArrowLeft:'l',ArrowRight:'r',ArrowUp:'u',ArrowDown:'d',Enter:'ok',' ':'ok',Escape:'back',Backspace:'back',p:'menu',P:'menu',m:'menu',M:'menu',v:'v',V:'v',j:'add',J:'add','+':'add','-':'rem',q:'lb',Q:'lb',e:'rb',E:'rb',x:'x',X:'x',y:'y',Y:'y',GamepadA:'ok',GamepadB:'back',GamepadX:'x',GamepadY:'y',GamepadMenu:'menu',GamepadView:'v',GamepadLeftShoulder:'lb',GamepadRightShoulder:'rb',GamepadDPadUp:'u',GamepadDPadDown:'d',GamepadDPadLeft:'l',GamepadDPadRight:'r',GamepadLeftThumbstickUp:'u',GamepadLeftThumbstickDown:'d',GamepadLeftThumbstickLeft:'l',GamepadLeftThumbstickRight:'r'};const a=map[e.key];if(!a)return;e.preventDefault();if(e.key.startsWith('Gamepad'))this.padKeys=true;this.act(a);}
+  act(a){const s=this.state;
+    if(s.err){if(a==='ok'||a==='back')this.errAct();return;}
+    if(s.screen==='splash'||s.screen==='boot')return;if(s.screen==='welcome'){if(a==='ok')this.go('lobby');return;}
+    if(s.screen==='lobby'&&a==='y')a='add';
+    if(s.screen==='sing'&&a==='x')a='v';
+    if(s.screen==='sing'&&s.mode==='jukebox'&&!s.paused&&a==='rb'){this.jukeNext();return;}
+    if(s.screen==='songs'&&s.search.open){this.searchKey(a);return;}
+    if(s.screen==='songs'&&(a==='lb'||a==='rb')){const n=ORDERS.length;this.setState({ord:(s.ord+(a==='rb'?1:n-1))%n,songF:0});this.toast('Orden: '+ORDERS[(s.ord+(a==='rb'?1:n-1))%n]);return;}
+    if(s.screen==='sing'&&s.paused&&s.pauseAudio){this.paKey(a);return;}
+    if(s.screen==='records'){if(a==='l'||a==='lb')this.setState({recTab:Math.max(0,s.recTab-1)});else if(a==='r'||a==='rb')this.setState({recTab:Math.min(3,s.recTab+1)});else if(a==='back')this.go('menu');return;}
+    if(s.screen==='settings'){this.setKey(a);return;}
+    if(s.screen==='calib'){this.calKey(a);return;}
+    if(s.screen==='party'){this.partyKey(a);return;}
+    if(s.screen==='lobby'){if(a==='ok')this.onStartFn();else if(a==='add')this.addPlayer();else if(a==='rem')this.setState({count:Math.max(0,s.count-1)});}
+    else if(s.screen==='menu'){if(a==='l')this.setState({menuF:Math.max(0,s.menuF-1)});else if(a==='r')this.setState({menuF:Math.min(6,s.menuF+1)});else if(a==='ok')this.menuAct(s.menuF);else if(a==='back')this.go('lobby');}
+    else if(s.screen==='songs'){const n=this.songsList().length;
+      if(s.zone==='filters'){if(a==='l')this.setState({filterF:Math.max(0,s.filterF-1)});else if(a==='r')this.setState({filterF:Math.min(FILTERS.length,s.filterF+1)});else if(a==='d'&&n)this.setState({zone:'grid'});else if(a==='ok')this.filterAct(s.filterF);else if(a==='back')this.go('menu');}
+      else{if(a==='l')this.setState({songF:Math.max(0,s.songF-1)});else if(a==='r')this.setState({songF:Math.min(n-1,s.songF+1)});else if(a==='u')this.setState({zone:'filters',filterF:1});else if(a==='ok')this.startSetup();else if(a==='back')this.go('menu');}}
+    else if(s.screen==='setup'){const N=s.setup.length;if(a==='u')this.setState({setupF:Math.max(0,s.setupF-1)});else if(a==='d')this.setState({setupF:Math.min(N,s.setupF+1)});
+      else if(a==='l'&&s.setupF<N)this.setupDiff(s.setupF,-1);else if(a==='r'&&s.setupF<N)this.setupDiff(s.setupF,1);
+      else if(a==='ok'){if(s.setupF===N)this.startCount();else this.setupToggle(s.setupF);}else if(a==='back')this.go('songs');}
+    else if(s.screen==='count'){if(a==='back'){(clearTimeout(this.cWait),clearInterval(this.cTimer));this.go(s.mode==='party'?'party':'setup');}}
+    else if(s.screen==='results'){if(a==='l')this.setState({resF:Math.max(0,s.resF-1)});else if(a==='r')this.setState({resF:Math.min(2,s.resF+1)});else if(a==='ok')this.resAct(s.resF);}
+    else if(s.screen==='sing'){
+      if(s.paused){if(a==='u')this.setState({pauseF:Math.max(0,s.pauseF-1)});else if(a==='d')this.setState({pauseF:Math.min(3,s.pauseF+1)});else if(a==='ok')this.pauseAct(s.pauseF);else if(a==='back'||a==='menu')this.setState({paused:false});}
+      else{if(a==='back'||a==='menu')this.setState({paused:true,pauseF:0});else if(a==='v')this.toggleVariant();}}
+  }
+  onStartFn=()=>{if(!this.state.count){this.toast('Espera a que se una alguien');return;}this.go('menu',{menuF:0});};
+  variant(){return this.state.variant??this.props.singVariant??'C';}
+  toggleVariant=()=>this.setState({variant:{A:'B',B:'C',C:'A'}[this.variant()]});
+
+  update(dt){if(this.state.paused)return;const ch=this.chart,S=this.state.singers,K=S.length,duel=this.state.mode==='duel';this.now+=dt;const now=this.now;
+    let act=null;for(const n of ch.notes){if(now>=n.start&&now<n.start+n.dur){act=n;break;}}
+    for(let k=0;k<K;k++){let sung=null;const a=act&&act.parts.includes(S[k].part)?act:null;
+      if(a){const kk=(now-a.start)/a.dur,q=a.q[k];let err;
+        if(q==='good')err=0.25*Math.sin(now*9+a.i+k*1.7);else if(q==='partial')err=kk<0.55?0.3*Math.sin(now*8+k):0.3+(kk-0.55)*4.5;else err=a.off[k]+0.3*Math.sin(now*7+k);
+        const tgt=a.p+err;sung=(kk<0.12&&this.lastP[k]!=null)?this.lastP[k]+(tgt-this.lastP[k])*(kk/0.12):tgt;}
+      else if(!act&&this.lastEnd!=null&&now-this.lastEnd<0.08&&this.lastMine&&this.lastMine[k])sung=this.lastP[k];
+      this.hit[k]=false;
+      if(a&&a.sl&&sung!=null){const tol=S[k].tol+(a.type==='rap'?0.6:0);this.hit[k]=Math.abs(sung-a.p)<=tol;const sl=a.sl[k];const si=Math.min(sl.length-1,Math.floor((now-a.start)/SL));
+        if(this.hit[k]&&!sl[si]){sl[si]=1;this.score[k]+=ch.unitP[S[k].part]*(a.type==='gold'?2:1);}
+        if(this.hit[k]&&Math.random()<(a.type==='gold'?0.8:0.3)/Math.sqrt(K))this.spawn(k,a.type==='gold');}
+      this.sung[k]=sung;if(sung!=null)this.lastP[k]=sung;
+      const h=this.hist[k];h.push({t:now,p:sung});while(h.length&&h[0].t<now-2.2)h.shift();
+      this.disp[k]+=(this.score[k]-this.disp[k])*Math.min(1,dt*6);}
+    if(act){this.lastEnd=act.start+act.dur;this.lastMine=S.map(s=>act.parts.includes(s.part));}
+    for(const n of ch.notes){if(!n.done&&now>=n.start+n.dur){n.done=true;if(n.sl)for(let k=0;k<K;k++){if(!n.parts.includes(S[k].part))continue;const r=n.sl[k].reduce((a,b)=>a+b,0)/n.sl[k].length;this.combo[k]=r>0.6?this.combo[k]+1:0;this.best[k]=Math.max(this.best[k],this.combo[k]);if(n.type==='gold'&&r>0.6)this.goldHit[k]++;}}}
+    const rate=r=>r>0.9?['Perfecto',C.red,'#fff']:r>0.75?['Genial',C.ink,'#fff']:r>0.55?['Bien','#fff',C.ink]:r>0.3?['Regular',C.n3,C.ink]:['Fallo',C.n5,C.ink];
+    for(const ph of ch.phrases){if(!ph.done&&now>=ph.end){ph.done=true;const ratio=k=>{let h=0,t=0;ph.notes.forEach(n=>{if(n.sl){h+=n.sl[k].reduce((a,b)=>a+b,0);t+=n.sl[k].length;}});return t?h/t:null;};
+      if(duel){this.teams().forEach((T,t)=>{const rs=T.ks.map(ratio).filter(r=>r!=null);if(!rs.length)return;const R=rate(rs.reduce((a,b)=>a+b,0)/rs.length);this.pops.push({team:t,text:R[0],bg:R[1],fg:R[2],t0:now});});}
+      else for(let k=0;k<K;k++){if(!ph.parts.includes(S[k].part))continue;const r=ratio(k);if(r==null)continue;const R=rate(r);this.pops.push({k,text:R[0],bg:R[1],fg:R[2],t0:now});}}}
+    if(duel){const av=this.teamAvg(this.score),tgt=0.5+0.5*Math.max(-1,Math.min(1,(av[1]-av[0])/Math.max(800,(av[0]+av[1])/2)));this.tug+=(tgt-this.tug)*Math.min(1,dt*3);
+      const ld=Math.abs(av[0]-av[1])<60?this.leader:(av[0]>av[1]?-1:1);if(ld!==this.leader&&av[0]+av[1]>400){this.leader=ld;this.pops.push({center:true,text:'Se adelanta '+this.teams()[ld<0?0:1].name,bg:C.red,fg:'#fff',t0:now});}}
+    this.parts=this.parts.filter(p=>(p.life-=dt)>0);this.parts.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=300*dt;});
+    if(now>=ch.duration)this.finishSing();
+  }
+  L(){return this.variant()==='A'?{x:96,y:220,w:1728,h:530,rx:96+0.27*1728}:{x:0,y:250,w:1920,h:600,rx:0.27*1920};}
+  py(p,L){return L.y+L.h-56-(p/12)*(L.h-112);}
+  spawn(k,gold){const L=(this.laneOf&&this.laneOf[k])||this.L();const y=this.py(this.sung[k],L);const col=gold&&this.state.singers.length===1?C.gold:this.state.singers[k].color;for(let i=0;i<(gold?3:1);i++)this.parts.push({x:L.rx,y,vx:-60-Math.random()*160,vy:-120-Math.random()*200,life:0.5,col,s:4+Math.random()*4});}
+
+  drawBg(c,dt){const sc=this.state.screen;if(sc==='splash'||sc==='welcome'){this.bgK=0;return this.drawBg0(c,dt,false);}
+    const tgt=sc==='sing'&&!!this.chart?1:0;if(this.bgK==null)this.bgK=tgt;const nowT=performance.now(),st=this._bgT?Math.min(0.05,(nowT-this._bgT)/1000)/1.0:0;this._bgT=nowT;this.bgK=tgt>this.bgK?Math.min(tgt,this.bgK+st):Math.max(tgt,this.bgK-st);
+    const k=this.bgK;if(k<=0.001)return this.drawBg0(c,dt,false);if(k>=0.999)return this.drawBg0(c,dt,true);
+    this.drawBg0(c,dt,false);if(!this.bgOff){this.bgOff=document.createElement('canvas');this.bgOff.width=1920;this.bgOff.height=1080;}
+    const o=this.bgOff.getContext('2d');o.setTransform(1,0,0,1,0,0);o.globalAlpha=1;this.drawBg0(o,dt,true);const e=k*k*(3-2*k);c.save();c.globalAlpha=e;c.drawImage(this.bgOff,0,0);c.restore();}
+  drawBg0(c,dt,live){if(this.state.screen==='splash'){c.fillStyle='#0e0f0f';c.fillRect(0,0,1920,1080);return;}if(this.state.screen==='welcome'){this.drawWelcome(c);return;}if(live&&this.variant()==='C'&&this.state.mode!=='jukebox'){if(!this.props.videoUrl)this.drawVideo(c);else{c.fillStyle='#000';c.fillRect(0,0,1920,1080);}return;}const dark=live&&(this.variant()==='B'||this.state.mode==='jukebox');c.fillStyle=dark?C.ink:C.bg;c.fillRect(0,0,1920,1080);
+    if(dark){c.fillStyle='rgba(243,242,242,0.04)';for(let i=0;i<12;i++){const x=96+i*(1728/12);c.fillRect(x,0,1,1080);}c.font='300 28px Archivo';c.fillStyle='rgba(243,242,242,0.25)';c.textAlign='right';c.fillText('Vídeo de la canción',1824,1060);}
+    else{c.fillStyle='rgba(32,30,29,0.035)';for(let i=0;i<=12;i++){const x=96+i*(1728/12);c.fillRect(x,0,1,1080);}
+      const sc=this.state.screen,md=this.state.mode,pre=sc==='songs'||sc==='setup'||sc==='count';
+      if(pre&&md==='duel'){c.fillStyle='rgba(32,30,29,0.05)';c.fillRect(960,0,960,1080);}
+      if(pre&&md==='duo'){c.fillStyle='rgba(32,30,29,0.05)';c.fillRect(0,540,1920,540);}
+      if(sc==='party'||(pre&&md==='party')){TEAMS.forEach((t,i)=>{c.fillStyle=t[1];c.fillRect(i*480,0,480,12);});}
+      if(sc==='menu')this.drawMenuArt(c,this.state.menuF,this.T||0,1380,200,444,420);}
+    const champs=this.state.screen==='party'&&this.state.party&&this.state.party.step==='champs';if(champs){c.fillStyle=C.red;c.fillRect(0,0,1920,1080);}
+    if(this.state.screen==='results'||champs)this.drawConf(c,dt);}
+  drawConf(c,dt){if(!this.conf.length)return;this.conf.forEach(p=>{p.y+=p.vy*dt;p.x+=p.vx*dt;p.r+=p.vr*dt;c.save();c.translate(p.x,p.y);c.rotate(p.r);c.fillStyle=p.c;c.fillRect(-p.w/2,-p.h/2,p.w,p.h);if(p.c==='#fff'){c.strokeStyle=C.ink;c.lineWidth=1.5;c.strokeRect(-p.w/2,-p.h/2,p.w,p.h);}c.restore();});
+    this.conf=this.conf.filter(p=>p.y<1140);}
+
+  drawNote(c,n,x,y,w,h,A,ks,cols){c.save();const ink=A?C.ink:C.bg,K=ks.length,R=Math.min(6,h/2,w/2);
+    const rp=(x1,y1,w1,h1,r)=>{c.beginPath();if(c.roundRect)c.roundRect(x1,y1,w1,h1,r);else c.rect(x1,y1,w1,h1);};
+    if(n.type==='free'){c.setLineDash([10,8]);c.lineWidth=2;c.strokeStyle=A?C.n6:C.n5;rp(x+1,y+1,w-2,h-2,R);c.stroke();c.restore();return;}
+    rp(x,y,w,h,R);c.save();c.clip();
+    if(n.type==='gold'){c.fillStyle=rgba(C.gold,0.35);c.fillRect(x,y,w,h);}
+    else if(n.type==='rap'){c.fillStyle=c.createPattern(A?this.stripeL:this.stripeD,'repeat');c.fillRect(x,y,w,h);}
+    else{c.fillStyle=this.vidMode?'rgba(243,242,242,0.62)':A?'#fff':'rgba(243,242,242,0.12)';c.fillRect(x,y,w,h);}
+    const sw=SL*PPS,sh=h/K;
+    for(let q=0;q<K;q++){const k=ks[q];c.fillStyle=n.type==='gold'&&K===1?C.gold:cols[k];const sl=n.sl[k];let i=0;
+      while(i<sl.length){if(sl[i]){let j=i;while(j<sl.length&&sl[j])j++;c.fillRect(x+i*sw,y+q*sh,Math.min((j-i)*sw,w-i*sw),sh);i=j;}else i++;}}
+    if(K>1){c.fillStyle=A?'rgba(32,30,29,0.25)':'rgba(243,242,242,0.25)';for(let k=1;k<K;k++)c.fillRect(x,y+k*sh-0.5,w,1);}
+    c.restore();
+    c.lineWidth=2;c.strokeStyle=n.type==='gold'?(A?C.goldD:C.gold):ink;rp(x+1,y+1,w-2,h-2,Math.max(0,R-1));c.stroke();
+    if(n.type==='gold'){c.fillStyle=A?C.goldD:C.gold;c.globalAlpha=0.5+0.5*Math.sin(this.T*6+n.i);for(let k=0;k<2;k++){c.save();c.translate(x+w*(0.3+0.4*k),y-10);c.rotate(Math.PI/4);c.fillRect(-4,-4,8,8);c.restore();}}
+    c.restore();}
+
+  drawLyrics(c,x0,y1,s1,y2,s2,part){s1=Math.round(s1*(this.state.settings.lyr?1.12:1));if(this.state.mode==='party'&&this.state.party&&this.state.party.ch===1){c.save();c.font='300 '+s1+'px Archivo';c.fillStyle=C.n5;c.textAlign='left';c.textBaseline='alphabetic';c.fillText('Sin letra. De memoria.',x0,y1);c.restore();return;}const ch=this.chart,now=this.now;const PH=part==null?ch.phrases:ch.phrases.filter(p=>p.parts.includes(part));const ci=PH.findIndex(p=>p.end+0.35>now);if(ci<0)return;const cur=PH[ci],nx=PH[ci+1];const joint=part!=null&&cur.parts.length===2;
+    const base=C.bg,dim=C.n5,fill=C.red5;
+    c.save();c.textBaseline='alphabetic';c.textAlign='left';
+    const prevEnd=ci>0?PH[ci-1].end:0;
+    const othersSing=part!=null&&ch.phrases.some(p=>!p.parts.includes(part)&&now>=p.start-0.3&&now<=p.end+0.35);
+    if(othersSing&&cur.start-now>1.2){c.font='300 '+s1+'px Archivo';c.fillStyle=dim;c.fillText('Canta la Parte '+(2-part),x0,y1);c.font='400 '+s2+'px Archivo';c.fillText(cur.notes.map(n=>n.s).join(''),x0,y2);c.restore();return;}
+    if(ci>0&&now>prevEnd+0.35&&cur.start-now>2.2){c.font='300 '+s1+'px Archivo';c.fillStyle=dim;c.fillText('Interludio musical',x0,y1);
+      const k=(now-prevEnd)/(cur.start-prevEnd);c.fillStyle='rgba(243,242,242,0.2)';c.fillRect(x0,y2-16,560,8);c.fillStyle=base;c.fillRect(x0,y2-16,560*k,8);c.restore();return;}
+    let x=x0;if(joint){c.font='800 '+Math.round(s1*0.55)+'px Archivo';const tw=c.measureText('Juntos').width;c.fillStyle=C.red;c.fillRect(x0,y1-s1*0.62,tw+24,s1*0.78);c.fillStyle='#fff';c.fillText('Juntos',x0+12,y1-s1*0.06);x+=tw+40;}
+    cur.notes.forEach(n=>{c.font=(n.type==='free'?'italic 400 ':'800 ')+s1+'px Archivo';const w=c.measureText(n.s).width;c.fillStyle=n.type==='free'?dim:base;c.fillText(n.s,x,y1);
+      const pr=Math.max(0,Math.min(1,(now-n.start)/n.dur));if(pr>0){c.save();c.beginPath();c.rect(x,y1-s1,w*pr,s1*1.4);c.clip();c.fillStyle=n.type==='gold'?C.gold:fill;c.fillText(n.s,x,y1);c.restore();}x+=w;});
+    if(nx){c.font='400 '+s2+'px Archivo';c.fillStyle=dim;c.fillText(nx.notes.map(n=>n.s).join(''),x0,y2);}
+    c.restore();}
+
+  drawLane(c,L,part,ks,A,label){const ch=this.chart,now=this.now,S=this.state.singers,cols=S.map(s=>s.color),K=ks.length,ink=A?C.ink:C.bg;
+    if(A){c.fillStyle='#fff';c.fillRect(L.x,L.y,L.w,L.h);c.fillStyle=C.ink;c.fillRect(L.x,L.y,L.w,2);c.fillRect(L.x,L.y+L.h-2,L.w,2);}
+    else{c.fillStyle='rgba(32,30,29,0.55)';c.fillRect(L.x,L.y,L.w,L.h);c.fillStyle=C.bg;c.fillRect(L.x,L.y,L.w,2);c.fillRect(L.x,L.y+L.h-2,L.w,2);}
+    c.save();c.beginPath();c.rect(L.x,L.y+2,L.w,L.h-4);c.clip();
+    c.fillStyle=A?C.n2:'rgba(243,242,242,0.08)';for(let p=0;p<=12;p+=2){c.fillRect(L.x,this.py(p,L),L.w,2);}
+    const H=K<=1?(A?28:34):Math.min(52,26+K*4);
+    for(const ph of ch.phrases){if(part!=null&&!ph.parts.includes(part))continue;
+      if(part!=null&&ph.parts.length===2){const x=L.rx+(ph.start-now)*PPS;if(x<L.x+L.w&&x+(ph.end-ph.start)*PPS>L.x){c.fillStyle=rgba(C.red,A?0.08:0.18);c.fillRect(x-12,L.y+2,(ph.end-ph.start)*PPS+24,L.h-4);c.font='800 28px Archivo';c.textBaseline='top';c.textAlign='left';c.fillStyle=C.red;c.fillText('Cantad juntos',Math.max(x,L.x+8),L.y+12);}}
+      for(const n of ph.notes){const x=L.rx+(n.start-now)*PPS,w=n.dur*PPS;if(x>L.x+L.w||x+w<L.x)continue;this.drawNote(c,n,x,this.py(n.p,L)-H/2,w,H,A,ks,cols);}}
+    c.fillStyle=C.red;c.fillRect(L.rx-2,L.y,4,L.h);
+    if(this.state.settings.trail){for(const k of ks){const path=()=>{c.beginPath();let pen=false;for(const h of this.hist[k]){if(h.p==null){pen=false;continue;}const x=L.rx-(now-h.t)*PPS;if(x<L.x)continue;const y=this.py(h.p,L)+(k-(S.length-1)/2)*2;if(!pen){c.moveTo(x,y);pen=true;}else c.lineTo(x,y);}};
+      path();c.lineWidth=K>3?7:10;c.strokeStyle=ink;c.stroke();path();c.lineWidth=K>3?3.5:5;c.strokeStyle=cols[k];c.stroke();}}
+    for(const k of ks){if(this.sung[k]==null)continue;const y=this.py(this.sung[k],L),r=(this.hit[k]?16:10)*(K>3?0.75:1);c.save();c.translate(L.rx,y);if(this.hit[k])c.rotate(Math.PI/4);c.fillStyle=ink;c.fillRect(-r-3,-r-3,2*r+6,2*r+6);c.fillStyle=this.hit[k]?cols[k]:(A?'#fff':C.ink);c.fillRect(-r,-r,2*r,2*r);c.restore();}
+    const PH=part==null?ch.phrases:ch.phrases.filter(p=>p.parts.includes(part));const f0=PH[0].start;if(now<f0&&now>f0-3){c.font='300 '+(L.h>400?160:110)+'px Archivo';c.textAlign='left';c.textBaseline='middle';c.fillStyle=C.red;c.fillText(Math.ceil(f0-now),L.rx+40,L.y+L.h/2);}
+    if(label){c.font='800 28px Archivo';c.textBaseline='top';c.textAlign='left';const w=c.measureText(label).width;c.fillStyle=ink;c.fillRect(L.x,L.y+2,w+32,44);c.fillStyle=A?'#fff':C.ink;c.fillText(label,L.x+16,L.y+10);}
+    else if(K===1&&this.state.mode==='sing'&&this.combo[ks[0]]>=3){c.font='800 32px Archivo';c.textBaseline='top';c.textAlign='left';const t='Racha ×'+this.combo[ks[0]];const w=c.measureText(t).width;c.fillStyle=ink;c.fillRect(L.x+(A?0:96),L.y+2,w+32,48);c.fillStyle=A?'#fff':C.ink;c.fillText(t,L.x+(A?16:112),L.y+10);}
+    c.restore();}
+
+  drawWelcome(c){const t=this.T||0;c.fillStyle=C.bg;c.fillRect(0,0,1920,1080);
+    if(!this.wBars){let s=7;const rnd=()=>(s=(s*16807)%2147483647)/2147483647;this.wBars=Array.from({length:14},(_,i)=>({y:90+rnd()*860,w:140+rnd()*300,x:rnd()*2400,v:30+rnd()*50,c:PLAYERS[i%8][1]}));}
+    c.globalAlpha=0.22;this.wBars.forEach(b=>{const x=((b.x-t*b.v)%2400+2400)%2400-300;c.fillStyle=b.c;c.beginPath();c.roundRect(x,b.y,b.w,22,6);c.fill();});c.globalAlpha=1;
+    const cx=1180,cy=428;c.lineWidth=3;for(let i=0;i<5;i++){const k=((t/1.8+i/5)%1);const r=80+k*1100;c.strokeStyle='rgba(236,48,19,'+(0.32*(1-k)).toFixed(3)+')';c.beginPath();c.arc(cx,cy,r,0,Math.PI*2);c.stroke();}}
+  drawVideo(c){const t=this.T||0;c.fillStyle='#7a7776';c.fillRect(0,0,1920,1080);
+    [[0.3,0.45,0.5,'217,214,213'],[0.72,0.35,0.42,'239,237,237'],[0.55,0.82,0.45,'58,56,55'],[0.1,0.85,0.35,'42,41,40'],[0.88,0.78,0.3,'189,186,185'],[0.5,0.3,0.18,'40,39,38']].forEach(([x,y,r,col],i)=>{const cx=(x+0.04*Math.sin(t*0.13+i))*1920,cy=(y+0.03*Math.cos(t*0.11+i*2))*1080,R=r*1920;const g=c.createRadialGradient(cx,cy,0,cx,cy,R);g.addColorStop(0,'rgba('+col+',1)');g.addColorStop(1,'rgba('+col+',0)');c.fillStyle=g;c.fillRect(0,0,1920,1080);});
+    c.strokeStyle='rgba(32,30,29,0.08)';c.lineWidth=2;c.beginPath();for(let k=-1080;k<1920;k+=9){c.moveTo(k,1080);c.lineTo(k+1080,0);}c.stroke();
+    c.font='600 22px Archivo';c.fillStyle='rgba(32,30,29,0.6)';c.textAlign='right';c.textBaseline='alphabetic';c.fillText('Videoclip de la canción · en blanco y negro',1824,206);}
+  drawMenuArt(c,i,t,x,y,w,h){const ink=C.ink,red=C.red;c.save();
+    if(i===0){const n=6,bw=w/n-12;for(let k=0;k<n;k++){const hh=h*(0.3+0.6*Math.abs(Math.sin(t*1.6+k*0.9)));c.fillStyle=k===n-1?red:ink;c.fillRect(x+k*(bw+12),y+h-hh,bw,hh);}}
+    else if(i===1){const s=170;c.fillStyle=ink;c.fillRect(x,y+h/2-s/2,s,s);c.fillStyle=red;c.fillRect(x+w-s,y+h/2-s/2,s,s);const mid=x+w/2+Math.sin(t*1.2)*40;c.fillStyle='#fff';c.fillRect(x+s+10,y+h/2-14,w-2*s-20,28);c.strokeStyle=ink;c.lineWidth=2;c.strokeRect(x+s+11,y+h/2-13,w-2*s-22,26);c.fillStyle=ink;c.fillRect(mid-6,y+h/2-30,12,60);}
+    else if(i===2){const lane=(yy,col,ph)=>{for(let k=0;k<5;k++){const xx=x+((k*110-t*60+ph)%(w+110)+w+110)%(w+110)-110,hh=[0,40,-30,60,10][k];c.fillStyle=col;c.fillRect(Math.max(x,xx),yy+hh,Math.max(0,Math.min(90,x+w-Math.max(x,xx))),26);}};c.save();c.beginPath();c.rect(x,y,w,h);c.clip();lane(y+60,ink,0);lane(y+260,red,55);c.restore();c.fillStyle=ink;c.fillRect(x,y+h/2-1,w,2);}
+    else if(i===3){const s=86;TEAMS.forEach((tm,k)=>{c.fillStyle=tm[1];c.fillRect(x+k*(s+33),y+h-s,s,s);});const p=(t*0.6)%4,k=Math.floor(p),fr=p-k,x0=x+k*(s+33)+s/2,x1=x+((k+1)%4)*(s+33)+s/2,xx=x0+(x1-x0)*fr,yy=y+h-s-30-Math.sin(fr*Math.PI)*170;c.fillStyle=ink;c.fillRect(xx-16,yy-16,32,32);}
+    else if(i===4){const rows=6;for(let k=0;k<rows;k++){const yy=y+k*(h/rows)+20,ww=w*(0.55+0.4*((k*37)%10)/10);c.fillStyle=k===1?'#fff':C.n3;c.fillRect(x,yy,ww,30);if(k===1){c.strokeStyle=ink;c.lineWidth=2;c.strokeRect(x+1,yy+1,ww-2,28);c.fillStyle=red;c.fillRect(x,yy,ww*((t*0.25)%1),30);}}}
+    else if(i===5){const bw=(w-40)/3,hs=[0.62,0.92,0.45];[0,1,2].forEach(k=>{const hh=h*hs[k];c.fillStyle=k===1?red:ink;c.fillRect(x+k*(bw+20),y+h-hh,bw,hh);c.fillStyle='#fff';c.font='800 56px Archivo';c.textAlign='left';c.textBaseline='top';c.fillText(String([2,1,3][k]),x+k*(bw+20)+16,y+h-hh+12);});}
+    else if(i===6){for(let k=0;k<3;k++){const yy=y+60+k*130;c.fillStyle=C.n3;c.fillRect(x,yy,w,14);const p=0.5+0.4*Math.sin(t*(0.7+k*0.3)+k*2);c.fillStyle=ink;c.fillRect(x,yy,w*p,14);c.fillStyle=k===0?red:ink;c.fillRect(x+w*p-14,yy-22,28,58);}}
+    c.restore();}
+  drawTag(c,x,y,col,label,up){c.fillStyle=col;c.fillRect(x,y,88,88);c.beginPath();if(up){c.moveTo(x,y+1);c.lineTo(x,y-24);c.lineTo(x+28,y+1);}else{c.moveTo(x,y+87);c.lineTo(x,y+112);c.lineTo(x+28,y+87);}c.closePath();c.fill();c.font='600 36px Archivo';c.fillStyle=C.ink;c.textAlign='left';c.textBaseline='middle';c.fillText(label,x+16,y+46);}
+  outText(c,t,x,y,fill,lw){c.lineJoin='round';c.lineWidth=lw;c.strokeStyle=C.ink;c.strokeText(t,x,y);c.fillStyle=fill;c.fillText(t,x,y);}
+  drawLyricsC(c,x0,yc,part,col){const ch=this.chart,now=this.now;const PH=part==null?ch.phrases:ch.phrases.filter(p=>p.parts.includes(part));const ci=PH.findIndex(p=>p.end+0.35>now);if(ci<0)return;const cur=PH[ci],nx=PH[ci+1];
+    const s1=Math.round(56*(this.state.settings.lyr?1.12:1)),s2=38,y1=yc+4,y2=yc+56,maxW=1824-x0;
+    c.save();c.textBaseline='alphabetic';c.textAlign='left';
+    const sep=ns=>ns.map((n,i)=>{const pv=ns[i-1];return {n,pre:'',txt:n.s};});
+    const line=(ns,size,w,fillFn)=>{const ps=sep(ns);c.font=w+' '+size+'px Archivo';const tw=ps.reduce((a,p)=>a+c.measureText(p.pre+p.txt).width,0);const S=Math.floor(size*Math.min(1,maxW/tw));let x=x0;
+      ps.forEach((p,i)=>{c.font=(p.n.type==='free'?'italic 400 ':w+' ')+S+'px Archivo';const wp=c.measureText(p.pre).width,wt=c.measureText(p.txt).width;fillFn(p,i,ps,x,wp,wt,S);x+=wp+wt;});};
+    const nextLine=()=>{if(nx)line(nx.notes,s2,'400',(p,i,ps,x,wp)=>{c.fillStyle='rgba(243,242,242,0.55)';c.fillText(p.pre,x,y2-s1+s2);c.fillText(p.txt,x+wp,y2-s1+s2);});};
+    if(this.state.mode==='party'&&this.state.party&&this.state.party.ch===1){c.font='300 '+s1+'px Archivo';c.fillStyle=C.n5;c.fillText('Sin letra. De memoria.',x0,y1-s1/2+20);c.restore();return;}
+    const othersSing=part!=null&&ch.phrases.some(p=>!p.parts.includes(part)&&now>=p.start-0.3&&now<=p.end+0.35);
+    const prevEnd=ci>0?PH[ci-1].end:0;const yA=yc-14;
+    if(othersSing&&cur.start-now>1.2){c.font='300 '+s1+'px Archivo';c.fillStyle=C.n5;c.fillText('Canta la Parte '+(2-part),x0,yA);c.font='400 '+s2+'px Archivo';c.fillStyle='rgba(243,242,242,0.55)';c.fillText(sep(cur.notes).map(p=>p.pre+p.txt).join(''),x0,yA+50);c.restore();return;}
+    if(ci>0&&now>prevEnd+0.35&&cur.start-now>2.2){c.font='300 '+s1+'px Archivo';c.fillStyle=C.n5;c.fillText('Interludio musical',x0,yA);const k=(now-prevEnd)/(cur.start-prevEnd);c.fillStyle='rgba(243,242,242,0.2)';c.fillRect(x0,yA+30,560,8);c.fillStyle='#f3f2f2';c.fillRect(x0,yA+30,560*k,8);c.restore();return;}
+    line(cur.notes,s1,'600',(p,i,ps,x,wp,wt,S)=>{const prv=i>0?ps[i-1].n:null;c.fillStyle=prv&&now>=prv.start+prv.dur?(prv.type==='gold'?C.gold:col):'#f3f2f2';c.fillText(p.pre,x,yA);const xx=x+wp;c.fillStyle=p.n.type==='free'?C.n5:'#f3f2f2';c.fillText(p.txt,xx,yA);
+      const pr=Math.max(0,Math.min(1,(now-p.n.start)/p.n.dur));if(pr>0&&p.n.type!=='free'){c.save();c.beginPath();c.rect(xx,yA-S,wt*pr,S*1.4);c.clip();c.fillStyle=p.n.type==='gold'?C.gold:col;c.fillText(p.txt,xx,yA);c.restore();}});
+    if(nx){line(nx.notes,s2,'400',(p,i,ps,x,wp)=>{c.fillStyle='rgba(243,242,242,0.55)';c.fillText(p.pre,x,yA+52);c.fillText(p.txt,x+wp,yA+52);});}
+    if(part!=null&&cur.parts.length===2){c.font='800 24px Archivo';const t='Juntos',w=c.measureText(t).width;c.fillStyle=C.red;c.fillRect(1824-w-24,yc-22,w+24,40);c.fillStyle='#fff';c.textAlign='right';c.textBaseline='middle';c.fillText(t,1812,yc-1);}
+    c.restore();}
+  drawLaneC(c,L,part,ks){const ch=this.chart,now=this.now,S=this.state.singers,cols=S.map(s=>s.color),K=ks.length;
+    c.save();c.beginPath();c.rect(0,L.y,1920,L.h);c.clip();
+    c.fillStyle='rgba(243,242,242,0.4)';c.fillRect(L.rx-1,L.y+10,2,L.h-20);
+    const H=K<=1?30:Math.min(48,24+K*4);this.vidMode=true;
+    for(const ph of ch.phrases){if(part!=null&&!ph.parts.includes(part))continue;for(const n of ph.notes){const x=L.rx+(n.start-now)*PPS,w=n.dur*PPS;if(x>1920||x+w<0)continue;this.drawNote(c,n,x,this.py(n.p,L)-H/2,w,H,true,ks,cols);}}
+    this.vidMode=false;
+    ks.forEach((k,q)=>{if(this.sung[k]==null)return;const y=this.py(this.sung[k],L)+(q-(K-1)/2)*4,col=cols[k],hit=this.hit[k],x1=L.rx-(hit?2:6);
+      c.fillStyle=C.ink;c.fillRect(L.x+96,y-5,x1-L.x-96,10);c.fillStyle=col;c.fillRect(L.x+96,y-3,x1-L.x-96,6);
+      const r=hit?22:14;c.beginPath();c.moveTo(x1+r,y);c.lineTo(x1-r*0.4,y-r);c.lineTo(x1-r*0.4,y+r);c.closePath();c.lineWidth=4;c.strokeStyle=C.ink;c.stroke();c.fillStyle=hit?'#fff':col;c.fill();});
+    const PH=part==null?ch.phrases:ch.phrases.filter(p=>p.parts.includes(part));const f0=PH[0].start;if(now<f0&&now>f0-3){c.font='300 '+(L.h>400?180:120)+'px Archivo';c.textAlign='left';c.textBaseline='middle';this.outText(c,String(Math.ceil(f0-now)),L.rx+40,L.y+L.h/2,C.red,8);}
+    c.restore();}
+  drawScoresC(c,ks,y0,big){const S=this.state.singers;this.rowY=this.rowY||[];let y=y0;
+    ks.forEach(k=>{c.textAlign='right';c.textBaseline='alphabetic';if(!big||ks.length>1){c.font='800 26px Archivo';this.outText(c,S[k].shape+' '+S[k].name,1824,y,'#fff',5);y+=8;}
+      const fs=big&&ks.length===1?104:ks.length>3?52:68;c.font='300 '+fs+'px Archivo';y+=fs*0.86;this.outText(c,fmt(Math.round(this.disp[k])),1824,y,S[k].color,6);this.rowY[k]=y-fs*0.86;y+=26;});}
+  drawSingC(c){const ch=this.chart,now=this.now,S=this.state.singers,K=S.length,mode=this.state.mode,two=mode==='duo'||mode==='duel';c.clearRect(0,0,1920,1080);
+    const dim=this.props.videoDim??0.12;if(dim>0){c.fillStyle='rgba(0,0,0,'+dim+')';c.fillRect(0,170,1920,740);}
+    c.fillStyle='rgba(20,19,18,0.92)';c.fillRect(0,0,1920,170);c.fillRect(0,910,1920,170);
+    const grpOf=s=>mode==='duo'?s.part:s.team;
+    if(two){const T=mode==='duel'?this.teams():null;
+      const lanes=[{g:1,L:{x:0,y:186,w:1920,h:334,rx:0.27*1920}},{g:0,L:{x:0,y:560,w:1920,h:334,rx:0.27*1920}}];this.laneOf=[];
+      lanes.forEach(({g,L})=>{const ks=S.map((s,k)=>grpOf(s)===g?k:-1).filter(k=>k>=0);ks.forEach(k=>this.laneOf[k]=L);const part=mode==='duo'?g:null;this.drawLaneC(c,L,part,ks);
+        const col=T?T[g].color:(ks.length?S[ks[0]].color:C.n5),lab='J'+(g+1);
+        if(g===1){this.drawTag(c,96,30,col,lab,false);this.drawLyricsC(c,240,88,part,col);}else{this.drawTag(c,96,950,col,lab,true);this.drawLyricsC(c,240,996,part,col);}
+        this.drawScoresC(c,ks,L.y+L.h*0.42,true);});
+      if(mode==='duel'){const x0=660,w=600,y=532,h=16;c.fillStyle='rgba(243,242,242,0.7)';c.fillRect(x0,y,w,h);const px=x0+w*(1-this.tug),cx=x0+w/2;c.fillStyle=this.tug<0.5?T[0].color:T[1].color;c.fillRect(Math.min(px,cx),y,Math.abs(px-cx),h);c.strokeStyle=C.ink;c.lineWidth=2;c.strokeRect(x0+1,y+1,w-2,h-2);c.fillStyle=C.ink;c.fillRect(cx-1,y-8,2,h+16);c.fillRect(px-5,y-10,10,h+20);}}
+    else{const L={x:0,y:200,w:1920,h:690,rx:0.27*1920},ks=S.map((_,k)=>k);this.laneOf=S.map(()=>L);this.drawLaneC(c,L,null,ks);
+      const so=SONGS[this.state.songSel];c.textAlign='left';c.textBaseline='alphabetic';c.font='800 40px Archivo';c.fillStyle='#f3f2f2';c.fillText(so.title,96,84);c.font='400 28px Archivo';c.fillStyle=C.n5;c.fillText(so.artist+(mode==='party'&&this.state.party?'  ·  Reto: '+CHALL[this.state.party.ch][0]:''),96,124);
+      if(K===1&&this.combo[0]>=3){c.font='800 32px Archivo';c.textAlign='right';c.fillStyle=C.gold;c.fillText('Racha ×'+this.combo[0],1824,104);}
+      const tagCol=K===1?S[0].color:'#f3f2f2';this.drawTag(c,96,950,tagCol,K===1?'J1':'×'+K,true);this.drawLyricsC(c,240,996,null,K===1?S[0].color:C.red5);
+      this.drawScoresC(c,ks,L.y+(K===1?L.h*0.45:30),true);}
+    this.parts.forEach(p=>{c.globalAlpha=Math.max(0,p.life/0.5);c.fillStyle=p.col;c.fillRect(p.x-p.s/2,p.y-p.s/2,p.s,p.s);});c.globalAlpha=1;
+    this.pops=this.pops.filter(p=>now-p.t0<1.4);this.pops.forEach(p=>{const k=(now-p.t0)/1.4;let ry;if(p.center)ry=200;else if(p.team!=null){const ks=S.map((s,i)=>s.team===p.team?i:-1).filter(i=>i>=0);ry=(this.rowY[ks[0]]||400)-56;}else ry=(this.rowY[p.k]||400)-56;
+      c.save();c.globalAlpha=k>.75?(1-k)/.25:1;c.font='800 34px Archivo';c.textBaseline='top';c.textAlign='left';const w=c.measureText(p.text).width+28;const bx=p.center?960-w/2:1824-w,by=ry-(k<.1?(1-k/.1)*14:0)-k*10;
+      c.fillStyle=p.bg;c.fillRect(bx,by,w,46);if(p.bg==='#fff'){c.strokeStyle=C.ink;c.lineWidth=2;c.strokeRect(bx+1,by+1,w-2,44);}c.fillStyle=p.fg;c.fillText(p.text,bx+14,by+6);c.restore();});
+    const pr=Math.min(1,now/ch.duration);c.fillStyle='rgba(243,242,242,0.15)';c.fillRect(0,1074,1920,6);c.fillStyle=C.red;c.fillRect(0,1074,1920*pr,6);}
+  drawSing(c){const ch=this.chart,now=this.now,A=this.variant()==='A',S=this.state.singers,K=S.length,mode=this.state.mode;c.clearRect(0,0,1920,1080);
+    if(mode!=='jukebox'&&this.variant()==='C'){this.drawSingC(c);return;}
+    if(mode==='jukebox'){this.drawLyrics(c,96,560,104,672,52,null);const pr=Math.min(1,now/ch.duration);c.fillStyle='rgba(243,242,242,0.2)';c.fillRect(96,800,1728,6);c.fillStyle=C.red;c.fillRect(96,800,1728*pr,6);return;}
+    if(mode==='duo'){const Ls=[0,1].map(i=>({x:96,y:i?604:224,w:1728,h:240,rx:96+0.27*1728}));this.laneOf=S.map(s=>Ls[s.part]);
+      Ls.forEach((L,pi)=>{const ks=S.map((s,k)=>s.part===pi?k:-1).filter(k=>k>=0);this.drawLane(c,L,pi,ks,A,'Parte '+(pi+1)+' · '+ks.map(k=>S[k].name).join(' · '));
+        const by=L.y+L.h+6;c.fillStyle=C.ink;c.fillRect(A?0:96,by,A?1920:1728,116);this.drawLyrics(c,120,by+64,52,by+102,28,pi);});}
+    else{const L=this.L();this.laneOf=S.map(()=>L);this.drawLane(c,L,null,S.map((_,k)=>k),A,null);
+      if(A){c.fillStyle=C.ink;c.fillRect(0,790,1920,220);this.drawLyrics(c,96,878,72,958,40,null);}else this.drawLyrics(c,96,948,80,1016,40,null);}
+    this.parts.forEach(p=>{c.globalAlpha=Math.max(0,p.life/0.5);c.fillStyle=p.col;c.fillRect(p.x-p.s/2,p.y-p.s/2,p.s,p.s);});c.globalAlpha=1;
+    if(mode==='duel'){const x0=96+420+32,w=1728-2*(420+32),y=96,h=40,T=this.teams();c.fillStyle=A?'#fff':'rgba(243,242,242,0.12)';c.fillRect(x0,y,w,h);
+      const px=x0+w*this.tug,cx=x0+w/2;c.fillStyle=this.tug<0.5?T[0].color:T[1].color;c.fillRect(Math.min(px,cx),y,Math.abs(px-cx),h);
+      c.strokeStyle=A?C.ink:C.bg;c.lineWidth=2;c.strokeRect(x0+1,y+1,w-2,h-2);c.fillStyle=A?C.ink:C.bg;c.fillRect(cx-1,y-8,2,h+16);c.fillRect(px-5,y-12,10,h+24);
+      c.font='600 28px Archivo';c.textAlign='center';c.textBaseline='top';c.fillStyle=A?C.ink:C.bg;const so=SONGS[this.state.songSel];c.fillText(so.title+' — '+so.artist,960,y+h+16);}
+    const cw=cellW(K),x0=1824-K*cw-(K-1)*8;
+    this.pops=this.pops.filter(p=>now-p.t0<1.4);this.pops.forEach(p=>{const k=(now-p.t0)/1.4;c.save();c.globalAlpha=k>.75?(1-k)/.25:1;const fs=K>4&&p.k!=null?28:36;c.font='800 '+fs+'px Archivo';c.textBaseline='top';c.textAlign='left';const w=c.measureText(p.text).width+28;
+      let bx,by=172+(k<.1?(1-k/.1)*-14:0);if(p.center){bx=960-w/2;by=176;}else if(p.team!=null)bx=p.team===0?96:1824-w;else bx=x0+p.k*(cw+8);
+      c.fillStyle=p.bg;c.fillRect(bx,by,w,fs+14);if(p.bg==='#fff'){c.strokeStyle=C.ink;c.lineWidth=2;c.strokeRect(bx+1,by+1,w-2,fs+12);}c.fillStyle=p.fg;c.fillText(p.text,bx+14,by+8);c.restore();});
+    const pr=Math.min(1,now/ch.duration);if(A){c.fillStyle=C.n3;c.fillRect(96,1036,1728,6);c.fillStyle=C.ink;c.fillRect(96,1036,1728*pr,6);}else{c.fillStyle='rgba(243,242,242,0.2)';c.fillRect(0,1074,1920,6);c.fillStyle=C.red;c.fillRect(0,1074,1920*pr,6);}
+  }
+
+  extraVals(){const s=this.state,n=s.count,V={};const ink=C.ink;
+    {const M=this.trMode(),T=TR[M],ph=s.tr,d=s.trDir,E='cubic-bezier(.2,.8,.2,1)',EI='cubic-bezier(.6,0,.8,.2)',EIO='cubic-bezier(.7,0,.2,1)';
+      let op=1,tf='none',tr='none',fl='none';
+      if(M==='Fundido'){op=ph==='out'||ph==='pre'?0:1;tr=ph==='out'?'opacity '+T.out+'ms ease-in':ph==='in'?'opacity '+T.in+'ms '+E:'none';}
+      else if(M==='Deslizar'){op=ph==='out'||ph==='pre'?0:1;tf=ph==='out'?'translateX('+(-90*d)+'px)':ph==='pre'?'translateX('+(90*d)+'px)':'translateX(0)';tr=ph==='out'?'opacity '+T.out+'ms '+EI+',transform '+T.out+'ms '+EI:ph==='in'?'opacity '+T.in+'ms '+E+',transform '+T.in+'ms '+E:'none';}
+      else if(M==='Zoom'){op=ph==='out'||ph==='pre'?0:1;tf=ph==='out'?'scale(0.965)':ph==='pre'?'scale(1.035)':'scale(1)';fl=ph==='out'||ph==='pre'?'blur(6px)':'blur(0px)';tr=ph==='out'?'opacity '+T.out+'ms ease-in,transform '+T.out+'ms ease-in,filter '+T.out+'ms ease-in':ph==='in'?'opacity '+T.in+'ms '+E+',transform '+T.in+'ms '+E+',filter '+T.in+'ms '+E:'none';}
+      else if(M==='Cortina'||M==='Barras'){tf=ph==='in'?'translateY(0)':ph==='pre'?'translateY(24px)':'translateY(0)';tr=ph==='in'?'transform '+T.in+'ms '+E:'none';}
+      if(M==='Suave'){const S='cubic-bezier(.45,0,.25,1)';op=ph==='out'||ph==='pre'?0:1;tf=ph==='out'?'scale(1.025)':ph==='pre'?'scale(0.985)':'scale(1)';fl=ph==='out'||ph==='pre'?'blur(10px)':'blur(0px)';tr=ph==='out'?'opacity '+T.out+'ms '+S+',transform '+T.out+'ms '+S+',filter '+T.out+'ms '+S:ph==='in'?'opacity '+T.in+'ms '+S+',transform '+T.in+'ms '+S+',filter '+T.in+'ms '+S:'none';}
+      if(M==='Apagón'||M==='Iris'||M==='Barrido'){tf=ph==='pre'?'scale(1.02)':'scale(1)';tr=ph==='in'?'transform '+T.in+'ms '+E:'none';}
+      V.tOp=op;V.tTf=tf;V.tTr=tr;V.tFl=fl;
+      {const cover=ph==='out'||ph==='pre',t=ph==='out'?T.out:T.in;V.ovBg='transparent';V.ovOp=0;V.ovClip='none';V.ovTf='none';V.ovTr='none';
+        if(M==='Apagón'){V.ovBg='#000';V.ovOp=cover?1:0;V.ovTr=ph==='out'?'opacity '+t+'ms ease-in':ph==='in'?'opacity '+t+'ms ease-out':'none';}
+        else if(M==='Iris'){V.ovBg=C.red;V.ovOp=1;V.ovClip=cover?'circle(75% at 50% 50%)':ph==='in'?'circle(0% at 50% 50%)':'circle(0% at 50% 50%)';V.ovTr=ph==='out'?'clip-path '+t+'ms '+EIO:ph==='in'?'clip-path '+t+'ms '+EIO:'none';}
+        else if(M==='Barrido'){V.ovBg=C.red;V.ovOp=1;V.ovTf=cover?'translateX(0) skewX(-12deg)':ph==='in'?'translateX(-130%) skewX(-12deg)':'translateX(130%) skewX(-12deg)';V.ovClip='none';V.ovTr=ph==='out'||ph==='in'?'transform '+t+'ms '+EIO:'none';}}
+      const cv=M==='Cortina';V.cvTf=!cv||ph==='idle'?'translateY(101%)':ph==='in'?'translateY(-101%)':'translateY(0)';V.cvTr=cv&&ph==='out'?'transform '+T.out+'ms '+EIO:cv&&ph==='in'?'transform '+T.in+'ms '+EIO:'none';V.cvLogoOp=cv&&(ph==='out'||ph==='pre')?1:0;
+      const NB=6,BH=180,cols=[C.red,C.ink,C.red,C.ink,C.red,C.ink];
+      V.cvBars=M!=='Barras'?[]:cols.map((bg,i)=>{const dl=i*40;const x=ph==='idle'?(d>0?'101%':'-101%'):ph==='in'?(d>0?'-101%':'101%'):'0';return {top:i*BH,h:BH+1,bg,tf:'translateX('+x+')',tr:ph==='out'?'transform '+(T.out-200)+'ms '+EIO+' '+dl+'ms':ph==='in'?'transform '+(T.in-200)+'ms '+EIO+' '+dl+'ms':'none'};});}
+    V.searchOpen=s.screen==='songs'&&s.search.open;const sfx=s.search.f,KN=KB.length;
+    V.kbKeys=[...KB].map((k,i)=>{const on=sfx===i;return {label:k,bg:on?C.red:'#fff',fg:on?'#fff':ink,t:on?'scale(1.08)':'scale(1)',s:on?SHADOW:'none',z:on?2:1,click:()=>{this.setState({search:{...s.search,f:i}});this.typeQ(k);}};});
+    V.kbAct=['Espacio · Y','Borrar · X','Buscar'].map((label,j)=>{const i=KN+j,on=sfx===i;return {label,br:j<2?'2px solid '+ink:'none',bg:on?C.red:j===2?ink:'#fff',fg:on||j===2?'#fff':ink,click:()=>{this.setState({search:{...s.search,f:i}});if(j===0)this.typeQ(' ');else if(j===1)this.typeQ(null);else this.closeSearch();}};});
+    V.qShow=s.query||'Escribe con el mando…';V.qColor=s.query?ink:C.n5;const nL=this.songsList().length;V.searchCount=nL===1?'1 canción':nL+' canciones';
+    V.isPA=!!s.pauseAudio;V.notPA=!s.pauseAudio;V.pauseTitle=s.pauseAudio?'Audio':'Pausa';const stg=s.settings;
+    V.paRows=[['Música',stg.music,String(stg.music)],['Efectos',stg.fx,String(stg.fx)],['Retraso del micro',Math.round(stg.delay/40),stg.delay+' ms']].map((r,i)=>{const on=s.paF===i;return {label:r[0],val:r[2],bg:on?C.red:'transparent',fg:on?'#fff':ink,cells:Array.from({length:10},(_,j)=>({c:j<r[1]?(on?'#fff':ink):(on?'rgba(255,255,255,0.35)':C.n3)})),click:()=>this.setState({paF:i})};});
+    V.onKeyOk=()=>this.act('ok');V.onKeyBack=()=>this.act('back');V.onKeyX=()=>this.act('x');V.onKeyY=()=>this.act('y');V.onKeyL=()=>this.act('lb');V.onKeyR=()=>this.act('rb');
+    V.isBoot=s.screen==='boot';V.videoEl=this.props.videoUrl&&s.screen==='sing'?React.createElement('video',{key:'v',src:this.props.videoUrl,autoPlay:true,muted:true,loop:true,playsInline:true,style:{position:'absolute',inset:0,width:1920,height:1080,objectFit:'cover',filter:'grayscale(1) contrast(1.08)'}}):null;V.isSplash=s.screen==='splash';V.isWelcome=s.screen==='welcome';V.spOp=s.splashIn&&!s.splashOut?1:0;V.spOpMs=s.splashOut?700:1000;V.bootOp=s.bootIn===false?0:1;V.spClip=s.splashRed?'circle(75% at 50% 50%)':'circle(0% at 50% 50%)';V.spOrigOp=1;V.spWhiteOp=0;V.spTf=s.splashIn?'scale(1)':'scale(0.94)';
+    if(!this._pressEl){const h=React.createElement;this._pressEl=h('div',{style:{display:'flex',alignItems:'center',gap:20,fontSize:40,fontWeight:800,animation:'gPulse 1.8s ease-in-out infinite'}},h('span',null,'Pulsa'),h('span',{style:{width:60,height:60,borderRadius:'50%',background:C.ink,color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:32,fontWeight:800}},'A'),h('span',null,'para continuar'));}V.pressEl=this._pressEl;V.bootW=Math.round(s.bootK*100);V.room=s.room;V.safe=!!this.props.showSafeArea;
+    V.isJukebox=s.screen==='sing'&&s.mode==='jukebox';
+    V.jq=s.jq.slice(0,4).map(i=>{const so=SONGS[i];return {title:so.title,artist:so.artist,bg:so.cv[0],blk:so.cv[1]};});
+    V.isRecords=s.screen==='records';V.recLabel=s.recTab===3?'TV-13 Rangos':'TV-16 Récords';
+    V.recTabs=['Por canción','Más canciones','Rachas','Rangos'].map((label,i)=>({label,br:i<3?'2px solid '+ink:'none',bg:s.recTab===i?C.red:'transparent',fg:s.recTab===i?'#fff':ink,click:()=>this.setState({recTab:i})}));
+    V.recIsTable=s.recTab<3;V.recIsRanks=s.recTab===3;
+    V.recHead=[['Canción','Récord','Quién'],['Cantante','Canciones','Mejor puntuación'],['Cantante','Racha','Canción']][Math.min(2,s.recTab)].map(l=>({l}));
+    const pc=nm=>{const P=PLAYERS.find(p=>p[0]===nm);return P?P[1]:C.n3;};
+    const r0=SONGS.map(so=>{const [sc,nm]=so.rec.split(' · ');return [so.title,sc||'—',nm||'Sin récord todavía',parseInt((sc||'0').replace('.',''))||0];}).sort((a,b)=>b[3]-a[3]);
+    V.recRows=(s.recTab===0?r0.map(r=>({a:r[0],b:r[1],c:r[2],color:pc(r[2])})):(s.recTab===1?REC2:REC3).map(r=>({a:r[0],b:r[1],c:r[2],color:pc(r[0])}))).map((r,i)=>({...r,pos:String(i+1).padStart(2,'0'),bg:i===0?'#fff':'transparent'}));
+    V.ranks=RANKS.map((r,i)=>({num:String(i+1).padStart(2,'0'),name:r[1],range:RANGE[i],bars:[5,4,3,2,1,0].map(j=>({w:Math.round((j+1)/6*100),c:j>i?C.n2:j===i?C.red:ink}))}));
+    V.isSettings=s.screen==='settings';const st=s.settings;
+    V.setRows=SET_ROWS.map((r,i)=>{const on=s.setF===i;const o={label:r.label,bg:on?'#fff':'transparent',bar:on?C.red:'transparent',isSeg:r.type==='seg',isBar:r.type==='bar',isAct:r.type==='act',opts:[],cells:[],val:'',cta:'',click:()=>{if(s.setF===i)this.act('ok');else this.setState({setF:i});}};
+      if(r.type==='seg')o.opts=r.opts.map((l,j)=>({label:l,br:j<r.opts.length-1?'2px solid '+ink:'none',bg:st[r.k]===j?(on?C.red:ink):'transparent',fg:st[r.k]===j?'#fff':ink}));
+      if(r.type==='bar'){o.cells=Array.from({length:10},(_,j)=>({c:j<st[r.k]?(on?C.red:ink):C.n3}));o.val=String(st[r.k]);}
+      if(r.type==='act'){o.val=r.k==='delay'?st.delay+' ms':r.k==='kick'?(n?PLAYERS[n-1][0]:'Nadie en la sala'):s.room;o.cta=r.k==='delay'?'Calibrar':r.k==='kick'?'Expulsar':'Generar';}
+      return o;});
+    V.setNum=String(s.setF+1).padStart(2,'0')+' / 0'+SET_ROWS.length;V.setTitle=SET_ROWS[s.setF].label;V.setHelp=SET_ROWS[s.setF].help;
+    const cb=s.calib;V.isCalib=s.screen==='calib';V.calSaved=st.delay+' ms';V.calManual=cb.manual+' ms';V.calPct=(cb.manual/400*100).toFixed(1);V.calSlBc=cb.f===1?C.red:ink;
+    V.calStatus=cb.phase==='measure'?'Escuchando… canta «pa» con cada pitido ('+(cb.beat+1)+' de 8).':cb.phase==='test'?'Prueba: si el retraso es correcto, tu «pa» cae sobre la línea.':cb.phase==='done'?'Hecho. Si aún lo notas desfasado, ajusta a mano y prueba otra vez.':'Sonarán 8 pitidos. Canta «pa» con cada uno, con el móvil cerca de la boca.';
+    V.calCells=Array.from({length:8},(_,i)=>{const m=cb.marks[i],cur=cb.beat===i;return {num:String(i+1),bg:cur?C.red:'#fff',ln:cur?'#fff':ink,mc:cur?'#fff':C.red,hasMark:m!=null,ml:(50+Math.max(-44,Math.min(44,(m||0)/300*44))).toFixed(1)};});
+    V.calOpts=['Medir cantando','Ajuste manual','Probar','Guardar y volver'].map((label,i)=>({label,hint:i===1?'‹ ›':'',bg:cb.f===i?C.red:'transparent',fg:cb.f===i?'#fff':ink,click:()=>{if(cb.f===i)this.act('ok');else this.setState({calib:{...cb,f:i}});}}));
+    const E0=ERRS[s.err];V.hasErr=!!E0;V.err=E0?{kicker:E0[0],title:E0[1],body:E0[2].replace('{room}',s.room),cta:s.errBusy?'Reconectando…':E0[3]}:{kicker:'',title:'',body:'',cta:''};
+    const p=s.party;V.isParty=s.screen==='party'&&!!p;
+    if(p){const sp=p.step;V.pTeams=sp==='teams';V.pRoul=sp==='roulette';V.pTurn=sp==='turn';V.pBoard=sp==='board';V.pChamps=sp==='champs';
+      V.partyLabel={teams:'TV-14a Equipos',roulette:'TV-14b Ruleta de retos',turn:'TV-14c Turno',board:'TV-14d Marcador de equipos',champs:'TV-14e Campeones'}[sp];
+      V.teamCountText=p.nT+' equipos · '+n+' jugadores';
+      V.teamCols=Array.from({length:p.nT},(_,t)=>{const ids=this.teamIds(p,t);return {num:String(t+1).padStart(2,'0'),name:TEAMS[t][0],color:TEAMS[t][1],fg:TEAMS[t][2],empty:!ids.length,players:ids.map(i=>{const on=p.pf===i;return {name:PLAYERS[i][0],shape:PLAYERS[i][2],color:PLAYERS[i][1],bg:on?C.red:'#fff',fg:on?'#fff':ink,s:on?SHADOW:'none',t:on?'scale(1.04)':'scale(1)',arrows:on?'‹ ›':'',click:()=>{if(p.pf===i)this.partyMove(i,1);else this.P({pf:i});}};})};});
+      V.roundText='Ronda '+p.round+' de '+p.rounds+' · turno de '+TEAMS[p.turn][0];
+      const landed=!p.spinning&&p.spin>=0;
+      V.chCards=CHALL.map((c,i)=>{const on=p.spin===i;return {num:String(i+1).padStart(2,'0'),name:c[0],desc:c[1],bg:on?C.red:'#fff',fg:on?'#fff':ink,t:on&&landed?'scale(1.05)':'scale(1)',s:on&&landed?SHADOW:'none',z:on?2:1};});
+      V.roulHint=p.spinning?'Girando…':landed?'Reto: '+CHALL[p.ch][0]:'Pulsa OK y que decida la ruleta';
+      if(sp==='turn'){const pi=this.turnPlayer(p);V.turnName=PLAYERS[pi][0];V.turnTeam=TEAMS[p.turn][0];V.turnColor=TEAMS[p.turn][1];}
+      V.chNum=String(p.ch+1).padStart(2,'0');V.chName=CHALL[p.ch][0];V.chDesc=CHALL[p.ch][1];
+      const mx=Math.max(1,...p.scores.slice(0,p.nT));let pos=0;
+      V.boardRows=Array.from({length:p.nT},(_,t)=>t).sort((a,b)=>p.scores[b]-p.scores[a]).map((t,i,arr)=>{if(i===0||p.scores[t]!==p.scores[arr[i-1]])pos=i+1;return {pos,name:TEAMS[t][0],color:TEAMS[t][1],players:this.teamIds(p,t).map(k=>PLAYERS[k][0]).join(' · '),score:fmt(p.scores[t]),pct:(p.scores[t]/mx*100).toFixed(1),bg:i===0?'#fff':'transparent'};});
+      V.boardLast=p.last?p.last.name+' suma '+fmt(p.last.pts)+' puntos para '+TEAMS[p.last.t][0]+'.':'';V.boardCta=p.round>=p.rounds?'Ver campeones':'Siguiente ronda';
+      const w=Array.from({length:p.nT},(_,t)=>t).sort((a,b)=>p.scores[b]-p.scores[a])[0];V.champName=TEAMS[w][0];V.champScore=fmt(p.scores[w]);
+      V.champPlayers=this.teamIds(p,w).map(k=>({name:PLAYERS[k][0],shape:PLAYERS[k][2],color:PLAYERS[k][1]}));
+      V.champOpts=['Otra partida','Menú'].map((label,i)=>({label,arrow:p.cf===i?'→':'',br:i===0?'2px solid '+ink:'none',bg:p.cf===i?ink:'transparent',fg:p.cf===i?'#fff':ink,click:()=>{this.P({cf:i});this.conf=[];if(i===0)this.partyNew();else this.go('menu');}}));}
+    return V;}
+  renderVals(){const s=this.state;
+    const slots=Array.from({length:8},(_,i)=>{if(i<s.count){const p=PLAYERS[i];return {name:p[0],color:p[1],shape:this.isOff(i)?'⊘':p[2],shapeColor:C.ink,op:this.isOff(i)?0.4:1,bg:s.justJ===i?C.red:'#fff',bc:C.ink,nameColor:s.justJ===i?'#fff':C.ink,shapeColor:s.justJ===i?'#fff':C.ink,t:s.justJ===i?'scale(1.08)':'scale(1)'};}
+      return {name:'Libre',color:'transparent',shape:'+',shapeColor:C.n5,op:1,bg:'transparent',bc:C.n3,nameColor:C.n5,t:'scale(1)'};});
+    const tiles=MODES.map((m,i)=>{const on=s.menuF===i;return {num:String(i+1).padStart(2,'0'),name:m[0],short:m[1],bg:on?C.red:'#fff',fg:on?'#fff':C.ink,t:on?'scale(1.05)':'scale(1)',s:on?SHADOW:'none',z:on?2:1,br:i<6?'2px solid '+C.ink:'none',click:()=>{this.setState({menuF:i});this.menuAct(i);}};});
+    const hero={num:String(s.menuF+1).padStart(2,'0'),name:MODES[s.menuF][0],desc:MODES[s.menuF][2]};
+    const list=this.songsList();const sf=Math.min(s.songF,Math.max(0,list.length-1));
+    const chipLab=['Buscar'+(s.query?' · «'+s.query+'»':''),'Orden · '+ORDERS[s.ord],'Idioma · '+LANGS[s.lng],'Década · '+(s.dec?'Años '+DECS[s.dec]:'Todas'),'Género · '+GENS[s.gen],'Solo dúos'],chipAct=[!!s.query,false,s.lng>0,s.dec>0,s.gen>0,s.duoOnly];
+    const filters=chipLab.map((label,i)=>{const on=s.zone==='filters'&&s.filterF===i,act=chipAct[i];return {label,bg:on?C.red:act?C.ink:'transparent',fg:on||act?'#fff':C.ink,ol:'none',click:()=>{this.setState({zone:'filters',filterF:i});this.filterAct(i);}};});
+    const CW=[440,280,200,150],CO=[0,400,660,860],COP=[1,0.9,0.7,0.45];
+    const covers=list.map((so,i)=>{const d=i-sf,ad=Math.min(Math.abs(d),4),on=d===0,gz=s.zone==='grid';const w=CW[Math.min(ad,3)],off=ad>3?1000:CO[ad];return {left:Math.round(960+Math.sign(d)*off-w/2),w,mt:-Math.round(w/2),op:ad>3?0:COP[ad],z:10-ad,s:on&&gz?SHADOW:'none',ol:on&&gz?'6px solid #ec3013':'0 solid transparent',bg:so.cv[0],blk:so.cv[1],fg:so.cv[2],ini:ini(so.title),fs:Math.round(w*0.24),duo:so.duo,click:()=>{if(on&&s.zone==='grid')this.startSetup();else this.setState({songF:i,zone:'grid'});}};});
+    const cs=s.screen==='songs'?(list[sf]||SONGS[0]):SONGS[s.songSel];
+    const cur={title:cs.title,artist:cs.artist,durYear:cs.dur+' · '+cs.year,lang:cs.lang+(cs.duo?' · Dúo':''),diff:[1,2,3].map(k=>({c:k<=cs.diff?C.ink:C.n3})),record:cs.rec,bg:cs.cv[0],blk:cs.cv[1],fg:cs.cv[2],ini:ini(cs.title)};
+    const N=s.setup.length;
+    const tog=s.mode==='sing';const setupRows=s.setup.map((r,i)=>{const P=PLAYERS[i],on=s.setupF===i,off=this.isOff(i);return {isToggle:tog,isSide:!tog,sides:['1','—','2'].map((label,j)=>({label,br:j<2?'2px solid '+C.ink:'none',bg:r.side===j?(on?C.red:C.ink):'transparent',fg:r.side===j?'#fff':C.ink})),name:P[0],color:P[1],shape:P[2],op:off?0.4:1,bg:on?'#fff':'transparent',s:on?'inset 0 0 0 4px '+C.red:'none',chk:r.on&&!off?C.ink:'transparent',onText:off?'Sin micro':r.on?'Sí':'No',
+      diffs:DIFFS.map((d,j)=>({label:d[0],br:j<2?'2px solid '+C.ink:'none',bg:r.diff===j?(on?C.red:C.ink):'transparent',fg:r.diff===j?'#fff':C.ink})),click:()=>{if(s.setupF===i)this.setupToggle(i);else this.setState({setupF:i});}};});
+    const nOn=this.singersFromSetup().length,sOn=s.setupF===N;
+    const startBtn={bg:sOn?C.red:C.ink,fg:'#fff',t:sOn?'scale(1.02)':'scale(1)',s:sOn?SHADOW:'none',label:nOn===1?'1 cantante':nOn+' cantantes'};
+    const opt=(labels,fi,act,br)=>labels.map((label,i)=>{const on=fi===i;return {label,arrow:on?'→':'',br:br&&i<labels.length-1?'2px solid '+C.ink:'none',bg:on?C.red:'transparent',fg:on?'#fff':C.ink,click:()=>act(i)};});
+    const A=this.variant()==='A',K=Math.max(1,s.singers.length),cw=cellW(K);
+    const scoreCells=s.singers.map((p,k)=>({name:p.name,color:p.color,shape:p.shape,w:cw,fs:K===1?60:K<=4?48:36,nfs:K>4?22:28,pad:'0',score:fmt(s.scores[k]||0)}));
+    const T=s.mode==='duel'&&s.singers.length?this.teams():[{name:'',color:C.n5},{name:'',color:C.n5}];
+    let res=null;if(s.results){const R=s.results,n=R.rows.length,t=s.resT;const tie=n>1&&R.rows[0].score===R.rows[1].score;
+      let pos=0;res={record:R.record&&t>=1,head:R.head?R.head:tie?'Empate.':(n===1?R.rows[0].name+', '+RANKS[rankIdx(R.rows[0].score)][1].toLowerCase()+'.':'Gana '+R.rows[0].name+'.'),rowH:n===1?180:n<=4?120:84,fs:n===1?96:n<=4?64:44,
+        rows:R.rows.map((r,i)=>{if(i===0||r.score!==R.rows[i-1].score)pos=i+1;const sc=Math.round(r.score*t),ri=rankIdx(t>=1?r.score:sc);return {pos,name:r.name,color:r.color,shape:r.shape,score:fmt(sc),pct:(r.score/10000*100*t).toFixed(1),rank:t>=1?RANKS[ri][1]:'…',lv:RANKS.map((_,j)=>({c:j<=ri?C.ink:C.n3})),stats:r.prec+' % · ★ '+r.gold+' · ×'+r.streak+(r.bestPh!=null?' · mejor frase '+r.bestPh+' %':'')};})};}
+    const vidC=this.variant()==='C'&&s.mode!=='jukebox';const E=React.createElement;const X=this.extraVals();
+    return {...X,scaleT:'translate(-50%,-50%) scale('+s.scale+')',bgRef:this.bgRef,singRef:this.singRef,qrRef:this.qrRef,
+      isLobby:s.screen==='lobby',isMenu:s.screen==='menu',isSongs:s.screen==='songs',isSetup:s.screen==='setup',isCount:s.screen==='count',isSing:s.screen==='sing',isResults:s.screen==='results',
+      lobbySlots:slots,lobbyCountText:s.count?s.count+' de 8 conectados':'Esperando a que alguien se una…',onAddPlayer:()=>this.addPlayer(),onStart:this.onStartFn,
+      connected:PLAYERS.slice(0,s.count).map(p=>({color:p[1],shape:p[2]})),tiles,hero,
+      onBack:()=>this.go(s.screen==='setup'?'songs':s.screen==='songs'?'menu':'lobby'),onOk:()=>s.screen==='menu'?this.menuAct(s.menuF):this.startSetup(),
+      filters,covers,hasSongs:list.length>0,isEmpty:list.length===0,songCountText:(s.query?'«'+s.query+'» · ':'')+(list.length===1?'1 canción':list.length+' canciones'),cur,eqOp:list.length?1:0,
+      setupRows,startBtn,onSetupStart:()=>this.startCount(),
+      eqEl:E('div',{style:{display:'flex',alignItems:'flex-end',gap:4,height:34}},[0,1,2,3].map(i=>E('div',{key:i,style:{width:6,height:8,background:C.red,animation:'mbEq '+(0.7+i*0.13)+'s ease-in-out '+(i*0.1)+'s infinite'}}))),
+      countEl:E('div',{key:s.countN,style:{fontSize:520,fontWeight:300,lineHeight:.8,letterSpacing:'-0.06em',color:'#fff',animation:'mbPop 300ms cubic-bezier(.2,.8,.2,1) both'}},s.countN),tip:s.tip,
+      hudFg:A&&s.mode!=='jukebox'?C.ink:C.bg,titleMax:Math.max(300,1728-(K*cw+(K-1)*8)-180),variantLabel:{A:'A · Carril sobre fondo claro',B:'B · Sobre vídeo oscuro',C:'C · Videoclip'}[this.variant()],hasVideo:s.screen==='sing'&&this.variant()==='C'&&s.mode!=='jukebox'&&!!this.props.videoUrl,videoUrl:this.props.videoUrl||'',onToggleVariant:this.toggleVariant,
+      scoreCells,paused:s.paused,res,isDuel:s.mode==='duel'&&!vidC,notDuel:s.mode!=='duel'&&!vidC,duelL:{name:T[0].name,color:T[0].color,score:fmt(s.teamScores[0])},duelR:{name:T[1].name,color:T[1].color,score:fmt(s.teamScores[1])},
+      vt:vidC?{b:186,c:C.ink}:s.mode==='jukebox'?{b:-300,c:C.bg}:s.mode==='duo'?{b:52,c:A?C.ink:C.bg}:{b:84,c:C.bg},
+      setupColLabel:s.mode==='sing'?'Canta':s.mode==='duel'?'Equipo':'Parte',setupOkLabel:s.mode==='sing'?'Activar':'Cambiar',countKicker:s.mode==='party'&&s.party?'Reto · '+CHALL[s.party.ch][0]:(MODE_KICK[s.mode]||'Prepárate'),
+      singLabel:s.mode==='jukebox'?'TV-15 Jukebox':s.mode==='party'?'TV-14 Pasa el micro · Ronda':s.mode==='duo'?'TV-09 Canto en Dúo':s.mode==='duel'?'TV-10 Canto en Duelo':K===1?'TV-07 Canto 1 jugador':'TV-08 Canto '+K+' jugadores',
+      pauseItems:opt(['Seguir','Reiniciar canción','Ajustes de audio','Salir'],s.pauseF,i=>this.pauseAct(i)),
+      resItems:opt(['Otra canción','Repetir','Menú'],s.resF,i=>this.resAct(i),true),
+      toastEl:E(React.Fragment,null,s.toasts.map(t=>E('div',{key:t.id,style:{display:'flex',background:C.ink,color:C.bg,fontSize:32,fontWeight:600,animation:'mbToast 3s ease-out forwards'}},E('div',{style:{width:10,background:C.red}}),E('div',{style:{padding:'16px 32px'}},t.text))))};
+  }
+}
+</script>
+</body>
+</html>

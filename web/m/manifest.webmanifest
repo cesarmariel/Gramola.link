@@ -1,0 +1,17 @@
+{
+  "name": "Gramola Micro",
+  "short_name": "Gramola",
+  "description": "Tu móvil es el micro de Gramola, el karaoke de la tele.",
+  "lang": "es",
+  "start_url": "/?pwa=1",
+  "scope": "/",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "portrait",
+  "background_color": "#f3f2f2",
+  "theme_color": "#f3f2f2",
+  "icons": [
+    { "src": "/assets/iconos/favicon-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/assets/iconos/favicon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

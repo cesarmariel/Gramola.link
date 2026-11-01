@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#f3f2f2">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Gramola">
+<link rel="manifest" href="/manifest.webmanifest">
+<title>Gramola · Micro</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/assets/iconos/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="icon" href="/assets/iconos/favicon-512.png" type="image/png" sizes="512x512">
+<link rel="apple-touch-icon" href="/assets/iconos/favicon-180.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Gramola">
+<meta property="og:locale" content="es_ES">
+<meta property="og:title" content="Gramola · Tu móvil es el micro">
+<meta property="og:description" content="Entra en la sala de la tele, elige tu color y canta.">
+<meta property="og:url" content="%%ORIGEN%%/">
+<meta property="og:image" content="%%ORIGEN%%/assets/og/gramola-og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Gramola: tu móvil es el micro. Karaoke en casa.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Gramola · Tu móvil es el micro">
+<meta name="twitter:description" content="Entra en la sala de la tele, elige tu color y canta.">
+<meta name="twitter:image" content="%%ORIGEN%%/assets/og/gramola-og.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/m/m.css?v=1793589434">
+</head>
+<body>
+  <!-- MOV-00 Instalar (desde el navegador) -->
+  <section id="s-install" class="screen">
+    <header class="bar"><img class="logo" src="/assets/logo/horizontal-claro.png" alt="gramola"></header>
+    <p class="step red">Gramola Micro</p>
+    <h1 class="big">Instálalo<br>en tu <b>móvil.</b></h1>
+    <p class="txt">Así, en la próxima fiesta, lo abres con un toque y a pantalla completa. Ocupa casi nada.</p>
+    <ol class="steps" id="install-steps" hidden></ol>
+    <div class="grow"></div>
+    <button class="cta" id="b-install" hidden>Instalar <span>↓</span></button>
+    <button class="ghost wide" id="b-skip">Seguir sin instalar</button>
+    <footer class="foot"><img src="/assets/nuvola/tinta.png" alt="nuvola"> · <span class="g-host"></span></footer>
+  </section>
+
+  <!-- MOV-00b Escanear (app instalada) -->
+  <section id="s-scan" class="screen">
+    <header class="bar"><img class="logo" src="/assets/logo/horizontal-claro.png" alt="gramola"></header>
+    <p class="step">Para entrar en la sala</p>
+    <h1 class="big">Escanea<br>el <b>QR.</b></h1>
+    <p class="txt">Apunta la cámara al QR que sale en la tele y entrarás en su sala.</p>
+    <p class="err" id="err-scan"></p>
+    <div class="grow"></div>
+    <button class="cta" id="b-scan">Escanear <span>→</span></button>
+    <button class="ghost wide" id="b-manual">Escribir el código</button>
+    <footer class="foot"><img src="/assets/nuvola/tinta.png" alt="nuvola"> · <span class="g-host"></span></footer>
+  </section>
+
+  <!-- MOV-00c Cámara -->
+  <section id="s-camera" class="screen cam">
+    <video id="cam-video" playsinline muted autoplay></video>
+    <div class="cam-frame"></div>
+    <p class="cam-txt">Apunta al QR de la tele</p>
+    <button class="cta dark cam-cancel" id="b-cam-cancel">Cancelar <span>×</span></button>
+  </section>
+
+  <!-- MOV-02c Foto (cámara frontal): lo que se ve dentro del cuadro es exactamente la foto -->
+  <section id="s-selfie" class="screen cam selfie">
+    <div class="sf-box" id="sf-box"><video id="sf-video" playsinline muted autoplay></video><img id="sf-img" alt="" hidden></div>
+    <p class="cam-txt sf-txt" id="sf-txt">Pon tu cara dentro del cuadro</p>
+    <div class="sf-bar">
+      <button class="cta dark" id="b-sf-cancel">Cancelar <span>×</span></button>
+      <button class="cta" id="b-sf-shot">Hacer foto <span>●</span></button>
+      <button class="cta dark" id="b-sf-again" hidden>Repetir <span>↺</span></button>
+      <button class="cta" id="b-sf-ok" hidden>Usar foto <span>✓</span></button>
+    </div>
+  </section>
+
+  <!-- MOV-01 Unirse -->
+  <section id="s-join" class="screen">
+    <header class="bar"><img class="logo" src="/assets/logo/horizontal-claro.png" alt="gramola"></header>
+    <h1 class="big">Tu móvil<br>es el <b>micro.</b></h1>
+    <label class="lbl" for="name">Tu nombre</label>
+    <input id="name" class="field" maxlength="16" autocomplete="nickname" enterkeyhint="next" placeholder="Tu nombre">
+    <label class="lbl" for="c0">Código de sala</label>
+    <div class="code" id="code">
+      <input id="c0" maxlength="1" autocomplete="off" autocapitalize="characters" inputmode="text">
+      <input id="c1" maxlength="1" autocomplete="off" autocapitalize="characters" inputmode="text">
+      <input id="c2" maxlength="1" autocomplete="off" autocapitalize="characters" inputmode="text">
+      <input id="c3" maxlength="1" autocomplete="off" autocapitalize="characters" inputmode="text" enterkeyhint="go">
+    </div>
+    <p class="hint" id="code-hint">Lo verás en la tele</p>
+    <p class="err" id="err-join"></p>
+    <div class="grow"></div>
+    <button class="cta" id="b-next">Siguiente <span>→</span></button>
+    <footer class="foot"><img src="/assets/nuvola/tinta.png" alt="nuvola"> · <span class="g-host"></span></footer>
+  </section>
+
+  <!-- MOV-02 Elegir color -->
+  <section id="s-color" class="screen">
+    <header class="bar"><img class="logo" src="/assets/logo/horizontal-claro.png" alt="gramola"><span class="who" id="who-color"></span></header>
+    <p class="step">Paso 2 de 2</p>
+    <h2 class="mid">Elige tu color</h2>
+    <p class="txt">Será tu micro y tu color en la tele. Cada color es de una sola persona.</p>
+    <div class="colors" id="colors"></div>
+    <p class="hint">8 jugadores · 8 colores. Los tachados ya tienen dueño.</p>
+    <div class="me-photo">
+      <div class="ph" id="ph-prev"><span>Sin foto</span></div>
+      <div class="ph-txt"><b>Tu foto</b><span>Opcional. Sale en la tele junto a tu nombre.</span></div>
+      <button class="ghost" id="b-photo">Hacer foto</button>
+    </div>
+    <p class="err" id="err-color"></p>
+    <div class="grow"></div>
+    <button class="cta" id="b-enter">Entrar en la sala <span>→</span></button>
+  </section>
+
+  <!-- MOV-02b Micro bloqueado -->
+  <section id="s-blocked" class="screen">
+    <header class="bar"><img class="logo" src="/assets/logo/horizontal-claro.png" alt="gramola"></header>
+    <p class="step red">Micro bloqueado</p>
+    <h2 class="mid">Actívalo<br>en <span id="browser-name">el navegador</span></h2>
+    <p class="txt" id="blocked-text">Sin micro no podemos oírte. Así se arregla:</p>
+    <ol class="steps" id="blocked-steps"></ol>
+    <div class="grow"></div>
+    <button class="cta" id="b-ask">Activar el micro <span>→</span></button>
+    <button class="cta dark" id="b-reload">Ya está, recargar <span>→</span></button>
+  </section>
+
+  <!-- MOV-03 Esperando -->
+  <section id="s-wait" class="screen">
+    <header class="bar"><span class="badge" id="badge-wait">J1</span><span class="who" id="who-wait"></span></header>
+    <div class="grow"></div>
+    <h2 class="mid" id="wait-title">Configura el modo de juego en la pantalla principal</h2>
+    <hr>
+    <p class="waiting"><span class="eq"><i></i><i></i><i></i></span> <b id="wait-state">Esperando…</b></p>
+    <p class="txt" id="wait-text">Deja el móvil a mano: cuando empiece la canción, se convierte en tu micro.</p>
+    <div class="grow"></div>
+    <p class="tip" id="tip-install" hidden></p>
+    <p class="tip warn" id="tip-awake" hidden>Tu móvil no deja mantener la pantalla encendida. Toca la pantalla de vez en cuando o súbele el tiempo de bloqueo: si se apaga, el micro deja de oírte.</p>
+    <button class="ghost" id="b-pad">Usar el móvil como mando</button>
+    <button class="ghost wide" id="b-tuner">Probar el micro</button>
+    <button class="ghost wide" id="b-leave">Salir de la sala</button>
+    <div class="pad" id="pad" hidden>
+      <span></span><button data-k="up">▲</button><span></span>
+      <button data-k="left">◀</button><button class="ok" data-k="ok">OK</button><button data-k="right">▶</button>
+      <button data-k="back">←</button><button data-k="down">▼</button><button data-k="y">Y</button>
+    </div>
+  </section>
+
+  <!-- MOV-04 Cantando -->
+  <section id="s-sing" class="screen sing">
+    <header class="bar"><span class="badge" id="badge-sing">J1</span></header>
+    <div class="mic" id="mic">
+      <img id="mic-img" alt="">
+      <div class="vu" id="vu"></div>
+    </div>
+  </section>
+
+  <!-- Probar el micro (afinador) -->
+  <section id="s-tuner" class="screen">
+    <header class="bar"><img class="logo" src="/assets/logo/horizontal-claro.png" alt="gramola"><span class="who">Probar el micro</span></header>
+    <p class="step">Canta una nota larga o pulsa el tono de referencia</p>
+    <div class="tuner">
+      <div class="t-note" id="t-note">–</div>
+      <div class="t-hz" id="t-hz">— Hz</div>
+      <div class="t-scale"><i class="t-mid"></i><i class="t-needle" id="t-needle"></i></div>
+      <div class="t-labels"><span>Bajo</span><span>Afinado</span><span>Alto</span></div>
+    </div>
+    <div class="t-row"><span>Volumen</span><div class="t-bar"><i id="t-vol"></i></div></div>
+    <div class="t-row"><span>Nitidez</span><div class="t-bar"><i id="t-clar"></i></div></div>
+    <p class="hint" id="t-info"></p>
+    <div class="grow"></div>
+    <button class="cta dark" id="b-ref">Tono de referencia · La 440 Hz <span>♪</span></button>
+    <button class="cta" id="b-tuner-back">Volver <span>←</span></button>
+  </section>
+
+  <!-- MOV-05 Reconectando -->
+  <section id="s-reconnect" class="screen">
+    <header class="bar"><img class="logo" src="/assets/logo/horizontal-claro.png" alt="gramola"></header>
+    <div class="grow"></div>
+    <p class="step red">Sin conexión</p>
+    <h2 class="mid">Reconectando…</h2>
+    <p class="txt" id="reconnect-text">Se ha perdido la conexión con la sala. No cierres esta página: volverás solo en cuanto haya red.</p>
+    <div class="progress"><i></i></div>
+    <div class="grow"></div>
+    <button class="cta dark" id="b-retry">Reintentar ahora <span>→</span></button>
+  </section>
+
+  <!-- MOV-05b Sala cerrada -->
+  <section id="s-closed" class="screen">
+    <header class="bar"><img class="logo" src="/assets/logo/horizontal-claro.png" alt="gramola"></header>
+    <div class="grow"></div>
+    <p class="step" id="closed-room">Sala</p>
+    <h2 class="mid">La sala<br>se ha cerrado</h2>
+    <p class="txt" id="closed-text">La tele ha terminado la fiesta o ha generado un código nuevo. Pide el código y vuelve a entrar.</p>
+    <div class="grow"></div>
+    <button class="cta" id="b-other">Unirme a otra sala <span>→</span></button>
+  </section>
+
+<script type="module" src="/m/m.js?v=1793589434"></script>
+</body>
+</html>
