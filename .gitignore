@@ -15,3 +15,4 @@ docs/PRIVADO.local.md
 /diseno/.thumbnail
 # Datos del servidor (récords)
 /server/data/
+__pycache__/

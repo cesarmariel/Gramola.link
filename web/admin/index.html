@@ -10,6 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;600;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/admin.css?v=%%V%%">
+<link rel="stylesheet" href="/editor.css?v=%%V%%">
 </head>
 <body>
 <!-- Entrada -->
@@ -36,10 +37,11 @@
       <a data-v="resumen" href="#resumen"><i>01</i>Resumen</a>
       <a data-v="directo" href="#directo"><i>02</i>Salas en directo <b id="nav-live"></b></a>
       <a data-v="canciones" href="#canciones"><i>03</i>Canciones <b id="nav-songs"></b></a>
-      <a data-v="records" href="#records"><i>04</i>Récords</a>
-      <a data-v="actividad" href="#actividad"><i>05</i>Actividad</a>
-      <a data-v="servidor" href="#servidor"><i>06</i>Servidor</a>
-      <a data-v="seguridad" href="#seguridad"><i>07</i>Seguridad</a>
+      <a data-v="creacion" href="#creacion"><i>04</i>Creación <b id="nav-jobs"></b></a>
+      <a data-v="records" href="#records"><i>05</i>Récords</a>
+      <a data-v="actividad" href="#actividad"><i>06</i>Actividad</a>
+      <a data-v="servidor" href="#servidor"><i>07</i>Servidor</a>
+      <a data-v="seguridad" href="#seguridad"><i>08</i>Seguridad</a>
     </nav>
     <div class="side-foot"><span id="ver"></span><button id="btn-out" class="link">Salir</button></div>
   </aside>
@@ -49,6 +51,7 @@
 <div id="toast" class="toast" hidden></div>
 <div id="modal" class="modal" hidden><div class="modal-box" id="modal-box"></div></div>
 <script src="/webauthn.js?v=%%V%%"></script>
+<script src="/editor.js?v=%%V%%"></script>
 <script src="/admin.js?v=%%V%%"></script>
 </body>
 </html>

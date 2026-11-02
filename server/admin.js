@@ -229,7 +229,7 @@ module.exports = function admin(ctx) {
       return {
         ...s, size: x.size, lufs: x.volumen ? x.volumen.antes_lufs : null, normalized: !!x.volumen,
         megamixOrigin: x.megamixInfo ? x.megamixInfo.origen || 'marcado' : null,
-        coverSource: x.caratula ? x.caratula.origen || 'itunes' : 'original', plays: rec.plays[s.id] || 0, record: rec.songs[s.id] || null,
+        coverSource: x.caratula ? x.caratula.origen || 'itunes' : 'original', draft: x.files.some(f => f.name === 'borrador.json'), hasVoice: x.files.some(f => f.name === 'voz-tono.json'), plays: rec.plays[s.id] || 0, record: rec.songs[s.id] || null,
         added: Math.min(...x.files.map(f => f.mtime).filter(Boolean), Date.now()),
       };
     });
@@ -244,7 +244,8 @@ module.exports = function admin(ctx) {
       p.on('error', e => { clearTimeout(to); resolve({ code: -1, out: '', err: e.message }); });
     });
   }
-  const py = (code, dir) => run('python3', ['-I', '-c', `import sys; sys.argv=['x']; sys.path.insert(0, ${JSON.stringify(TOOLS_DIR)}); ${code}`, dir], { cwd: dir });
+  // (la carpeta se guarda en «d» antes de vaciar sys.argv, que las herramientas leen al importarse)
+  const py = (code, dir) => run('python3', ['-I', '-c', `import sys; d = sys.argv[1]; sys.argv = ['x']; sys.path.insert(0, ${JSON.stringify(TOOLS_DIR)}); ${code}`, dir], { cwd: dir });
   // Portadas: iTunes (600×600) y Deezer (1000×1000); se devuelven juntas para elegir
   async function deezerSearch(q) {
     const r = await fetch('https://api.deezer.com/search?' + new URLSearchParams({ q, limit: '40' }), { signal: AbortSignal.timeout(15000) });
@@ -500,6 +501,119 @@ module.exports = function admin(ctx) {
     const rec = ctx.records();
     json(res, 200, { id, song: s, header: headerOf(dir), txts: txtsOf(dir), ...songExtra(dir), plays: rec.plays[id] || 0, record: rec.songs[id] || null });
   });
+  // --- editor: el .txt que usa la tele (el mismo que elige el servidor), con versiones anteriores guardadas
+  const VER_DIR = path.join(DATA_DIR, 'versiones');
+  const chartFile = dir => { const f = fs.readdirSync(dir).find(x => x.toLowerCase().endsWith('.txt')); if (!f) throw httpErr(404, 'Esta canción no tiene .txt'); return f; };
+  const verDir = id => path.join(VER_DIR, safeName(id));
+  on('GET', '/songs/([^/]+)/chart', (req, res, m) => {
+    const id = decodeURIComponent(m[1]), dir = songDir(id), f = chartFile(dir), h = headerOf(dir);
+    const base = '/songs/' + encodeURIComponent(id) + '/';
+    const has = n => fs.existsSync(path.join(dir, n));
+    json(res, 200, {
+      id, file: f, text: readText(path.join(dir, f)),
+      audio: (h.MP3 || h.AUDIO) ? base + encodeURIComponent(h.MP3 || h.AUDIO) : null,
+      vocals: has('voz.mp3') ? base + 'voz.mp3?v=' + Math.round(fs.statSync(path.join(dir, 'voz.mp3')).mtimeMs) : null,
+      pitch: has('voz-tono.json') ? base + 'voz-tono.json?v=' + Math.round(fs.statSync(path.join(dir, 'voz-tono.json')).mtimeMs) : null,
+      megamix: readJson(path.join(dir, 'megamix.json'), null),
+    });
+  });
+  on('PUT', '/songs/([^/]+)/chart', async (req, res, m) => {
+    const id = decodeURIComponent(m[1]), dir = songDir(id), f = chartFile(dir);
+    const b = JSON.parse((await readRaw(req, 2 * 1024 * 1024)).toString('utf8') || '{}');
+    const text = String(b.text || '');
+    if (!/^#TITLE:/m.test(text) || !/^#BPM:/m.test(text) || !/^[:*FRG]\s*-?\d+\s+\d+\s+-?\d+/m.test(text)) throw httpErr(400, 'El .txt no es válido (falta TITLE, BPM o notas)');
+    const vd = verDir(id);
+    fs.mkdirSync(vd, { recursive: true });
+    fs.copyFileSync(path.join(dir, f), path.join(vd, new Date().toISOString().replace(/[:.]/g, '-') + '.txt'));
+    const old = fs.readdirSync(vd).sort();
+    for (const x of old.slice(0, Math.max(0, old.length - 60))) fs.unlinkSync(path.join(vd, x));
+    fs.writeFileSync(path.join(dir, f), text.replace(/\r?\n/g, '\r\n'), 'utf8');
+    ctx.songsChanged();
+    ev('songs', `Editor: «${id}» guardada${b.note ? ' (' + String(b.note).slice(0, 80) + ')' : ''}`);
+    json(res, 200, { ok: true });
+  });
+  on('GET', '/songs/([^/]+)/versions', (req, res, m) => {
+    const id = decodeURIComponent(m[1]); songDir(id);
+    let l = []; try { l = fs.readdirSync(verDir(id)).filter(x => x.endsWith('.txt')).sort().reverse(); } catch {}
+    json(res, 200, l.map(n => ({ name: n, size: fs.statSync(path.join(verDir(id), n)).size })));
+  });
+  on('GET', '/songs/([^/]+)/versions/([^/]+)', (req, res, m) => {
+    const id = decodeURIComponent(m[1]), n = safeName(decodeURIComponent(m[2])), f = path.join(verDir(id), n);
+    if (!fs.existsSync(f)) throw httpErr(404, 'No existe esa versión');
+    json(res, 200, { text: readText(f) });
+  });
+
+  // ===================================================================== creación de canciones (trabajador en el propio servidor)
+  // Cola en data/trabajos/<id>/ (job.json + entradas + resultados). El trabajador (tools/trabajador/trabajador.py)
+  // pide trabajo con su clave, descarga el audio, procesa y sube los resultados; el servidor instala la canción
+  // como BORRADOR (no sale en la tele hasta «Publicar»).
+  const JOBS = path.join(DATA_DIR, 'trabajos');
+  const WORKER_FILE = path.join(DATA_DIR, 'trabajador.json');
+  let worker = { seen: 0, host: '', job: null };
+  const jobPath = (id, f = 'job.json') => path.join(JOBS, safeName(id), f);
+  const jobGet = id => { const j = readJson(jobPath(id), null); if (!j) throw httpErr(404, 'No existe ese trabajo'); return j; };
+  const jobPut = j => { j.updated = Date.now(); writeJson(jobPath(j.id), j); return j; };
+  const jobsAll = () => { let l = []; try { l = fs.readdirSync(JOBS).map(d => readJson(path.join(JOBS, d, 'job.json'), null)).filter(Boolean); } catch {} return l.sort((a, b) => b.created - a.created); };
+  const folderFor = (artista, titulo) => {
+    const base = `${artista} - ${titulo}`.replace(/[\/\\:*?"<>|\0]/g, '-').replace(/\s+/g, ' ').trim().slice(0, 150) || 'Canción';
+    let n = base, k = 2;
+    while (fs.existsSync(path.join(SONGS_DIR, n))) n = `${base} (${k++})`;
+    return n;
+  };
+  on('GET', '/jobs', (req, res) => json(res, 200, { jobs: jobsAll().slice(0, 100), worker: { ...worker, configured: fs.existsSync(WORKER_FILE) } }));
+  on('POST', '/jobs', async (req, res) => {
+    const b = await body(req), id = Date.now().toString(36) + crypto.randomBytes(3).toString('hex');
+    let j;
+    if (b.kind === 'analizar') {
+      const sid = String(b.song || ''); songDir(sid);
+      j = { id, kind: 'analizar', song: sid, titulo: headerOf(songDir(sid)).TITLE || sid, artista: headerOf(songDir(sid)).ARTIST || '', state: 'pendiente', created: Date.now() };
+    } else {
+      const titulo = String(b.titulo || '').trim().slice(0, 120), artista = String(b.artista || '').trim().slice(0, 120), letra = String(b.letra || '').slice(0, 30000);
+      if (!titulo || !artista) throw httpErr(400, 'Faltan el título o el artista');
+      if (letra.split('\n').filter(l => l.trim()).length < 2) throw httpErr(400, 'Pega la letra (una frase por línea)');
+      const folder = folderFor(artista, titulo);
+      j = { id, kind: 'crear', titulo, artista, idioma: String(b.idioma || 'es').slice(0, 5), anio: String(b.anio || '').slice(0, 4), folder, audioName: folder + '.mp3', state: 'subiendo', created: Date.now() };
+      fs.mkdirSync(path.join(JOBS, id), { recursive: true });
+      fs.writeFileSync(jobPath(id, 'letra.txt'), letra);
+    }
+    fs.mkdirSync(path.join(JOBS, id), { recursive: true });
+    jobPut(j);
+    ev('songs', j.kind === 'crear' ? `Creación pedida: «${j.artista} - ${j.titulo}»` : `Análisis de voz pedido: «${j.song}»`);
+    json(res, 200, j);
+  });
+  on('PUT', '/jobs/([^/]+)/audio', async (req, res, m) => {
+    const j = jobGet(m[1]);
+    if (j.kind !== 'crear') throw httpErr(400, 'Este trabajo no lleva audio');
+    const buf = await readRaw(req, 60 * 1024 * 1024);
+    if (buf.length < 50000) throw httpErr(400, 'El audio no es válido');
+    const ext = /\.(mp3|m4a|ogg|wav|flac|opus)$/i.exec(String(req.headers['x-name'] || ''))?.[1]?.toLowerCase() || 'mp3';
+    // Se guarda tal cual; si no es MP3, el servidor lo pasa a MP3 (la tele y el trabajador lo leen igual)
+    fs.writeFileSync(jobPath(j.id, 'entrada.' + ext), buf);
+    if (ext !== 'mp3') {
+      const r = await run('ffmpeg', ['-y', '-loglevel', 'error', '-i', jobPath(j.id, 'entrada.' + ext), '-vn', '-c:a', 'libmp3lame', '-b:a', '192k', jobPath(j.id, 'entrada.mp3')]);
+      if (r.code !== 0) throw httpErr(400, 'No se pudo convertir el audio: ' + r.err);
+    }
+    j.state = 'pendiente'; j.size = buf.length; jobPut(j);
+    json(res, 200, j);
+  });
+  on('POST', '/jobs/([^/]+)/retry', (req, res, m) => { const j = jobGet(m[1]); j.state = 'pendiente'; j.error = null; j.progress = 0; j.msg = ''; jobPut(j); json(res, 200, j); });
+  on('DELETE', '/jobs/([^/]+)', async (req, res, m) => { jobGet(m[1]); await fsp.rm(path.join(JOBS, safeName(m[1])), { recursive: true, force: true }); json(res, 200, { ok: true }); });
+  on('POST', '/worker/token', (req, res) => {
+    const token = rand(32);
+    writeJson(WORKER_FILE, { hash: hash(token), created: Date.now() });
+    ev('admin', 'Clave nueva para el trabajador de creación de canciones');
+    json(res, 200, { token });
+  });
+  // Borradores: publicar (deja de ser borrador y, si se quiere, entra en Novedades)
+  on('POST', '/songs/([^/]+)/publish', async (req, res, m) => {
+    const id = decodeURIComponent(m[1]), dir = songDir(id), b = await body(req);
+    try { fs.unlinkSync(path.join(dir, 'borrador.json')); } catch {}
+    if (b.novedad !== false) { const nv = ctx.novedades(); nv[id] = nv[id] || Date.now(); ctx.saveNovedades(); }
+    ctx.songsChanged();
+    ev('songs', `Publicada: «${id}»${b.novedad !== false ? ' (en Novedades)' : ''}`);
+    json(res, 200, { ok: true });
+  });
+
   // Novedades: marcar o quitar varias de golpe
   on('POST', '/novedades', async (req, res) => {
     const b = await body(req), nv = ctx.novedades();
@@ -602,7 +716,7 @@ module.exports = function admin(ctx) {
       r = await run('ffmpeg', ['-y', '-loglevel', 'error', '-i', path.join(dir, audio), '-ss', (off / 1000).toFixed(3), '-to', ((e + 3000) / 1000).toFixed(3), '-vn', '-ac', '2', '-c:a', 'libmp3lame', '-b:a', '192k', path.join(dir, 'megamix.mp3')]);
       if (r.code === 0) { writeJson(path.join(dir, 'megamix.json'), { file: 'megamix.mp3', offset: off, start: a, end: e, origen: 'manual' }); r.out = 'ok · estribillo manual ' + Math.round((e - a) / 1000) + ' s'; }
     } else {
-      r = await py('import megamix; print(megamix.preparar(sys.argv[1], forzar=True, auto=True))', dir);
+      r = await py('import megamix; print(megamix.preparar(d, forzar=True, auto=True))', dir);
     }
     ctx.songsChanged();
     ev('songs', `Megamix de «${id}»: ${r.code === 0 ? r.out : 'error'}`);
@@ -611,7 +725,7 @@ module.exports = function admin(ctx) {
   });
   on('POST', '/songs/([^/]+)/normalize', async (req, res, m) => {
     const id = decodeURIComponent(m[1]), dir = songDir(id);
-    const r = await py('import normalizar; print(normalizar.una(sys.argv[1])[1])', dir);
+    const r = await py('import normalizar; print(normalizar.una(d)[1])', dir);
     ctx.songsChanged();
     ev('songs', `Volumen de «${id}»: ${r.code === 0 ? r.out : 'error'}`);
     if (r.code !== 0) throw httpErr(500, 'No se pudo: ' + (r.err || r.out));
@@ -718,23 +832,118 @@ module.exports = function admin(ctx) {
     json(res, 200, { ok: true });
   });
 
+  // ===================================================================== API del trabajador (clave propia, no Touch ID)
+  function workerOk(req) {
+    const w = readJson(WORKER_FILE, null), m = String(req.headers.authorization || '').match(/^Bearer (.+)$/);
+    return !!(w && m && crypto.timingSafeEqual(Buffer.from(hash(m[1])), Buffer.from(w.hash)));
+  }
+  async function instalar(j) {
+    const src = p => jobPath(j.id, p);
+    if (j.kind === 'analizar') {
+      const dir = songDir(j.song);
+      for (const f of ['voz.mp3', 'voz-tono.json']) if (fs.existsSync(src(f))) fs.copyFileSync(src(f), path.join(dir, f));
+      ev('songs', `Voz analizada: «${j.song}»`);
+      return;
+    }
+    const folder = fs.existsSync(path.join(SONGS_DIR, j.folder)) ? folderFor(j.artista, j.titulo) : j.folder;
+    const dir = path.join(SONGS_DIR, folder);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.copyFileSync(src('entrada.mp3'), path.join(dir, j.audioName));
+    fs.copyFileSync(src('cancion.txt'), path.join(dir, folder + '.txt'));
+    for (const f of ['voz.mp3', 'voz-tono.json']) if (fs.existsSync(src(f))) fs.copyFileSync(src(f), path.join(dir, f));
+    writeJson(path.join(dir, 'borrador.json'), { trabajo: j.id, creada: Date.now() });
+    j.song = folder;
+    ctx.songsChanged();
+    ev('songs', `Canción creada (borrador): «${folder}»`);
+    // Portada (primera de iTunes), volumen igualado y tramo del Megamix: en segundo plano
+    (async () => {
+      try {
+        const r = (await coverSearch(`${j.artista} ${j.titulo}`, 'itunes'))[0];
+        if (r) {
+          const buf = Buffer.from(await (await fetch(r.art, { signal: AbortSignal.timeout(20000) })).arrayBuffer());
+          if (buf.length > 2000) { fs.writeFileSync(path.join(dir, 'cover-itunes.jpg'), buf); setCover(dir, 'cover-itunes.jpg', { origen: 'itunes', disco: r.album, año: r.year, url: r.art }); }
+        }
+      } catch {}
+      await py('import normalizar; print(normalizar.una(d)[1])', dir).catch(() => {});
+      await py('import megamix; print(megamix.preparar(d, forzar=True, auto=True))', dir).catch(() => {});
+      ctx.songsChanged();
+    })();
+  }
+  const wroutes = [];
+  const won = (method, pattern, fn) => wroutes.push({ method, re: new RegExp('^/api/worker' + pattern + '$'), fn });
+  won('POST', '/next', async (req, res) => {
+    const b = await body(req);
+    worker = { seen: Date.now(), host: String(b.host || '').slice(0, 60), job: worker.job, version: String(b.version || '').slice(0, 20) };
+    // Un trabajo que lleva 20 min sin dar señales (el trabajador se reinició a medias) vuelve a la cola
+    for (const x of jobsAll()) if (x.state === 'procesando' && Date.now() - (x.updated || 0) > 20 * 60e3) { x.state = 'pendiente'; x.msg = 'Vuelve a la cola'; jobPut(x); }
+    const j = jobsAll().reverse().find(x => x.state === 'pendiente');
+    if (!j) return json(res, 200, {});
+    j.state = 'procesando'; j.started = Date.now(); j.progress = 0; j.msg = 'Empezando'; j.worker = worker.host; jobPut(j);
+    worker.job = j.id;
+    const out = { ...j };
+    if (j.kind === 'crear') out.letra = fs.readFileSync(jobPath(j.id, 'letra.txt'), 'utf8');
+    json(res, 200, out);
+  });
+  won('GET', '/jobs/([^/]+)/input', (req, res, m) => {
+    const j = jobGet(m[1]);
+    let f;
+    if (j.kind === 'crear') f = jobPath(j.id, 'entrada.mp3');
+    else { const dir = songDir(j.song), h = headerOf(dir); f = path.join(dir, h.MP3 || h.AUDIO || ''); }
+    if (!fs.existsSync(f)) throw httpErr(404, 'Falta el audio');
+    res.writeHead(200, { 'content-type': 'audio/mpeg', 'content-length': fs.statSync(f).size });
+    fs.createReadStream(f).pipe(res);
+  });
+  won('POST', '/jobs/([^/]+)/progress', async (req, res, m) => {
+    const j = jobGet(m[1]), b = await body(req);
+    j.progress = Math.max(0, Math.min(100, +b.p || 0)); j.msg = String(b.msg || '').slice(0, 200); jobPut(j);
+    worker.seen = Date.now();
+    json(res, 200, { ok: true, cancel: j.state !== 'procesando' });
+  });
+  won('PUT', '/jobs/([^/]+)/result/([^/]+)', async (req, res, m) => {
+    const j = jobGet(m[1]), name = decodeURIComponent(m[2]);
+    if (!['cancion.txt', 'voz.mp3', 'voz-tono.json'].includes(name)) throw httpErr(400, 'Fichero no admitido');
+    fs.writeFileSync(jobPath(j.id, name), await readRaw(req, 40 * 1024 * 1024));
+    json(res, 200, { ok: true });
+  });
+  won('POST', '/jobs/([^/]+)/done', async (req, res, m) => {
+    const j = jobGet(m[1]), b = await body(req);
+    worker.job = null; worker.seen = Date.now();
+    if (b.ok) {
+      try { await instalar(j); j.state = 'hecho'; j.progress = 100; j.msg = String(b.msg || 'Hecho').slice(0, 200); }
+      catch (e) { j.state = 'error'; j.error = 'Al instalar: ' + e.message; }
+    } else { j.state = 'error'; j.error = String(b.error || 'Error').slice(0, 2000); }
+    j.finished = Date.now(); jobPut(j);
+    if (j.state === 'error') ev('songs', `Error en el trabajo «${j.artista} - ${j.titulo}»: ${j.error.slice(0, 120)}`);
+    json(res, 200, { ok: true });
+  });
+
   // ===================================================================== entrada HTTP
-  const PAGE = { '/': 'index.html', '/admin.css': 'admin.css', '/admin.js': 'admin.js', '/webauthn.js': 'webauthn.js' };
+  const PAGE = { '/': 'index.html', '/admin.css': 'admin.css', '/admin.js': 'admin.js', '/webauthn.js': 'webauthn.js', '/editor.js': 'editor.js', '/editor.css': 'editor.css' };
   async function handle(req, res, url) {
     if (!isAdminHost(req.headers.host)) {
-      if (url.pathname.startsWith('/api/admin/')) { json(res, 404, { error: 'No encontrado' }); return true; }
+      if (url.pathname.startsWith('/api/admin/') || url.pathname.startsWith('/api/worker/')) { json(res, 404, { error: 'No encontrado' }); return true; }
       return false;
+    }
+    if (url.pathname.startsWith('/api/worker/')) {
+      for (const r of wroutes) {
+        if (r.method !== req.method) continue;
+        const m = url.pathname.match(r.re); if (!m) continue;
+        try { if (!workerOk(req)) throw httpErr(401, 'Clave del trabajador no válida'); await r.fn(req, res, m, url); }
+        catch (e) { if (!res.headersSent) json(res, e.code && e.code >= 400 && e.code < 600 ? e.code : 500, { error: e.message || 'Error' }); if (!e.code) console.error('trabajador:', e); }
+        return true;
+      }
+      json(res, 404, { error: 'No encontrado' }); return true;
     }
     if (!url.pathname.startsWith('/api/admin/')) {
       // Canciones: con sesión de admin se pueden escuchar y ver aquí; el resto de ficheros del juego, como en la web
-      if (url.pathname.startsWith('/songs/') || url.pathname.startsWith('/assets/') || url.pathname.startsWith('/vendor/') || url.pathname.startsWith('/audio/')) return false;
+      if (/^\/(songs|assets|vendor|audio|js)\//.test(url.pathname)) return false;
       const f = PAGE[url.pathname];
       if (!f) { res.writeHead(302, { location: '/' }); res.end(); return true; }
       const file = path.join(WEB_DIR, 'admin', f);
       const type = f.endsWith('.css') ? 'text/css; charset=utf-8' : f.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/html; charset=utf-8';
       res.writeHead(200, {
         'content-type': type, 'cache-control': 'no-cache', 'x-frame-options': 'DENY', 'referrer-policy': 'no-referrer', 'x-robots-tag': 'noindex, nofollow',
-        'content-security-policy': "default-src 'self'; img-src 'self' data: blob: https://*.mzstatic.com https://*.dzcdn.net; media-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self'; frame-ancestors 'none'",
+        'content-security-policy': "default-src 'self'; img-src 'self' data: blob: https://*.mzstatic.com https://*.dzcdn.net; media-src 'self' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self'; frame-ancestors 'none'",
       });
       // La página lleva la versión en las direcciones de sus ficheros: cada despliegue obliga a bajarlos de nuevo
       if (f === 'index.html') { try { res.end(fs.readFileSync(file, 'utf8').replaceAll('%%V%%', versionNow())); } catch { res.end(); } return true; }

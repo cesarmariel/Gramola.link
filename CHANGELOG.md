@@ -2,6 +2,13 @@
 
 Versiones con el esquema `1.AA.MMDD.HHMM` (fecha y hora del despliegue).
 
+## 1.26.1102.1150
+- **Editor de canciones** en el admin (tipo DAW): notas a la altura de su tono, frases, forma de onda (también de la voz sola) y curva de la voz real; mover, alargar, partir, unir, cambiar sílabas, notas doradas/libres/rap, cortes de frase, GAP; deshacer y rehacer; reproducción lenta, tono guía, repetir frase, vista de karaoke y prueba con el micro con % por frase; versiones de cada guardado.
+- **Creación de canciones** a partir del audio y la letra: cola en el admin que atiende un trabajador en el propio servidor (servicio con prioridad mínima y límites; separación de voz con Demucs, alineación forzada MMS, tono con CREPE, sílabas con pyphen; ~5 min por canción). Quedan como **borrador** (no salen en la tele) con portada, volumen y Megamix; se revisan en el editor y se publican (entrando en Novedades).
+- **Analizar la voz** de cualquier canción para verla en el editor.
+- Arreglado: «Detectar solo» (Megamix) e «Igualar el volumen» del admin fallaban al llamar a las herramientas.
+- El servidor vuelve a leer las Novedades si el fichero cambia por fuera.
+
 ## 1.26.1102.1107
 - **Novedades**: en el admin se seleccionan canciones con casillas y se marcan como Novedades (o desde la ficha); botón «★ Novedades» junto a «Retiradas». En la tele salen las primeras de la lista, en su grupo «★» y con la etiqueta NUEVA.
 - Admin: columna de idioma en corto (ES, EN, CA…) y «Añadida» con fecha y hora.

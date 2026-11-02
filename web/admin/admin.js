@@ -113,7 +113,14 @@
   const every = (fn, ms) => { const g = viewGen, run = () => Promise.resolve().then(fn).catch(e => { if (g === viewGen) fail(e); }); run(); timers.push(setInterval(run, ms)); };
   const VIEWS = {};
   let viewGen = 0;
+  let editor = null, skipRoute = false;
   function route() {
+    if (skipRoute) { skipRoute = false; return; }
+    // Cambios sin guardar en el editor: se pregunta antes de salir
+    if (editor && editor.isDirty() && !location.hash.startsWith('#editor/') && !confirm('Hay cambios sin guardar en el editor. ¿Salir igualmente?')) {
+      skipRoute = true; history.back(); return;
+    }
+    editor = null;
     stopTimers();
     const gen = ++viewGen;
     const [v, ...rest] = (location.hash.slice(1) || 'resumen').split('/');
@@ -248,7 +255,7 @@
   let songs = null;
   const picked = new Set();   // canciones seleccionadas en la lista (se mantiene entre páginas)
   const sState = { q: '', f: 'todas', sort: 'title', dir: 1, page: 1, per: (() => { try { const v = localStorage.getItem('adm-per'); return v === null ? 50 : +v; } catch { return 50; } })() };
-  const FILTERS = { todas: 'Todas', sinmegamix: 'Sin Megamix', sinnorm: 'Volumen sin igualar', portada: 'Portada original', duo: 'Dúos', nunca: 'Nunca cantadas', video: 'Con vídeo' };
+  const FILTERS = { todas: 'Todas', borradores: 'Borradores', sinmegamix: 'Sin Megamix', sinnorm: 'Volumen sin igualar', portada: 'Portada original', duo: 'Dúos', nunca: 'Nunca cantadas', video: 'Con vídeo' };
   VIEWS.canciones = async ([id]) => {
     if (id === 'retiradas') return retiradas();
     if (id) return songSheet(id);
@@ -256,7 +263,7 @@
     v.innerHTML = `<div class="head"><h1>Canciones</h1><span class="sub" id="c-sub"></span></div>
       <div class="tools"><input class="inp" id="c-q" placeholder="Buscar título, artista, año, carpeta…" value="${esc(sState.q)}">
         <div class="chips" id="c-f">${Object.entries(FILTERS).map(([k, t]) => `<button class="chip ${sState.f === k ? 'on' : ''}" data-f="${k}">${t}</button>`).join('')}</div>
-        <span class="grow"></span><button class="btn ${sState.f === 'novedades' ? 'dark' : ''}" id="c-nov">★ Novedades <b id="c-nn"></b></button><button class="btn" id="c-ret">Retiradas</button><button class="btn red" id="c-new">+ Canción nueva</button></div>
+        <span class="grow"></span><button class="btn ${sState.f === 'novedades' ? 'dark' : ''}" id="c-nov">★ Novedades <b id="c-nn"></b></button><button class="btn" id="c-ret">Retiradas</button><button class="btn" id="c-new">Subir UltraStar</button><button class="btn red" id="c-crear">✨ Crear canción</button></div>
       <div class="selbar" id="c-sel" hidden><b id="c-seln"></b><button class="btn sm red" data-nv="1">★ Marcar como Novedades</button><button class="btn sm" data-nv="0">Quitar de Novedades</button><button class="link small" data-nv="x">Deseleccionar</button></div>
       <div class="pager" id="c-pg1"></div><div id="c-list"></div><div class="pager" id="c-pg2"></div>`;
     $('c-q').oninput = () => { sState.q = $('c-q').value; sState.page = 1; draw(); };
@@ -280,13 +287,14 @@
       } catch (err) { fail(err); }
     };
     $('c-new').onclick = newSong;
+    $('c-crear').onclick = crearCancion;
     songs = await api('/songs');
     $('nav-songs').textContent = songs.length;
     function draw() {
       const q = sState.q.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
       const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
       let l = songs.filter(s => !q || norm(`${s.title} ${s.artist} ${s.year} ${s.id} ${s.genre} ${s.language}`).includes(q));
-      const F = { novedades: s => s.isNew, sinmegamix: s => !s.megamix, sinnorm: s => !s.normalized, portada: s => s.coverSource === 'original', duo: s => s.duet, nunca: s => !s.plays, video: s => s.hasVideo };
+      const F = { borradores: s => s.draft, novedades: s => s.isNew, sinmegamix: s => !s.megamix, sinnorm: s => !s.normalized, portada: s => s.coverSource === 'original', duo: s => s.duet, nunca: s => !s.plays, video: s => s.hasVideo };
       if (F[sState.f]) l = l.filter(F[sState.f]);
       const k = sState.sort, d = sState.dir;
       const val = s => k === 'record' ? (s.record ? s.record.score : -1) : k === 'megamix' ? (s.megamix ? 1 : 0) : s[k];
@@ -314,7 +322,7 @@
       const allOn = l.length && l.every(s => picked.has(s.id));
       $('c-list').innerHTML = `<table class="tbl"><thead><tr><th class="ck"><input type="checkbox" data-all ${allOn ? 'checked' : ''} title="Seleccionar las de esta página"></th><th></th>${th('title', 'Canción')}${th('year', 'Año', 'r hide-m')}${th('language', 'Idioma', 'hide-m lang')}${th('duration', 'Dur.', 'r hide-m')}${th('difficulty', 'Dif.', 'hide-m')}${th('megamix', 'Megamix', 'hide-m')}${th('lufs', 'Volumen', 'r hide-m')}${th('plays', 'Cantada', 'r')}${th('record', 'Récord', 'r hide-m')}${th('size', 'Tamaño', 'r hide-m')}${th('added', 'Añadida', 'r hide-m when')}</tr></thead><tbody>
         ${l.map(s => `<tr class="click ${picked.has(s.id) ? 'picked' : ''}" data-id="${esc(s.id)}"><td class="ck"><input type="checkbox" data-pick ${picked.has(s.id) ? 'checked' : ''}></td><td><img class="cov" loading="lazy" src="${esc(cover(s))}" alt=""></td>
-          <td><div class="t-title">${esc(s.title)}${s.isNew ? ' <span class="badge red">★ nueva</span>' : ''}${s.duet ? ' <span class="badge warn">dúo</span>' : ''}${s.hasVideo ? ' <span class="badge no">vídeo</span>' : ''}</div><div class="t-art">${esc(s.artist)}</div></td>
+          <td><div class="t-title">${esc(s.title)}${s.draft ? ' <span class="badge warn">borrador</span>' : ''}${s.isNew ? ' <span class="badge red">★ nueva</span>' : ''}${s.duet ? ' <span class="badge warn">dúo</span>' : ''}${s.hasVideo ? ' <span class="badge no">vídeo</span>' : ''}</div><div class="t-art">${esc(s.artist)}</div></td>
           <td class="r hide-m">${s.year || '—'}</td><td class="hide-m small lang" title="${esc(s.language || '')}">${esc(langShort(s.language))}</td><td class="r hide-m">${s.duration ? mmss(s.duration) : '—'}</td>
           <td class="hide-m"><span class="diff">${'●'.repeat(s.difficulty)}${'○'.repeat(3 - s.difficulty)}</span></td>
           <td class="hide-m">${s.megamix ? `<span class="badge ${s.megamixOrigin === 'detectado' ? 'warn' : 'ok'}">${esc(s.megamixOrigin || 'sí')}</span>` : '<span class="badge no">no</span>'}</td>
@@ -373,7 +381,10 @@
         </dl>
         <div class="row" style="margin-top:14px"><button class="btn sm ${s.isNew ? 'dark' : ''}" id="s-nov">${s.isNew ? '★ Novedad · quitar' : '★ Marcar como novedad'}</button><button class="btn sm" id="s-ren">Renombrar carpeta</button><button class="btn sm danger" id="s-ret">Retirar</button></div>
       </div><div>
-        <h2 class="sec" style="margin-top:0">Escuchar</h2>
+        ${d.files.some(f => f.name === 'borrador.json') ? `<div class="card" style="border-color:var(--warn);margin-bottom:12px"><b>Borrador:</b> creada automáticamente; no sale en la tele hasta que la publiques. Revísala en el editor.
+          <div class="row" style="margin-top:8px"><button class="btn red" id="s-pub">Publicar</button><label class="row small"><input type="checkbox" id="s-pubnv" checked> y ponerla en Novedades</label></div></div>` : ''}
+        <div class="row" style="margin-bottom:6px"><a class="btn dark" href="#editor/${enc(id)}">✎ Abrir en el editor</a><button class="btn" id="s-voz">${d.files.some(f => f.name === 'voz-tono.json') ? 'Volver a analizar la voz' : 'Analizar la voz'}</button><span class="small muted">La voz sola y su tono ayudan a encajar las notas en el editor</span></div>
+        <h2 class="sec" style="margin-top:8px">Escuchar</h2>
         ${audioUrl ? `<audio id="s-audio" controls preload="metadata" src="${audioUrl}"></audio>` : '<p class="red-t">Sin audio</p>'}
         <h2 class="sec">Megamix</h2>
         ${mm ? `<p>Estribillo de <b>${mmss(mm.start / 1000)}</b> a <b>${mmss(mm.end / 1000)}</b> (${Math.round((mm.end - mm.start) / 1000)} s) · <span class="badge ${mm.origen === 'detectado' ? 'warn' : 'ok'}">${esc(mm.origen || 'marcado')}</span></p>
@@ -399,6 +410,8 @@
     if ($('s-rest')) $('s-rest').onclick = () => act(api(`/songs/${enc(id)}/cover`, { method: 'POST', json: { restore: true } }), 'Portada anterior recuperada');
     if ($('s-p0')) $('s-p0').onclick = async () => { if (await ask('¿Poner a 0 las veces cantada?', esc(s.title))) act(api('/records/plays/' + enc(id), { method: 'DELETE' })); };
     if ($('s-r0')) $('s-r0').onclick = async () => { if (await ask('¿Borrar el récord de esta canción?', esc(s.title))) act(api('/records/song/' + enc(id), { method: 'DELETE' })); };
+    if ($('s-pub')) $('s-pub').onclick = () => act(api(`/songs/${enc(id)}/publish`, { method: 'POST', json: { novedad: $('s-pubnv').checked } }), 'Publicada');
+    $('s-voz').onclick = async () => { try { await api('/jobs', { method: 'POST', json: { kind: 'analizar', song: id } }); toast('En la cola de creación'); location.hash = 'creacion'; } catch (e) { fail(e); } };
     $('s-nov').onclick = () => act(api('/novedades', { method: 'POST', json: { ids: [id], on: !s.isNew } }), s.isNew ? 'Quitada de Novedades' : 'Marcada como novedad');
     $('s-ren').onclick = async () => { const to = await prompt2('Renombrar carpeta', 'Nombre nuevo de la carpeta', id); if (to && to !== id) try { const r = await api(`/songs/${enc(id)}/rename`, { method: 'POST', json: { to } }); toast('Renombrada'); location.hash = 'canciones/' + enc(r.id); } catch (e) { fail(e); } };
     $('s-ret').onclick = async () => { if (await ask(`¿Retirar «${s.title}»?`, 'Deja de salir en el juego. Se guarda en «Retiradas» y se puede restaurar.', 'Retirar')) try { await api(`/songs/${enc(id)}/retire`, { method: 'POST', json: {} }); toast('Retirada'); location.hash = 'canciones'; } catch (e) { fail(e); } };
@@ -524,6 +537,89 @@
     };
     draw();
   }
+
+  // ------------------------------------------------------------------ Creación de canciones (trabajador en el propio servidor)
+  const IDIOMAS = { es: 'Castellano', en: 'Inglés', ca: 'Catalán', fr: 'Francés', it: 'Italiano', pt: 'Portugués', de: 'Alemán', gl: 'Gallego', eu: 'Euskera' };
+  function crearCancion() {
+    const b = modal(`<h3>Crear canción</h3>
+      <p class="small muted">Sube el audio y pega la letra: el servidor separa la voz, encaja cada sílaba en su sitio y saca las notas. Queda como <b>borrador</b> para revisarla en el editor antes de publicarla.</p>
+      <div class="grid2"><div><label class="lbl">Artista</label><input class="inp" id="k-art"></div><div><label class="lbl">Título</label><input class="inp" id="k-tit"></div></div>
+      <div class="grid2"><div><label class="lbl">Idioma de la letra</label><select class="inp" id="k-lang">${Object.entries(IDIOMAS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div><div><label class="lbl">Año</label><input class="inp" id="k-year" maxlength="4" placeholder="opcional"></div></div>
+      <label class="lbl">Audio (MP3, M4A, WAV…)</label><input type="file" id="k-audio" accept="audio/*,.mp3,.m4a,.wav,.flac,.ogg" class="inp">
+      <label class="lbl">Letra · una frase por línea (como se verá en la tele)</label><textarea class="inp" id="k-letra" rows="12" placeholder="Cada línea será una frase en pantalla.
+Las líneas vacías no cuentan."></textarea>
+      <div class="progress"><i id="k-p"></i></div><p class="small muted" id="k-st"></p>
+      <div class="row" style="margin-top:12px"><button class="btn red" id="k-go">Crear</button><button class="btn ghost" id="k-x">Cancelar</button></div>`);
+    $('k-x').onclick = closeModal;
+    $('k-audio').onchange = () => {
+      const f = $('k-audio').files[0]; if (!f || $('k-tit').value) return;
+      const m = f.name.replace(/\.[^.]+$/, '').split(/\s+-\s+/);
+      if (m.length >= 2) { $('k-art').value = $('k-art').value || m[0]; $('k-tit').value = m.slice(1).join(' - '); }
+    };
+    $('k-go').onclick = async () => {
+      const f = $('k-audio').files[0];
+      if (!f) return toast('Elige el audio', true);
+      $('k-go').disabled = true;
+      try {
+        $('k-st').textContent = 'Creando el trabajo…';
+        const j = await api('/jobs', { method: 'POST', json: { kind: 'crear', artista: $('k-art').value, titulo: $('k-tit').value, idioma: $('k-lang').value, anio: $('k-year').value, letra: $('k-letra').value } });
+        $('k-st').textContent = `Subiendo el audio (${mb(f.size)})…`;
+        await new Promise((res, rej) => {   // con barra de progreso
+          const x = new XMLHttpRequest(); x.open('PUT', `/api/admin/jobs/${j.id}/audio`); x.setRequestHeader('x-name', f.name);
+          x.upload.onprogress = e => { if (e.lengthComputable) $('k-p').style.width = (e.loaded / e.total * 100) + '%'; };
+          x.onload = () => x.status < 300 ? res() : rej(new Error((JSON.parse(x.responseText || '{}').error) || 'Error ' + x.status)); x.onerror = () => rej(new Error('Sin conexión'));
+          x.send(f);
+        });
+        closeModal(); toast('En la cola de creación'); location.hash = 'creacion';
+      } catch (e) { fail(e); $('k-go').disabled = false; }
+    };
+  }
+  const ESTADO = { subiendo: ['Subiendo', 'no'], pendiente: ['En cola', 'warn'], procesando: ['Procesando', 'red'], hecho: ['Hecho', 'ok'], error: ['Error', 'red'] };
+  VIEWS.creacion = async () => {
+    const v = $('view');
+    v.innerHTML = `<div class="head"><h1>Creación</h1><span class="sub"><button class="btn red" id="j-new">✨ Crear canción</button></span></div>
+      <div class="card" id="j-w"></div><h2 class="sec">Trabajos</h2><div id="j-l"></div>`;
+    $('j-new').onclick = crearCancion;
+    v.onclick = async e => {
+      const b = e.target.closest('[data-j]'); if (!b) return;
+      const id = b.dataset.j, a = b.dataset.a;
+      try {
+        if (a === 'retry') await api(`/jobs/${id}/retry`, { method: 'POST', json: {} });
+        if (a === 'del' && await ask('¿Borrar este trabajo?', 'Se borra de la cola con sus ficheros (la canción, si ya se creó, se queda).')) await api(`/jobs/${id}`, { method: 'DELETE' });
+        if (a === 'token') {
+          if (!await ask('¿Clave nueva para el trabajador?', 'La anterior deja de valer: habrá que ponerla en la configuración del trabajador (/opt/gramola-trabajador/config.json).', 'Generar', false)) return;
+          const r = await api('/worker/token', { method: 'POST', json: {} });
+          modal(`<h3>Clave del trabajador</h3><p class="small">Cópiala ahora: no se vuelve a mostrar.</p><pre class="out">${esc(r.token)}</pre><button class="btn" data-go="creacion">Cerrar</button>`);
+          $('modal-box').querySelector('[data-go]').onclick = closeModal;
+        }
+        draw();
+      } catch (err) { fail(err); }
+    };
+    async function draw() {
+      const d = await api('/jobs'), w = d.worker, vivo = w.seen && Date.now() - w.seen < 45000;
+      $('nav-jobs').textContent = d.jobs.filter(j => ['pendiente', 'procesando'].includes(j.state)).length || '';
+      $('j-w').innerHTML = `<div class="row"><span class="dot ${vivo ? 'on' : ''}"></span><b>${vivo ? 'Trabajador conectado' : 'Trabajador sin conexión'}</b>
+        <span class="muted small">${w.seen ? `${esc(w.host || 'servidor')} · último contacto ${ago(w.seen)}${w.version ? ' · v' + esc(w.version) : ''}` : w.configured ? 'Aún no se ha conectado' : 'Sin clave configurada'}</span>
+        <span class="grow"></span><button class="btn sm ghost" data-j="-" data-a="token">Clave del trabajador</button></div>
+        ${vivo ? '' : '<p class="small muted" style="margin:8px 0 0">El trabajador corre en el propio servidor (servicio gramola-trabajador). Si no está conectado, los trabajos esperan en la cola.</p>'}`;
+      $('j-l').innerHTML = d.jobs.length ? `<table class="tbl"><thead><tr><th>Canción</th><th>Tipo</th><th>Estado</th><th>Pedido</th><th></th></tr></thead><tbody>${d.jobs.map(j => {
+        const [et, ec] = ESTADO[j.state] || [j.state, 'no'];
+        return `<tr><td><div class="t-title">${esc(j.titulo)}</div><div class="t-art">${esc(j.artista)}${j.idioma ? ' · ' + esc(IDIOMAS[j.idioma] || j.idioma) : ''}</div></td>
+          <td class="small">${j.kind === 'crear' ? 'Crear canción' : 'Analizar voz'}</td>
+          <td style="min-width:220px"><span class="badge ${ec}">${et}</span> ${j.state === 'procesando' ? `<div class="progress" style="margin-top:6px"><i style="width:${j.progress || 0}%"></i></div><span class="small muted">${esc(j.msg || '')}</span>` : j.state === 'error' ? `<div class="small red-t" style="margin-top:4px;max-width:420px;overflow-wrap:anywhere">${esc((j.error || '').slice(-300))}</div>` : j.state === 'hecho' ? `<span class="small muted">${esc(j.msg || '')}${j.finished && j.started ? ' · ' + dur((j.finished - j.started) / 1000) : ''}</span>` : ''}</td>
+          <td class="small muted">${ago(j.created)}</td>
+          <td class="r">${j.state === 'hecho' && j.song ? `<a class="btn sm dark" href="#editor/${enc(j.song)}">Editor</a> <a class="btn sm" href="#canciones/${enc(j.song)}">Ficha</a> ` : ''}${j.state === 'error' ? `<button class="btn sm" data-j="${j.id}" data-a="retry">Reintentar</button> ` : ''}<button class="btn sm danger" data-j="${j.id}" data-a="del">Borrar</button></td></tr>`;
+      }).join('')}</tbody></table>` : '<div class="empty">No hay trabajos. Pulsa «Crear canción» para empezar.</div>';
+    }
+    every(draw, 3000);
+  };
+
+  // ------------------------------------------------------------------ Editor de canciones
+  VIEWS.editor = async ([id]) => {
+    if (!id) { location.hash = 'canciones'; return; }
+    document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('on', a.dataset.v === 'canciones'));
+    editor = await GramolaEditor.open($('view'), id, api, toast);
+  };
 
   // ------------------------------------------------------------------ 04 · Récords
   VIEWS.records = async () => {

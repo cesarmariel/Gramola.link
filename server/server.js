@@ -109,6 +109,7 @@ function scanSongs(force) {
       hasVideo: !!head.VIDEO,
       megamix: megamixOf(dir, base),
       isNew: !!novedades[d.name],
+      draft: fs.existsSync(path.join(dir, 'borrador.json')),
       newAt: novedades[d.name] || null,
     });
   }
@@ -297,7 +298,8 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' });
     return res.end('Solo para la tele de una sala abierta');
   }
-  if (req.method === 'GET' && url.pathname === '/api/songs') return json(res, 200, scanSongs());
+  // Los borradores (canciones creadas sin revisar) no salen en la tele
+  if (req.method === 'GET' && url.pathname === '/api/songs') return json(res, 200, scanSongs().filter(s => !s.draft));
   if (req.method === 'GET' && url.pathname === '/api/health') return json(res, 200, { ok: true, rooms: rooms.size });
   if (req.method === 'GET' && url.pathname === '/api/records') return json(res, 200, records);
   // Telemetría de rendimiento de las pruebas en la tele (solo números; se guarda en memoria, últimas 300)

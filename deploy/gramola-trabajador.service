@@ -1,0 +1,34 @@
+# Trabajador de creación de canciones (separar la voz, encajar la letra, sacar las notas).
+# Corre en el mismo servidor con prioridad mínima y límites para no frenar el resto de webs.
+# Instalación: ver tools/trabajador/LEEME.md
+[Unit]
+Description=Gramola - trabajador de creación de canciones
+After=network.target gramola.service
+
+[Service]
+Type=simple
+User=USUARIO
+Group=psacln
+WorkingDirectory=/opt/gramola-trabajador
+Environment=GRAMOLA_TRABAJADOR_CFG=/opt/gramola-trabajador/config.json
+Environment=HOME=/opt/gramola-trabajador
+Environment=TORCH_HOME=/opt/gramola-trabajador/cache
+Environment=XDG_CACHE_HOME=/opt/gramola-trabajador/cache
+Environment=NUMBA_CACHE_DIR=/opt/gramola-trabajador/cache/numba
+Environment=PYTHONWARNINGS=ignore
+ExecStart=/opt/gramola-trabajador/.venv/bin/python -u /var/www/vhosts/DOMINIO/app/tools/trabajador/trabajador.py
+Restart=always
+RestartSec=30
+# Prioridad mínima de CPU y disco, como mucho 2,5 núcleos y 5 GB de memoria
+Nice=19
+IOSchedulingClass=idle
+CPUQuota=250%
+MemoryHigh=4G
+MemoryMax=5G
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/gramola-trabajador
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

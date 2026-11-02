@@ -51,3 +51,4 @@ la sala dura 15 min sin tele; ping de WebSocket cada 25 s.
 | `POST /api/records` | `{code, token, song, title, artist, players:[{name,score,streak,bot}]}`. Solo con el token de una sala abierta. |
 | `GET /api/health` | Estado. |
 | `/api/admin/*` | Solo en el subdominio `admin.` y con sesión de Touch ID. Ver [ADMIN.md](ADMIN.md). |
+| `/api/worker/*` | Solo en `admin.`, con la clave del trabajador (`Authorization: Bearer`): `next`, `jobs/<id>/input`, `progress`, `result/<fichero>`, `done`. Ver [ADMIN.md](ADMIN.md). |
