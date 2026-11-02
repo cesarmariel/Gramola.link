@@ -35,12 +35,13 @@ const num = s => parseFloat(String(s || '0').replace(',', '.')) || 0;
 let songsCache = { at: 0, list: [] };
 // Novedades: canciones marcadas desde la administración para que salgan primero en la tele ({ id: fecha })
 const NEW_FILE = path.join(DATA_DIR, 'novedades.json');
-let novedades = {};
+let novedades = {}, novedadesMtime = 0;
 try { novedades = JSON.parse(fs.readFileSync(NEW_FILE, 'utf8')) || {}; } catch {}
 function saveNovedades() {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   fs.writeFileSync(NEW_FILE + '.tmp', JSON.stringify(novedades));
   fs.renameSync(NEW_FILE + '.tmp', NEW_FILE);
+  try { novedadesMtime = fs.statSync(NEW_FILE).mtimeMs; } catch {}
   songsCache.at = 0;
 }
 
@@ -57,6 +58,8 @@ function megamixOf(dir, base) {
 
 function scanSongs(force) {
   if (!force && Date.now() - songsCache.at < 5000) return songsCache.list;
+  // Si novedades.json se ha cambiado por fuera (por ejemplo, al subir canciones por SSH), se vuelve a leer
+  try { const m = fs.statSync(NEW_FILE).mtimeMs; if (m !== novedadesMtime) { novedades = JSON.parse(fs.readFileSync(NEW_FILE, 'utf8')) || {}; novedadesMtime = m; } } catch {}
   const out = [];
   let dirs = [];
   try { dirs = fs.readdirSync(SONGS_DIR, { withFileTypes: true }).filter(d => d.isDirectory()); } catch { dirs = []; }
