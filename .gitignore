@@ -16,3 +16,4 @@ docs/PRIVADO.local.md
 # Datos del servidor (récords)
 /server/data/
 __pycache__/
+.local/

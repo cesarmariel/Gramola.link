@@ -4,7 +4,8 @@
   "description": "Servidor de salas de MusicBox (karaoke con el móvil como micro)",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test test/*.test.cjs"
   },
   "license": "MIT",
   "type": "commonjs",

@@ -130,7 +130,9 @@ window.GR = (() => {
   const local = () => /^(localhost|\d+\.\d+\.\d+\.\d+)$/.test(location.hostname);
   G.webHost = () => location.hostname.replace(/^(www|micro)\./, '');
   G.microHost = () => local() ? location.host + '/m' : 'micro.' + G.webHost();
-  G.microUrl = () => local() ? location.origin + '/m/index.html' : 'https://' + G.microHost() + '/';
+  G.microUrl = () => location.hostname === 'localhost'
+    ? location.protocol + '//micro.localhost' + (location.port ? ':' + location.port : '') + '/'
+    : local() ? location.origin + '/m/index.html' : 'https://' + G.microHost() + '/';
   // ------------------------------------------------------------------ QR real de la sala
   let qrEl = null, qrFor = null;
   G.qr = el => { if (el) qrEl = el; drawQR(); return true; };

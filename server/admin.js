@@ -87,7 +87,7 @@ module.exports = function admin(ctx) {
   };
   function cookie(req, name) {
     const m = (req.headers.cookie || '').match(new RegExp('(?:^|; )' + name + '=([^;]+)'));
-    return m ? decodeURIComponent(m[1]) : null;
+    try { return m ? decodeURIComponent(m[1]) : null; } catch { return null; }
   }
   const secure = req => originOf(req).startsWith('https') ? '; Secure' : '';
   function sessionOf(req) {

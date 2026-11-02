@@ -18,6 +18,7 @@ const WEB_DIR = process.env.WEB_DIR || path.join(__dirname, '..', 'web');
 const SONGS_DIR = process.env.SONGS_DIR || path.join(WEB_DIR, 'songs');
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const SERVE_STATIC = process.env.SERVE_STATIC !== '0';
+const ENABLE_TELEMETRY = process.env.ENABLE_TELEMETRY === '1';
 const MAX_PLAYERS = 8;
 const ROOM_TTL_MS = 15 * 60 * 1000; // la sala aguanta 15 min sin tele conectada
 // Un color por micro: J1..J8
@@ -246,7 +247,7 @@ function readBody(req, max = 32 * 1024) {
 // Pase de tele: las canciones (con derechos) solo se sirven a una tele con sala abierta
 function cookie(req, name) {
   const m = (req.headers.cookie || '').match(new RegExp('(?:^|; )' + name + '=([^;]+)'));
-  return m ? decodeURIComponent(m[1]) : null;
+  try { return m ? decodeURIComponent(m[1]) : null; } catch { return null; }
 }
 function hasTvPass(req) {
   // El pase llega en la cookie o, si la tele no guarda cookies, en el parámetro ?k= (clave de una sala abierta)
@@ -267,8 +268,26 @@ const admin = require('./admin')({
   sendTo: send, closeRoom: r => closeRoom(r), announce: r => announce(r), wsCount: () => wss.clients.size,
 });
 
-const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, 'http://x');
+const server = http.createServer((req, res) => {
+  handleHttp(req, res).catch(e => {
+    console.error('http:', e.message);
+    if (res.headersSent) return res.destroy();
+    json(res, 500, { error: 'Error interno' });
+  });
+});
+
+async function readJsonBody(req, max) {
+  const body = JSON.parse(await readBody(req, max));
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('objeto JSON requerido');
+  return body;
+}
+
+async function handleHttp(req, res) {
+  let url;
+  try {
+    const parsed = new URL(req.url, 'http://x');
+    url = { pathname: decodeURIComponent(parsed.pathname), search: parsed.search, searchParams: parsed.searchParams };
+  } catch { return json(res, 400, { error: 'ruta' }); }
   const host = String(req.headers.host || '');
   if (await admin.handle(req, res, url)) return;
   // Subdominio micro.: la app del micro en la raíz
@@ -287,7 +306,7 @@ const server = http.createServer(async (req, res) => {
   }
   if (req.method === 'POST' && url.pathname === '/api/tv-pass') {
     let body;
-    try { body = JSON.parse(await readBody(req, 1024)); } catch { return json(res, 400, { error: 'json' }); }
+    try { body = await readJsonBody(req, 1024); } catch { return json(res, 400, { error: 'json' }); }
     const room = rooms.get(String(body.code || '').toUpperCase());
     if (!room || room.hostToken !== body.token) return json(res, 403, { error: 'sala' });
     admin.count('tvs');
@@ -305,19 +324,25 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && url.pathname === '/api/records') return json(res, 200, records);
   // Telemetría de rendimiento de las pruebas en la tele (solo números; se guarda en memoria, últimas 300)
   if (req.method === 'POST' && url.pathname === '/api/telemetry') {
+    if (!ENABLE_TELEMETRY) return json(res, 404, { error: 'No disponible' });
     let body;
-    try { body = JSON.parse(await readBody(req, 4096)); } catch { return json(res, 400, { error: 'json' }); }
+    try { body = await readJsonBody(req, 4096); } catch { return json(res, 400, { error: 'json' }); }
     const pick = ['fps', 'p95', 'worst', 'heap', 'screen', 'singers', 'video', 'cam', 'note', 'ua'];
     const row = { t: new Date().toISOString() };
     for (const k of pick) if (body[k] !== undefined) row[k] = typeof body[k] === 'string' ? body[k].slice(0, 160) : body[k];
     telemetry.push(row); if (telemetry.length > 300) telemetry.shift();
     return json(res, 200, { ok: true });
   }
-  if (req.method === 'GET' && url.pathname === '/api/telemetry') return json(res, 200, telemetry.slice(-100));
+  if (req.method === 'GET' && url.pathname === '/api/telemetry') {
+    if (!ENABLE_TELEMETRY) return json(res, 404, { error: 'No disponible' });
+    if (!admin.isAuthed(req)) return json(res, 401, { error: 'Sesión requerida' });
+    return json(res, 200, telemetry.slice(-100));
+  }
   if (req.method === 'POST' && url.pathname === '/api/records') {
     // Solo una tele con sala abierta puede guardar (código + token de la sala)
     let body;
-    try { body = JSON.parse(await readBody(req)); } catch { return json(res, 400, { error: 'json' }); }
+    try { body = await readJsonBody(req); } catch { return json(res, 400, { error: 'json' }); }
+    if (!Array.isArray(body.players) || body.players.some(p => !p || typeof p !== 'object' || Array.isArray(p))) return json(res, 400, { error: 'jugadores' });
     const room = rooms.get(String(body.code || '').toUpperCase());
     if (!room || room.hostToken !== body.token) return json(res, 403, { error: 'sala' });
     const r = addRecord(body);
@@ -330,7 +355,7 @@ const server = http.createServer(async (req, res) => {
   }
   if (SERVE_STATIC && (req.method === 'GET' || req.method === 'HEAD')) return serveStatic(req, res, url.pathname);
   res.writeHead(404); res.end();
-});
+}
 
 // ---------- ficheros estáticos (web + canciones), con Range para poder saltar en el audio ----------
 const MIME = {
@@ -342,8 +367,7 @@ const MIME = {
 };
 
 function serveStatic(req, res, pathname) {
-  let rel;
-  try { rel = decodeURIComponent(pathname); } catch { res.writeHead(400); return res.end(); }
+  const rel = pathname; // La ruta ya se decodificó antes de comprobar permisos.
   const isSong = rel.startsWith('/songs/');
   const root = isSong ? SONGS_DIR : WEB_DIR;
   let file = path.normalize(path.join(root, isSong ? rel.slice(7) : rel));
@@ -561,4 +585,4 @@ setInterval(() => {
   }
 }, 25 * 1000).unref();
 
-server.listen(PORT, HOST, () => console.log(`gramola: escuchando en ${HOST}:${PORT}, canciones en ${SONGS_DIR}`));
+server.listen(PORT, HOST, () => console.log(`gramola: escuchando en ${HOST}:${server.address().port}, canciones en ${SONGS_DIR}`));
