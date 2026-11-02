@@ -80,7 +80,7 @@
   }
 
   // ------------------------------------------------------------------ el editor
-  async function open(view, id, api, toast) {
+  async function open(view, id, api, toast, opts = {}) {
     const fail = e => toast(e.message || String(e), true);
     const data = await api('/songs/' + encodeURIComponent(id) + '/chart');
     let doc = parse(data.text);
@@ -99,13 +99,15 @@
 
     view.innerHTML = `<div class="ed">
       <div class="ed-top">
-        <button class="btn ghost sm" data-go="canciones/${esc(encodeURIComponent(id))}">← Ficha</button>
+        <button class="btn ghost sm" data-go="${data.draft ? 'creacion' : 'canciones/' + esc(encodeURIComponent(id))}">← ${data.draft ? 'Creación' : 'Ficha'}</button>
         <div class="ed-title"><b>${esc(hv('TITLE') || id)}</b> <span>${esc(hv('ARTIST') || '')}</span></div>
         <span class="ed-dirty" id="ed-dirty" hidden>sin guardar</span>
+        ${data.draft ? '<span class="badge warn" id="ed-draft">sin publicar · no sale en la tele</span>' : ''}
         <span class="grow"></span>
         <select class="inp sm" id="ed-ver" title="Versiones guardadas"><option value="">Versiones…</option></select>
         <button class="btn sm" id="ed-undo" title="⌘Z">Deshacer</button><button class="btn sm" id="ed-redo" title="⇧⌘Z">Rehacer</button>
-        <button class="btn red" id="ed-save">Guardar (⌘S)</button>
+        <button class="btn ${data.draft ? '' : 'red'}" id="ed-save">Guardar (⌘S)</button>
+        ${data.draft ? '<button class="btn red" id="ed-pub" title="Guarda los cambios y la pone en la tele (en Novedades)">Publicar</button>' : ''}
       </div>
       <div class="ed-bar">
         <button class="btn dark" id="ed-play" title="Espacio">▶</button>
@@ -114,10 +116,12 @@
         <label class="ed-ck"><input type="checkbox" id="ed-guide"> Tono guía</label>
         <label class="ed-ck"><input type="checkbox" id="ed-loop"> Repetir frase</label>
         <label class="ed-ck"><input type="checkbox" id="ed-mic"> Probar con micro</label>
+        <button class="btn sm dark" id="ed-ver" title="La canción tal como está ahora, en la app de la tele">▶ Ver en el juego</button>
         <span class="ed-sep"></span>
         <span class="small muted">GAP</span><button class="btn sm ghost" data-gap="-50">−50</button><button class="btn sm ghost" data-gap="-10">−10</button>
         <input class="inp sm mono" id="ed-gap" size="7"><button class="btn sm ghost" data-gap="10">+10</button><button class="btn sm ghost" data-gap="50">+50</button>
         <span class="small muted">BPM <b class="mono" id="ed-bpm"></b></span>
+        <select class="inp sm" id="ed-tools" title="Herramientas de tiempos"><option value="">Tiempos…</option><option value="shift">Desplazar desde el cursor…</option><option value="stretch">Estirar o encoger la selección…</option><option value="bpm">Cambiar el BPM (sin mover nada)…</option></select>
         ${doc.tracks.length > 1 ? `<select class="inp sm" id="ed-track">${doc.tracks.map((t, i) => `<option value="${i}">Voz ${i + 1}</option>`).join('')}</select>` : ''}
         <span class="grow"></span>
         <span class="small muted">Zoom</span><input type="range" id="ed-zoom" min="0" max="100" value="45">
@@ -602,6 +606,17 @@
       } catch (e) { fail(e); }
     }
     $('#ed-save').onclick = save;
+    if ($('#ed-pub')) $('#ed-pub').onclick = async () => {
+      if (!confirm('¿Publicarla? Saldrá en la tele, en Novedades.')) return;
+      try {
+        if (dirty) await save();
+        const nid = await window.GramolaAdmin.publicar(id);
+        if (!nid) return;
+        data.draft = false; $('#ed-pub').remove(); $('#ed-draft').remove(); $('#ed-save').classList.add('red');
+        toast('Publicada: ya sale en la tele, en Novedades');
+        if (nid !== id) location.hash = 'editor/' + encodeURIComponent(nid);   // sustituyó a la anterior: ahora vive en su carpeta
+      } catch (e) { fail(e); }
+    };
     async function loadVersions() {
       try {
         const l = await api('/songs/' + encodeURIComponent(id) + '/versions');
@@ -618,12 +633,90 @@
       $('#ed-ver').value = '';
     };
     loadVersions();
+
+    // ---------------- herramientas de tiempos
+    function pedir(titulo, texto, valor) {
+      return new Promise(res => {
+        const o = document.createElement('div'); o.className = 'ed-dlg';
+        o.innerHTML = `<div><h3>${esc(titulo)}</h3><p class="small muted">${texto}</p><input class="inp" value="${esc(valor)}"><div class="row" style="margin-top:12px"><button class="btn red" data-ok>Aplicar</button><button class="btn ghost" data-no>Cancelar</button></div></div>`;
+        document.body.appendChild(o);
+        const i = o.querySelector('input'); i.focus(); i.select();
+        const fin = v => { o.remove(); res(v); };
+        o.querySelector('[data-ok]').onclick = () => fin(i.value); o.querySelector('[data-no]').onclick = () => fin(null);
+        i.onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') fin(i.value); if (e.key === 'Escape') fin(null); };
+      });
+    }
+    $('#ed-tools').onchange = async () => {
+      const v = $('#ed-tools').value; $('#ed-tools').value = '';
+      if (v === 'shift') {
+        const desde = Math.round(ms2b(audio.currentTime * 1000));
+        const r = await pedir('Desplazar desde el cursor', `Mueve todas las notas y cortes desde ${fmt(audio.currentTime * 1000)} hasta el final. En milisegundos: positivo = más tarde, negativo = antes.`, '250');
+        const ms = num(r); if (r == null || !ms) return;
+        const d = Math.round(ms / beatMs());
+        push(); for (const n of T().notes) if (n.b >= desde) n.b += d;
+        T().breaks = T().breaks.map(b => (b >= desde ? b + d : b)); refresh();
+        toast(`Movido ${ms > 0 ? '+' : ''}${Math.round(ms)} ms desde ${fmt(audio.currentTime * 1000)}`);
+      } else if (v === 'stretch') {
+        const S = [...sel].sort((a, b) => a.b - b.b);
+        if (S.length < 2) return toast('Elige antes varias notas (arrastrando el fondo o una frase en la lista)', true);
+        const r = await pedir('Estirar o encoger la selección', 'Porcentaje, desde la primera nota elegida: 105 = un 5 % más larga (si se va quedando atrás), 95 = un 5 % más corta.', '100');
+        const k = num(r) / 100; if (r == null || !(k > 0.3 && k < 3) || k === 1) return;
+        const a0 = S[0].b, fin0 = Math.max(...S.map(n => n.b + n.l));
+        push();
+        for (const n of S) { const e = n.b + n.l; n.b = a0 + Math.round((n.b - a0) * k); n.l = Math.max(1, Math.round(a0 + (e - a0) * k) - n.b); }
+        T().breaks = T().breaks.map(b => (b > a0 && b < fin0 ? a0 + Math.round((b - a0) * k) : b)); refresh();
+      } else if (v === 'bpm') {
+        const r = await pedir('Cambiar el BPM', `Ahora ${bpm}. Las notas se quedan donde están: solo cambia la rejilla (más BPM = pasos más finos para ajustar).`, String(bpm));
+        const nb = num(r); if (r == null || !(nb >= 20 && nb <= 2000) || nb === bpm) return;
+        const k = nb / bpm;
+        push();
+        for (const tr of doc.tracks) { for (const n of tr.notes) { const e = n.b + n.l; n.b = Math.round(n.b * k); n.l = Math.max(1, Math.round(e * k) - n.b); } tr.breaks = tr.breaks.map(b => Math.round(b * k)); tr.br2 = {}; }
+        bpm = nb; setHead('BPM', String(nb)); refresh();
+      }
+    };
+
+    // ---------------- ver en el juego (la app de la tele, en una ventana)
+    let pv = null;
+    function verEnJuego(desdeMs) {
+      audio.pause();
+      if (!pv) {
+        pv = document.createElement('div'); pv.className = 'ed-pv';
+        pv.innerHTML = `<div class="ed-pv-box"><div class="ed-pv-bar"><b>Vista como en el juego</b><span class="small muted">lo que hay en el editor ahora, aunque no esté guardado</span><span class="grow"></span>
+          <button class="btn sm" data-pv="ini">Desde el principio</button><button class="btn sm" data-pv="cur">Desde el cursor</button><button class="btn sm dark" data-pv="pausa">Pausa</button><button class="btn sm ghost" data-pv="x">Cerrar</button></div>
+          <div class="ed-pv-tv"><iframe src="/app/?preview=1" allow="autoplay"></iframe><div class="ed-pv-load">Cargando la tele…</div></div></div>`;
+        document.body.appendChild(pv);
+        pv.paused = false;
+        pv.onclick = e => {
+          const b = e.target.closest('[data-pv]'); if (!b) return;
+          const a = b.dataset.pv, f = pv.querySelector('iframe').contentWindow;
+          if (a === 'x') { f.postMessage({ type: 'gramola-preview-stop' }, location.origin); pv.hidden = true; return; }
+          if (a === 'pausa') { pv.paused = !pv.paused; b.textContent = pv.paused ? 'Seguir' : 'Pausa'; f.postMessage({ type: 'gramola-preview-pause', paused: pv.paused }, location.origin); return; }
+          enviar(a === 'ini' ? 0 : pv.desde);
+        };
+      }
+      pv.hidden = false; pv.desde = desdeMs;
+      const enviar = at => {
+        pv.paused = false; pv.querySelector('[data-pv="pausa"]').textContent = 'Pausa';
+        pv.querySelector('iframe').contentWindow.postMessage({ type: 'gramola-preview', id, txt: serialize(doc), at: Math.max(0, at - 2000), name: 'Vista previa' }, location.origin);
+      };
+      pv.enviar = enviar;
+      if (pv.ready) enviar(desdeMs); else pv.pend = desdeMs;
+    }
+    const onPv = e => {
+      if (e.origin !== location.origin || !pv) return;
+      if (e.data && e.data.type === 'gramola-preview-ready') { pv.ready = true; pv.querySelector('.ed-pv-load').remove(); if (pv.pend != null) { pv.enviar(pv.pend); pv.pend = null; } }
+      if (e.data && e.data.type === 'gramola-preview-error') toast(e.data.msg, true);
+    };
+    addEventListener('message', onPv);
+    $('#ed-ver').onclick = () => verEnJuego(audio.currentTime * 1000);
+    if (opts.verAlAbrir) setTimeout(() => verEnJuego(0), 300);
     if (doc.wasRelative) toast('La canción venía en formato relativo: se guardará en formato normal');
 
     let cleaned = false;
     function cleanup() {
       if (cleaned) return; cleaned = true;
       removeEventListener('keydown', onKey); removeEventListener('mousemove', onMove); removeEventListener('mouseup', onUp); removeEventListener('beforeunload', onLeave);
+      removeEventListener('message', onPv); if (pv) pv.remove();
       ro.disconnect(); audio.pause(); audio.src = ''; stopMic(); if (mic) mic.st.getTracks().forEach(t => t.stop()); actx.close().catch(() => {});
     }
     // Al salir del editor (cambio de apartado) se para todo
@@ -631,7 +724,7 @@
     mo.observe(view, { childList: true });
     viewMs = Math.max(-500, b2ms(T().notes[0] ? T().notes[0].b : 0) - 2000);
     resize(); refresh();
-    return { isDirty: () => dirty };
+    return { isDirty: () => dirty, draft: !!data.draft };
   }
 
   window.GramolaEditor = { open, parse, serialize, phrasesOf };

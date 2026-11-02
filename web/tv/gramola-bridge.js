@@ -41,7 +41,11 @@ window.GR = (() => {
   }
 
   // ------------------------------------------------------------------ red
+  // Vista previa del editor del admin (/app/?preview=1, dentro de un iframe): sin sala ni móviles; canta la canción
+  // que mande el editor (aunque no esté guardada) desde el punto que diga, con pausa.
+  G.preview = /[?&]preview=1/.test(location.search);
   async function connect() {
+    if (G.preview) { loadSongs(); return; }
     const { Net } = await import('/js/net.js');
     G.net = new Net(onMessage, st => {
       G.netOk = st === 'open';
@@ -183,7 +187,7 @@ window.GR = (() => {
     const K = G.token ? 'k=' + encodeURIComponent(G.token) : '';
     const withK = u => K ? u + (u.includes('?') ? '&' : '?') + K : u;
     G.withK = withK;
-    try { list = await (await fetch(withK('/api/songs'), { cache: 'no-store' })).json(); } catch {}
+    try { list = await (await fetch(withK(G.preview ? '/api/songs?preparacion=1' : '/api/songs'), { cache: 'no-store' })).json(); } catch {}
     let rec = { songs: {}, singers: {}, plays: {} };
     try { rec = await (await fetch('/api/records', { cache: 'no-store' })).json(); } catch {}
     G.records = rec;
@@ -225,7 +229,38 @@ window.GR = (() => {
     G.ready = true;
     const c = g();
     if (c) c.setState({ jq: G.jq(), songF: 0 });
+    if (G.preview) previewReady();
   }
+  function previewReady() {
+    if (!g()) return setTimeout(previewReady, 200);
+    parent.postMessage({ type: 'gramola-preview-ready' }, location.origin);
+  }
+  if (G.preview) addEventListener('message', async e => {
+    if (e.origin !== location.origin || !e.data) return;
+    const d = e.data, c = g();
+    if (!c) return;
+    if (d.type === 'gramola-preview') {
+      const idx = SONGS.findIndex(s => s.id === d.id);
+      if (idx < 0) return parent.postMessage({ type: 'gramola-preview-error', msg: 'La canción no está cargada' }, location.origin);
+      if (d.txt) {   // lo que hay en el editor ahora mismo, aunque no esté guardado
+        const { parseUltraStar } = await import('/js/ultrastar.js');
+        const s = parseUltraStar(d.txt), old = SONGS[idx].song;
+        s.audioUrl = old.audioUrl; s.videoUrl = null;
+        SONGS[idx].song = s;
+      }
+      const P0 = PLAYERS[0];
+      c.setState({ mode: 'sing', songSel: idx, paused: false, err: null, singers: [{ id: null, bot: false, name: d.name || 'Vista previa', color: P0[1], shape: P0[2], tol: 1, team: 0, part: 0 }] }, () => {
+        c.startSing();
+        const at = Math.max(0, (d.at || 0) / 1000);
+        const go = () => { if (G.audio && G.audio.readyState >= 1) { G.audio.currentTime = at; } else setTimeout(go, 50); };
+        if (at > 0.5) go();
+      });
+    } else if (d.type === 'gramola-preview-pause') {
+      if (c.state.screen === 'sing' && !!c.state.paused !== !!d.paused) c.act('menu');
+    } else if (d.type === 'gramola-preview-stop') {
+      stopAudio(); c.chart = null; c.setState({ screen: 'menu', paused: false });
+    }
+  });
   const dec = d => (+d < 30 ? 2000 : 1900) + +d;
   G.decadeStart = d => dec(d);
   function langName(l) {

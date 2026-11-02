@@ -205,3 +205,6 @@ pre.out { background: var(--ink); color: #eee; padding: 10px; font-size: 12px; w
 #c-nn { font-weight: 600; }
 .tbl .lang { width: 52px; text-align: center; padding-left: 4px; padding-right: 4px; }
 .tbl .when { white-space: nowrap; min-width: 140px; }
+.aviso-fijo { position: fixed; right: 20px; top: 20px; z-index: 45; display: flex; align-items: center; gap: 12px; background: var(--ink); color: #fff; padding: 12px 14px 12px 18px; box-shadow: 0 12px 30px rgba(0,0,0,.3); font-weight: 600; max-width: min(560px, calc(100vw - 40px)); }
+.aviso-fijo + .aviso-fijo { top: 84px; }
+.aviso-fijo .link { color: #ccc; }

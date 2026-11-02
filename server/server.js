@@ -299,7 +299,8 @@ const server = http.createServer(async (req, res) => {
     return res.end('Solo para la tele de una sala abierta');
   }
   // Los borradores (canciones creadas sin revisar) no salen en la tele
-  if (req.method === 'GET' && url.pathname === '/api/songs') return json(res, 200, scanSongs().filter(s => !s.draft));
+  // (en la vista previa del admin también las que están en preparación)
+  if (req.method === 'GET' && url.pathname === '/api/songs') return json(res, 200, scanSongs().filter(s => !s.draft || (url.searchParams.has('preparacion') && admin.isAuthed(req))));
   if (req.method === 'GET' && url.pathname === '/api/health') return json(res, 200, { ok: true, rooms: rooms.size });
   if (req.method === 'GET' && url.pathname === '/api/records') return json(res, 200, records);
   // Telemetría de rendimiento de las pruebas en la tele (solo números; se guarda en memoria, últimas 300)

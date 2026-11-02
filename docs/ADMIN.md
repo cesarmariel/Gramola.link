@@ -55,11 +55,26 @@ Desde la ficha, **«✎ Abrir en el editor»** (`#editor/<carpeta>`). Edita el m
 
 ## Creación de canciones
 
+El apartado **Creación** es el taller completo: cola de trabajos, **Borradores** (descargadas de Spotify a falta de la
+letra) y **En preparación** (creadas sin publicar), con «✎ Editar», «▶ Ver en el juego», «Publicar» y «Descartar».
+Una canción en preparación se edita dentro de Creación y se publica desde allí o desde el propio editor.
+
+- **Ver en el juego**: el editor abre la app de la tele de verdad en una ventana (`/app/?preview=1`, sin sala ni
+  móviles) con la canción **tal como está en el editor, aunque no esté guardada**: desde el principio o desde el cursor,
+  con pausa. La app carga también las canciones en preparación (`/api/songs?preparacion=1`, solo con sesión de admin).
+- **Tiempos** (en el editor): desplazar todo desde el cursor (± ms), estirar o encoger una selección (%, para cuando
+  se va desfasando poco a poco) y cambiar el BPM sin mover nada de sitio (rejilla más fina o más gruesa).
+- **Publicar** con duplicado: si ya hay otra canción con el mismo artista y título, se pregunta. *Sustituir* = la
+  nueva ocupa la carpeta de la antigua (se queda con su historial: veces cantada, récords, Novedades) y la antigua va a
+  Retiradas («… (sustituida fecha)»); o *publicar las dos*.
+
 **«✨ Crear canción»** (en *Canciones* o en *Creación*): artista, título, idioma, año, audio y la letra con **una frase por línea**.
 El trabajo va a una cola que atiende el **trabajador** (`tools/trabajador/`, servicio `gramola-trabajador` en el mismo servidor, con prioridad mínima): separa la voz, encaja la letra
 sílaba a sílaba, saca las notas y devuelve el `.txt`. El servidor la instala **sin publicar** (`borrador.json` en la
 carpeta: no sale en la tele; filtro «Sin publicar» en Canciones), le pone la primera portada de iTunes, iguala el volumen y busca el estribillo del Megamix.
-Se revisa en el editor y se **publica** desde la ficha (por defecto, entrando en Novedades).
+Al terminar, un aviso en cualquier apartado lleva al editor para revisarla; se **publica** desde el editor o desde
+Creación (entrando en Novedades). El botón de los formularios es **«Editar»**: no publica nada; pasa al editor, que muestra el avance mientras se
+encaja la letra (unos 5 minutos) y se abre solo con la canción al terminar.
 
 En una canción de prueba con su `.txt` hecho a mano: los inicios de palabra a una mediana de 65 ms (el 92 % a menos de
 150 ms) y el 76 % de las notas a ±1 semitono. Tarda unos 5 minutos por canción en el servidor.
@@ -83,7 +98,10 @@ título, `GET /api/admin/letras`). Fuentes, en orden: **LRCLIB** (base abierta, 
 líneas, y con la duración se elige la versión que encaja), **Genius** y **songlyrics** (dos de las fuentes de
 [SimonIT/spotifylyrics](https://github.com/SimonIT/spotifylyrics)). Se limpia a una frase por línea, sin marcas como
 «[Estribillo]» ni cabeceras de la web. Conviene revisarla: cada línea será una frase en la tele. Si es sincronizada,
-el LRC se guarda junto al trabajo (`letra.lrc`).
+el LRC se guarda junto al trabajo (`letra.lrc`) y **guía el encaje**: primero se alinea toda la canción, se mide el
+desfase entre la letra sincronizada y el audio (puede ser de otra versión: disco, videoclip con intro…) y, si casa
+con un desfase constante en al menos el 60 % de las líneas, cada línea se busca solo en su zona corregida (así no se
+confunden estribillos repetidos ni se cuelan frases en los solos). Si no casa, se queda la alineación global.
 
 **«Analizar la voz»** (en la ficha) hace solo la parte de la voz para una canción que ya existe: deja `voz.mp3` y
 `voz-tono.json`, que el editor usa para encajar mejor.

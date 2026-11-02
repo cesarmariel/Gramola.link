@@ -515,6 +515,7 @@ module.exports = function admin(ctx) {
       vocals: has('voz.mp3') ? base + 'voz.mp3?v=' + Math.round(fs.statSync(path.join(dir, 'voz.mp3')).mtimeMs) : null,
       pitch: has('voz-tono.json') ? base + 'voz-tono.json?v=' + Math.round(fs.statSync(path.join(dir, 'voz-tono.json')).mtimeMs) : null,
       megamix: readJson(path.join(dir, 'megamix.json'), null),
+      draft: has('borrador.json'),
     });
   });
   on('PUT', '/songs/([^/]+)/chart', async (req, res, m) => {
@@ -583,6 +584,7 @@ module.exports = function admin(ctx) {
       j = { id, kind: 'crear', titulo, artista, idioma: String(b.idioma || 'es').slice(0, 5), anio: String(b.anio || '').slice(0, 4), folder, audioName: folder + '.mp3', state: 'subiendo', created: Date.now() };
       fs.mkdirSync(path.join(JOBS, id), { recursive: true });
       fs.writeFileSync(jobPath(id, 'letra.txt'), letra);
+      if (b.lrc) fs.writeFileSync(jobPath(id, 'letra.lrc'), String(b.lrc).slice(0, 60000));
     }
     fs.mkdirSync(path.join(JOBS, id), { recursive: true });
     jobPut(j);
@@ -612,6 +614,7 @@ module.exports = function admin(ctx) {
     if (!titulo || !artista) throw httpErr(400, 'Faltan el título o el artista');
     if (letra.split('\n').filter(l => l.trim()).length < 2) throw httpErr(400, 'Pega la letra (una frase por línea)');
     fs.writeFileSync(jobPath(j.id, 'letra.txt'), letra);
+    if (b.lrc) fs.writeFileSync(jobPath(j.id, 'letra.lrc'), String(b.lrc).slice(0, 60000));
     const folder = folderFor(artista, titulo);
     Object.assign(j, { kind: 'crear', origen: 'spotify', titulo, artista, idioma: String(b.idioma || 'es').slice(0, 5), anio: String(b.anio || '').slice(0, 4), folder, audioName: folder + '.mp3', state: 'pendiente', progress: 0, msg: '' });
     jobPut(j);
@@ -647,13 +650,39 @@ module.exports = function admin(ctx) {
     json(res, 200, { token });
   });
   // Borradores: publicar (deja de ser borrador y, si se quiere, entra en Novedades)
+  // Si ya hay otra canción con el mismo artista y título, se pregunta: sustituirla (la nueva ocupa su carpeta y se queda
+  // con su historial; la antigua va a Retiradas) o publicar las dos.
   on('POST', '/songs/([^/]+)/publish', async (req, res, m) => {
-    const id = decodeURIComponent(m[1]), dir = songDir(id), b = await body(req);
+    let id = decodeURIComponent(m[1]), dir = songDir(id);
+    const b = await body(req), h = headerOf(dir), key = normKey(h.ARTIST) + '|' + normKey(h.TITLE);
+    const otra = ctx.scanSongs(true).find(s => s.id !== id && !s.draft && normKey(s.artist) + '|' + normKey(s.title) === key);
+    if (otra && b.sustituir == null) return json(res, 409, { error: 'Ya hay una canción igual', dup: otra.id, dupTitle: `${otra.artist} - ${otra.title}` });
     try { fs.unlinkSync(path.join(dir, 'borrador.json')); } catch {}
-    if (b.novedad !== false) { const nv = ctx.novedades(); nv[id] = nv[id] || Date.now(); ctx.saveNovedades(); }
+    const nv = ctx.novedades();
+    if (otra && b.sustituir === true) {
+      fs.mkdirSync(RETIRED_DIR, { recursive: true });
+      const viejo = path.join(SONGS_DIR, otra.id);
+      fs.renameSync(viejo, path.join(RETIRED_DIR, `${otra.id} (sustituida ${new Date().toISOString().slice(0, 10)} ${Date.now() % 100000})`));
+      fs.renameSync(dir, viejo);
+      if (nv[id]) { delete nv[id]; }
+      ev('songs', `«${otra.id}» sustituida por la versión nueva (la anterior está en Retiradas)`);
+      id = otra.id;
+    }
+    if (b.novedad !== false) nv[id] = nv[id] || Date.now();
+    ctx.saveNovedades();
     ctx.songsChanged();
     ev('songs', `Publicada: «${id}»${b.novedad !== false ? ' (en Novedades)' : ''}`);
-    json(res, 200, { ok: true });
+    json(res, 200, { ok: true, id });
+  });
+  on('GET', '/preparacion', (req, res) => {
+    const l = ctx.scanSongs(true).filter(s => s.draft).map(s => {
+      const dir = path.join(SONGS_DIR, s.id), b = readJson(path.join(dir, 'borrador.json'), {});
+      const key = normKey(s.artist) + '|' + normKey(s.title);
+      const otra = ctx.scanSongs().find(x => x.id !== s.id && !x.draft && normKey(x.artist) + '|' + normKey(x.title) === key);
+      let editada = null; try { editada = fs.readdirSync(path.join(VER_DIR, s.id)).length; } catch {}
+      return { ...s, creada: b.creada || null, dup: otra ? otra.id : null, editada };
+    });
+    json(res, 200, l.sort((a, b) => (b.creada || 0) - (a.creada || 0)));
   });
 
   // ===================================================================== letras
@@ -1021,7 +1050,10 @@ module.exports = function admin(ctx) {
     j.state = 'procesando'; j.started = Date.now(); j.progress = 0; j.msg = 'Empezando'; j.worker = worker.host; jobPut(j);
     worker.job = j.id;
     const out = { ...j };
-    if (j.kind === 'crear') out.letra = fs.readFileSync(jobPath(j.id, 'letra.txt'), 'utf8');
+    if (j.kind === 'crear') {
+      out.letra = fs.readFileSync(jobPath(j.id, 'letra.txt'), 'utf8');
+      try { out.lrc = fs.readFileSync(jobPath(j.id, 'letra.lrc'), 'utf8'); } catch {}
+    }
     json(res, 200, out);
   });
   won('GET', '/jobs/([^/]+)/input', (req, res, m) => {
@@ -1076,7 +1108,8 @@ module.exports = function admin(ctx) {
     }
     if (!url.pathname.startsWith('/api/admin/')) {
       // Canciones: con sesión de admin se pueden escuchar y ver aquí; el resto de ficheros del juego, como en la web
-      if (/^\/(songs|assets|vendor|audio|js)\//.test(url.pathname)) return false;
+      // Ficheros del juego (también la app de la tele, para la vista previa del editor)
+      if (/^\/(songs|assets|vendor|audio|js|tv|app|fonts)\//.test(url.pathname) || ['/app', '/api/songs', '/api/records', '/api/health'].includes(url.pathname)) return false;
       const f = PAGE[url.pathname];
       if (!f) { res.writeHead(302, { location: '/' }); res.end(); return true; }
       const file = path.join(WEB_DIR, 'admin', f);

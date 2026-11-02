@@ -121,7 +121,7 @@ def atender(j):
             nombres = ['voz.mp3', 'voz-tono.json']
             msg = 'Voz analizada'
         else:
-            txt = crear.crear(audio, j['letra'], out, j['titulo'], j['artista'], j.get('idioma') or 'es', j.get('anio') or None, j['audioName'], progreso)
+            txt = crear.crear(audio, j['letra'], out, j['titulo'], j['artista'], j.get('idioma') or 'es', j.get('anio') or None, j['audioName'], progreso, j.get('lrc'))
             nombres = ['cancion.txt', 'voz.mp3', 'voz-tono.json']
             msg = f'{sum(1 for l in txt.splitlines() if l[:1] in ":*FRG")} notas'
         for n in nombres:

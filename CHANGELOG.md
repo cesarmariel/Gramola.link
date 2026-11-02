@@ -2,6 +2,15 @@
 
 Versiones con el esquema `1.AA.MMDD.HHMM` (fecha y hora del despliegue).
 
+## 1.26.1102.1233
+- **Creación = taller completo**: sección «En preparación» (creadas sin publicar) con Editar, Ver en el juego, Publicar y Descartar; el editor de una canción en preparación vive dentro de Creación.
+- **Ver en el juego** desde el editor: la app de la tele en una ventana con lo que hay en el editor (aunque no esté guardado), desde el principio o desde el cursor, con pausa.
+- **Tiempos** en el editor: desplazar todo desde el cursor, estirar o encoger una selección y cambiar el BPM sin mover nada.
+- **Publicar** pregunta si ya hay otra canción igual: sustituirla (la nueva ocupa su sitio y su historial; la antigua va a Retiradas) o publicar las dos. También desde el editor.
+- El botón de los formularios pasa a «Editar»: va al editor, que muestra el avance mientras se encaja la letra y se abre solo con la canción al terminar (no publica nada).
+- La letra sincronizada (LRCLIB) guía el encaje: se mide el desfase con el audio y, si casa, cada línea se busca en su zona.
+- Arreglado: el tono con CREPE fallaba con algunas duraciones (se pasaba a pYIN).
+
 ## 1.26.1102.1202
 - **Letras automáticas**: al importar de Spotify la letra se busca sola, y en «Crear canción» hay un botón «Buscar la letra». Fuentes: LRCLIB (a menudo sincronizada por líneas) y, de reserva, Genius y songlyrics (como SimonIT/spotifylyrics). Se deja una frase por línea, sin marcas ni cabeceras.
 

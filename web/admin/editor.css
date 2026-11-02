@@ -28,3 +28,16 @@
 .ed-sc span { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(31, 157, 85, .25); }
 .ed-sc b { position: relative; margin-right: 6px; } .ed-sc { z-index: 0; }
 @media (max-width: 1000px) { .ed-under, .ed-low { grid-template-columns: 1fr; } }
+
+/* Diálogo y vista como en el juego */
+.ed-dlg { position: fixed; inset: 0; background: rgba(32,30,29,.5); z-index: 70; display: grid; place-items: center; }
+.ed-dlg > div { background: var(--bg); border: 2px solid var(--ink); padding: 20px; width: min(460px, 92vw); }
+.ed-dlg h3 { font-weight: 300; font-size: 24px; letter-spacing: -.03em; margin-bottom: 6px; }
+.ed-pv { position: fixed; inset: 0; background: rgba(32,30,29,.75); z-index: 65; display: grid; place-items: center; padding: 20px; }
+.ed-pv[hidden] { display: none; }
+.ed-pv-box { background: var(--ink); border: 2px solid var(--ink); width: min(1280px, 100%); }
+.ed-pv-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 12px; color: #fff; }
+.ed-pv-bar .btn.sm:not(.dark) { background: transparent; color: #fff; border-color: #fff; }
+.ed-pv-tv { position: relative; aspect-ratio: 16 / 9; background: #000; }
+.ed-pv-tv iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.ed-pv-load { position: absolute; inset: 0; display: grid; place-items: center; color: #9b9797; font-weight: 600; }

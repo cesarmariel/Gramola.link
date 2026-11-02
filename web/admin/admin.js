@@ -15,7 +15,7 @@
     const r = await fetch('/api/admin' + path, o);
     if (r.status === 401 && !path.startsWith('/auth/')) { showLogin(); throw new Error('Sesión caducada'); }
     const j = r.headers.get('content-type')?.includes('json') ? await r.json() : null;
-    if (!r.ok) throw new Error((j && j.error) || 'Error ' + r.status);
+    if (!r.ok) { const err = new Error((j && j.error) || 'Error ' + r.status); err.data = j; err.status = r.status; throw err; }
     return j;
   }
   let toastT;
@@ -24,6 +24,33 @@
     clearTimeout(toastT); toastT = setTimeout(() => (el.hidden = true), err ? 5000 : 2600);
   }
   const fail = e => toast(e.message || String(e), true);
+  // Publicar una canción en preparación; si ya hay otra igual, se pregunta si sustituirla. Devuelve el id final o null.
+  async function publicar(id) {
+    const intento = async extra => api(`/songs/${enc(id)}/publish`, { method: 'POST', json: { novedad: true, ...extra } });
+    try { return (await intento({})).id; }
+    catch (e) {
+      if (!/Ya hay una canción igual/.test(e.message)) { fail(e); return null; }
+      const d = e.data || {};
+      const r = await new Promise(res => {
+        const b = modal(`<h3>Ya existe «${esc(d.dupTitle || d.dup || '')}»</h3>
+          <p>En la biblioteca ya hay una canción con el mismo artista y título. ¿Qué hago con esta?</p>
+          <p class="small muted"><b>Sustituir</b>: esta ocupa el sitio de la antigua (se queda con sus veces cantada y récords) y la antigua pasa a Retiradas, de donde se puede recuperar.</p>
+          <div class="row" style="margin-top:16px"><button class="btn red" data-r="1">Sustituir la antigua</button><button class="btn" data-r="0">Publicar las dos</button><button class="btn ghost" data-r="x">Cancelar</button></div>`);
+        b.onclick = ev => { const x = ev.target.closest('[data-r]'); if (!x) return; closeModal(); res(x.dataset.r); };
+      });
+      if (r === 'x') return null;
+      try { return (await intento({ sustituir: r === '1' })).id; } catch (e2) { fail(e2); return null; }
+    }
+  }
+  window.GramolaAdmin = { publicar };
+  function aviso(texto, href, accion) {
+    const el = document.createElement('div');
+    el.className = 'aviso-fijo';
+    el.innerHTML = `<span>✓ ${esc(texto)}</span><a class="btn sm red" href="${href}">${esc(accion)}</a><button class="link small" aria-label="Cerrar">✕</button>`;
+    el.querySelector('a').onclick = () => el.remove();
+    el.querySelector('button').onclick = () => el.remove();
+    document.body.appendChild(el);
+  }
   const mb = b => b == null ? '—' : b >= 1073741824 ? (b / 1073741824).toFixed(2) + ' GB' : b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : b >= 1024 ? Math.round(b / 1024) + ' KB' : b + ' B';
   const nf = n => (n ?? 0).toLocaleString('es-ES');
   const dur = s => { s = Math.round(s || 0); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return h ? `${h} h ${m} min` : m ? `${m} min` : `${s} s`; };
@@ -146,6 +173,20 @@
       } catch {}
     };
     side(); setInterval(side, 10000);
+    // Aviso al terminar un trabajo de creación (en cualquier apartado): «Abrir en el editor»
+    const desde = Date.now(), avisados = new Set();
+    const vigilar = async () => {
+      try {
+        const d = await api('/jobs');
+        for (const j of d.jobs) {
+          if (avisados.has(j.id) || !(j.finished > desde)) continue;
+          if (j.state === 'hecho' && j.kind === 'crear' && j.song) { avisados.add(j.id); if (location.hash === '#preparando/' + j.id) continue; aviso(`«${j.titulo}» está lista para revisar`, `#editor/${enc(j.song)}`, 'Abrir en el editor'); }
+          else if (j.state === 'borrador') { avisados.add(j.id); aviso(`«${j.titulo}» descargada de Spotify${j.letraFuente ? ' (con la letra)' : ''}`, '#creacion', 'Ver borradores'); }
+          else if (j.state === 'error') { avisados.add(j.id); aviso(`Error con «${j.titulo}»`, '#creacion', 'Ver'); }
+        }
+      } catch {}
+    };
+    setInterval(vigilar, 8000);
     api('/server').then(s => ($('ver').textContent = 'v' + s.version)).catch(() => {});
   }
 
@@ -382,7 +423,7 @@
         <div class="row" style="margin-top:14px"><button class="btn sm ${s.isNew ? 'dark' : ''}" id="s-nov">${s.isNew ? '★ Novedad · quitar' : '★ Marcar como novedad'}</button><button class="btn sm" id="s-ren">Renombrar carpeta</button><button class="btn sm danger" id="s-ret">Retirar</button></div>
       </div><div>
         ${d.files.some(f => f.name === 'borrador.json') ? `<div class="card" style="border-color:var(--warn);margin-bottom:12px"><b>Sin publicar:</b> creada automáticamente; no sale en la tele hasta que la publiques. Revísala en el editor.
-          <div class="row" style="margin-top:8px"><button class="btn red" id="s-pub">Publicar</button><label class="row small"><input type="checkbox" id="s-pubnv" checked> y ponerla en Novedades</label></div></div>` : ''}
+          <div class="row" style="margin-top:8px"><button class="btn red" id="s-pub">Publicar (entra en Novedades)</button></div></div>` : ''}
         <div class="row" style="margin-bottom:6px"><a class="btn dark" href="#editor/${enc(id)}">✎ Abrir en el editor</a><button class="btn" id="s-voz">${d.files.some(f => f.name === 'voz-tono.json') ? 'Volver a analizar la voz' : 'Analizar la voz'}</button><span class="small muted">La voz sola y su tono ayudan a encajar las notas en el editor</span></div>
         <h2 class="sec" style="margin-top:8px">Escuchar</h2>
         ${audioUrl ? `<audio id="s-audio" controls preload="metadata" src="${audioUrl}"></audio>` : '<p class="red-t">Sin audio</p>'}
@@ -410,7 +451,7 @@
     if ($('s-rest')) $('s-rest').onclick = () => act(api(`/songs/${enc(id)}/cover`, { method: 'POST', json: { restore: true } }), 'Portada anterior recuperada');
     if ($('s-p0')) $('s-p0').onclick = async () => { if (await ask('¿Poner a 0 las veces cantada?', esc(s.title))) act(api('/records/plays/' + enc(id), { method: 'DELETE' })); };
     if ($('s-r0')) $('s-r0').onclick = async () => { if (await ask('¿Borrar el récord de esta canción?', esc(s.title))) act(api('/records/song/' + enc(id), { method: 'DELETE' })); };
-    if ($('s-pub')) $('s-pub').onclick = () => act(api(`/songs/${enc(id)}/publish`, { method: 'POST', json: { novedad: $('s-pubnv').checked } }), 'Publicada');
+    if ($('s-pub')) $('s-pub').onclick = async () => { const nid = await publicar(id); if (nid) { toast('Publicada: ya sale en la tele'); location.hash = 'canciones/' + enc(nid); } };
     $('s-voz').onclick = async () => { try { await api('/jobs', { method: 'POST', json: { kind: 'analizar', song: id } }); toast('En la cola de creación'); location.hash = 'creacion'; } catch (e) { fail(e); } };
     $('s-nov').onclick = () => act(api('/novedades', { method: 'POST', json: { ids: [id], on: !s.isNew } }), s.isNew ? 'Quitada de Novedades' : 'Marcada como novedad');
     $('s-ren').onclick = async () => { const to = await prompt2('Renombrar carpeta', 'Nombre nuevo de la carpeta', id); if (to && to !== id) try { const r = await api(`/songs/${enc(id)}/rename`, { method: 'POST', json: { to } }); toast('Renombrada'); location.hash = 'canciones/' + enc(r.id); } catch (e) { fail(e); } };
@@ -586,14 +627,15 @@
       <div class="grid2"><div><label class="lbl">Artista</label><input class="inp" id="k-art" value="${esc(j.artista)}"></div><div><label class="lbl">Título</label><input class="inp" id="k-tit" value="${esc(j.titulo)}"></div></div>
       <div class="grid2"><div><label class="lbl">Idioma de la letra</label><select class="inp" id="k-lang">${Object.entries(IDIOMAS).map(([k, v]) => `<option value="${k}" ${k === (j.idioma || 'es') ? 'selected' : ''}>${v}</option>`).join('')}</select></div><div><label class="lbl">Año</label><input class="inp" id="k-year" maxlength="4" value="${esc(j.anio || '')}"></div></div>
       <div class="row" style="justify-content:space-between;align-items:flex-end"><label class="lbl">Letra · una frase por línea (como se verá en la tele)</label><button class="btn sm" id="k-buscar" type="button">Buscar la letra</button></div><p class="small muted" id="k-lst" style="margin:0 0 6px"></p><textarea class="inp" id="k-letra" rows="12">${esc(letra)}</textarea>
-      <div class="row" style="margin-top:12px"><button class="btn red" id="k-go">Crear</button><button class="btn" id="k-save">Guardar y seguir luego</button><button class="btn ghost" id="k-x">Cerrar</button></div>`);
+      <p class="small muted" style="margin:10px 0 0">«Editar» no la publica: pasa al editor, que primero coloca la letra sobre la voz y saca las notas (unos 5 minutos) y después te deja retocarla y publicarla.</p>
+      <div class="row" style="margin-top:12px"><button class="btn red" id="k-go">Editar</button><button class="btn" id="k-save">Guardar y seguir luego</button><button class="btn ghost" id="k-x">Cerrar</button></div>`);
     $('k-buscar').onclick = () => buscarLetraUI(j.duracion);
     if (j.letraFuente && letra) $('k-lst').textContent = `Letra encontrada en ${j.letraFuente}. Revísala: cada línea será una frase en la tele.`;
     else if (!letra) $('k-lst').textContent = 'No se encontró la letra automáticamente: pulsa «Buscar la letra» o pégala.';
     const datos = () => ({ artista: $('k-art').value, titulo: $('k-tit').value, idioma: $('k-lang').value, anio: $('k-year').value, letra: $('k-letra').value });
     $('k-x').onclick = closeModal;
     $('k-save').onclick = async () => { try { await api(`/jobs/${j.id}`, { method: 'PATCH', json: datos() }); closeModal(); toast('Guardado en Borradores'); route(); } catch (e) { fail(e); } };
-    $('k-go').onclick = async () => { try { await api(`/jobs/${j.id}/continuar`, { method: 'POST', json: datos() }); closeModal(); toast('En la cola de creación'); route(); } catch (e) { fail(e); } };
+    $('k-go').onclick = async () => { try { await api(`/jobs/${j.id}/continuar`, { method: 'POST', json: datos() }); closeModal(); location.hash = 'preparando/' + j.id; } catch (e) { fail(e); } };
   }
   function crearCancion() {
     const b = modal(`<h3>Crear canción</h3>
@@ -605,7 +647,8 @@
       <div class="row" style="justify-content:space-between;align-items:flex-end"><label class="lbl">Letra · una frase por línea (como se verá en la tele)</label><button class="btn sm" id="k-buscar" type="button">Buscar la letra</button></div><p class="small muted" id="k-lst" style="margin:0 0 6px"></p><textarea class="inp" id="k-letra" rows="12" placeholder="Cada línea será una frase en pantalla.
 Las líneas vacías no cuentan."></textarea>
       <div class="progress"><i id="k-p"></i></div><p class="small muted" id="k-st"></p>
-      <div class="row" style="margin-top:12px"><button class="btn red" id="k-go">Crear</button><button class="btn ghost" id="k-x">Cancelar</button></div>`);
+      <p class="small muted" style="margin:10px 0 0">«Editar» no la publica: pasa al editor, que primero coloca la letra sobre la voz y saca las notas (unos 5 minutos) y después te deja retocarla y publicarla.</p>
+      <div class="row" style="margin-top:12px"><button class="btn red" id="k-go">Editar</button><button class="btn ghost" id="k-x">Cancelar</button></div>`);
     $('k-x').onclick = closeModal;
     $('t-sp').onclick = importarSpotify;
     $('k-buscar').onclick = () => buscarLetraUI(0);
@@ -628,7 +671,7 @@ Las líneas vacías no cuentan."></textarea>
           x.onload = () => x.status < 300 ? res() : rej(new Error((JSON.parse(x.responseText || '{}').error) || 'Error ' + x.status)); x.onerror = () => rej(new Error('Sin conexión'));
           x.send(f);
         });
-        closeModal(); toast('En la cola de creación'); location.hash = 'creacion';
+        closeModal(); location.hash = 'preparando/' + j.id;
       } catch (e) { fail(e); $('k-go').disabled = false; }
     };
   }
@@ -636,13 +679,17 @@ Las líneas vacías no cuentan."></textarea>
   VIEWS.creacion = async () => {
     const v = $('view');
     v.innerHTML = `<div class="head"><h1>Creación</h1><span class="sub"><button class="btn red" id="j-new">✨ Crear canción</button></span></div>
-      <div class="card" id="j-w"></div><h2 class="sec">Borradores</h2><div id="j-b"></div><h2 class="sec">Trabajos</h2><div id="j-l"></div>`;
+      <div class="card" id="j-w"></div>
+      <h2 class="sec">En preparación · creadas, sin publicar</h2><p class="small muted" style="margin:-4px 0 10px">Edítalas hasta que estén perfectas (notas, frases, tiempos, vista como en el juego) y publícalas: hasta entonces no salen en la tele.</p><div id="j-p"></div>
+      <h2 class="sec">Borradores · descargadas de Spotify, falta la letra</h2><div id="j-b"></div><h2 class="sec">Trabajos</h2><div id="j-l"></div>`;
     $('j-new').onclick = crearCancion;
     v.onclick = async e => {
       const b = e.target.closest('[data-j]'); if (!b) return;
       const id = b.dataset.j, a = b.dataset.a;
       try {
         if (a === 'cont') { const d = await api('/jobs'); const j = d.jobs.find(x => x.id === id); if (j) continuarBorrador(j); return; }
+        if (a === 'pub') { const nid = await publicar(id); if (nid) toast('Publicada: ya sale en la tele, en Novedades'); draw.firmaP = null; return draw(); }
+        if (a === 'descartar') { if (await ask('¿Descartar esta canción?', 'Pasa a Retiradas (se puede recuperar desde Canciones → Retiradas).', 'Descartar')) { await api(`/songs/${enc(id)}/retire`, { method: 'POST', json: {} }); toast('Descartada'); draw.firmaP = null; } return draw(); }
         if (a === 'retry') await api(`/jobs/${id}/retry`, { method: 'POST', json: {} });
         if (a === 'del' && await ask('¿Borrar este trabajo?', 'Se borra de la cola con sus ficheros (la canción, si ya se creó, se queda).')) await api(`/jobs/${id}`, { method: 'DELETE' });
         if (a === 'token') {
@@ -661,6 +708,16 @@ Las líneas vacías no cuentan."></textarea>
         <span class="muted small">${w.seen ? `${esc(w.host || 'servidor')} · último contacto ${ago(w.seen)}${w.version ? ' · v' + esc(w.version) : ''}` : w.configured ? 'Aún no se ha conectado' : 'Sin clave configurada'}</span>
         <span class="grow"></span><button class="btn sm ghost" data-j="-" data-a="token">Clave del trabajador</button></div>
         ${vivo ? '' : '<p class="small muted" style="margin:8px 0 0">El trabajador corre en el propio servidor (servicio gramola-trabajador). Si no está conectado, los trabajos esperan en la cola.</p>'}`;
+      const prep = await api('/preparacion');
+      const firmaP = JSON.stringify(prep.map(s => [s.id, s.editada, s.dup, s.cover]));
+      if (firmaP !== draw.firmaP) {
+        draw.firmaP = firmaP;
+        $('j-p').innerHTML = prep.length ? `<table class="tbl"><tbody>${prep.map(s => `<tr><td style="width:64px"><img class="cov" style="width:52px;height:52px" src="${esc(cover(s))}" alt=""></td>
+          <td><div class="t-title">${esc(s.title)}</div><div class="t-art">${esc(s.artist)}${s.year ? ' (' + s.year + ')' : ''} · ${s.duration ? mmss(s.duration) : ''} · ${nf(s.notes)} notas</div>${s.dup ? `<div class="small red-t">Ya hay otra igual publicada: ${esc(s.dup)} (al publicar podrás sustituirla)</div>` : ''}</td>
+          <td class="small muted">Creada ${ago(s.creada)}<br>${s.editada ? `Editada (${s.editada} versiones)` : '<span class="red-t">Sin revisar</span>'}</td>
+          <td class="r"><a class="btn sm dark" href="#editor/${enc(s.id)}">✎ Editar</a> <a class="btn sm" href="#editor/${enc(s.id)}/ver">▶ Ver en el juego</a> <button class="btn sm red" data-j="${esc(s.id)}" data-a="pub">Publicar</button> <button class="btn sm danger" data-j="${esc(s.id)}" data-a="descartar">Descartar</button></td></tr>`).join('')}</tbody></table>`
+          : '<div class="empty">Nada en preparación. Las canciones creadas aparecen aquí hasta que las publiques.</div>';
+      }
       const bor = d.jobs.filter(j => j.state === 'borrador'), resto = d.jobs.filter(j => j.state !== 'borrador');
       const firmaB = JSON.stringify(bor.map(j => [j.id, j.titulo, j.artista, j.dup, j.updated, j.letraFuente]));
       if (firmaB !== draw.firmaB) {   // no se repinta si no cambia (para no cortar el audio de la vista previa)
@@ -678,17 +735,38 @@ Las líneas vacías no cuentan."></textarea>
           <td class="small">${j.kind === 'crear' ? 'Crear canción' + (j.origen === 'spotify' ? ' (Spotify)' : '') : j.kind === 'spotify' ? 'Descargar de Spotify' : 'Analizar voz'}</td>
           <td style="min-width:220px"><span class="badge ${ec}">${et}</span> ${j.state === 'procesando' ? `<div class="progress" style="margin-top:6px"><i style="width:${j.progress || 0}%"></i></div><span class="small muted">${esc(j.msg || '')}</span>` : j.state === 'error' ? `<div class="small red-t" style="margin-top:4px;max-width:420px;overflow-wrap:anywhere">${esc((j.error || '').slice(-300))}</div>` : j.state === 'hecho' ? `<span class="small muted">${esc(j.msg || '')}${j.finished && j.started ? ' · ' + dur((j.finished - j.started) / 1000) : ''}</span>` : ''}</td>
           <td class="small muted">${ago(j.created)}</td>
-          <td class="r">${j.state === 'hecho' && j.song ? `<a class="btn sm dark" href="#editor/${enc(j.song)}">Editor</a> <a class="btn sm" href="#canciones/${enc(j.song)}">Ficha</a> ` : ''}${j.state === 'error' ? `<button class="btn sm" data-j="${j.id}" data-a="retry">Reintentar</button> ` : ''}<button class="btn sm danger" data-j="${j.id}" data-a="del">Borrar</button></td></tr>`;
+          <td class="r">${j.kind === 'crear' && ['pendiente', 'procesando'].includes(j.state) ? `<a class="btn sm dark" href="#preparando/${j.id}">Editor</a> ` : ''}${j.state === 'hecho' && j.song ? `<a class="btn sm dark" href="#editor/${enc(j.song)}">Editor</a> <a class="btn sm" href="#canciones/${enc(j.song)}">Ficha</a> ` : ''}${j.state === 'error' ? `<button class="btn sm" data-j="${j.id}" data-a="retry">Reintentar</button> ` : ''}<button class="btn sm danger" data-j="${j.id}" data-a="del">Borrar</button></td></tr>`;
       }).join('')}</tbody></table>` : '<div class="empty">No hay trabajos. Pulsa «Crear canción» para empezar.</div>';
     }
     every(draw, 3000);
   };
 
+  // ------------------------------------------------------------------ Editor: mientras se encaja la letra
+  VIEWS.preparando = async ([jid]) => {
+    document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('on', a.dataset.v === 'creacion'));
+    const v = $('view');
+    v.innerHTML = `<button class="btn ghost sm back" data-go="creacion">← Creación</button><div class="head"><h1 id="pp-t">Editor</h1><span class="sub" id="pp-a"></span></div>
+      <div class="card" style="max-width:760px"><h2 class="sec" style="margin-top:0">Preparando la canción para editarla</h2>
+      <p class="small muted">El servidor separa la voz, coloca cada sílaba de la letra en su sitio y saca las notas. Tarda unos 5 minutos; en cuanto acabe se abre aquí el editor. Puedes salir y volver: el trabajo sigue.</p>
+      <div class="progress" style="height:12px"><i id="pp-p" style="width:2%"></i></div><p class="small" id="pp-m" style="margin-top:8px">En cola…</p></div>`;
+    every(async () => {
+      const d = await api('/jobs'), j = d.jobs.find(x => x.id === jid);
+      if (!j) { $('pp-m').textContent = 'Este trabajo ya no existe.'; return; }
+      $('pp-t').textContent = j.titulo; $('pp-a').textContent = j.artista;
+      if (j.state === 'hecho' && j.song) { stopTimers(); location.hash = 'editor/' + enc(j.song); return; }
+      if (j.state === 'error') { $('pp-m').innerHTML = `<span class="red-t">Error: ${esc((j.error || '').slice(-300))}</span> <button class="btn sm" data-go="creacion">Ver en Creación</button>`; return; }
+      const vivo = d.worker.seen && Date.now() - d.worker.seen < 45000;
+      $('pp-p').style.width = Math.max(2, j.progress || 0) + '%';
+      $('pp-m').textContent = j.state === 'procesando' ? `${j.progress || 0} % · ${j.msg || ''}` : vivo ? 'En cola (empieza en cuanto acabe lo anterior)…' : 'En cola: el trabajador no está conectado ahora mismo.';
+    }, 2500);
+  };
+
   // ------------------------------------------------------------------ Editor de canciones
-  VIEWS.editor = async ([id]) => {
+  VIEWS.editor = async ([id, extra]) => {
     if (!id) { location.hash = 'canciones'; return; }
-    document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('on', a.dataset.v === 'canciones'));
-    editor = await GramolaEditor.open($('view'), id, api, toast);
+    editor = await GramolaEditor.open($('view'), id, api, toast, { verAlAbrir: extra === 'ver' });
+    // Las que están en preparación se editan dentro de Creación
+    document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('on', a.dataset.v === (editor.draft ? 'creacion' : 'canciones')));
   };
 
   // ------------------------------------------------------------------ 04 · Récords

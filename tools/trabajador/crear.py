@@ -107,7 +107,9 @@ def medir_tono(voz, sr=SR):
         f0 = torchcrepe.filter.mean(f0, 3)
         f0, per = f0[0].cpu().numpy(), per[0].cpu().numpy()
         liberar()
-        rms = np.sqrt(np.convolve(y ** 2, np.ones(400) / 400, 'same'))[::160][:len(f0)]
+        rms = np.sqrt(np.convolve(y ** 2, np.ones(400) / 400, 'same'))[::160]
+        n = min(len(f0), len(per), len(rms))   # a veces difieren en una trama según la duración
+        f0, per, rms = f0[:n], per[:n], rms[:n]
         umbral = max(1e-4, np.percentile(rms, 30) * 1.5)
         midi = np.where((per > 0.45) & (rms > umbral), 69 + 12 * np.log2(np.maximum(f0, 1) / 440), np.nan)
         return np.arange(len(f0)) * 0.01, midi
@@ -151,7 +153,45 @@ def palabras_de(lineas):
     return out
 
 
-def alinear(voz, sr, palabras):
+def ventanas_lrc(lineas, lrc, dur):
+    """Con una letra sincronizada (LRC), la zona de la canción donde cae cada línea: {línea: (ini, fin)} en segundos.
+    Las líneas se emparejan por su texto (la letra puede estar retocada); las que no casan quedan entre sus vecinas."""
+    import difflib
+    import re
+    marcas = []
+    for L in (lrc or '').splitlines():
+        ts = re.findall(r'\[(\d+):(\d+(?:[.:]\d+)?)\]', L)
+        txt = re.sub(r'\[[^\]]*\]', '', L).strip()
+        for mm, ss in ts:
+            if txt:
+                marcas.append((int(mm) * 60 + float(ss.replace(':', '.')), txt))
+    marcas.sort()
+    if len(marcas) < 3:
+        return {}
+    n = lambda s: re.sub(r'[^a-z0-9]', '', ''.join(normalizar(c) for c in s))
+    a, b = [n(x) for x in lineas], [n(x[1]) for x in marcas]
+    ini = {}
+    for blk in difflib.SequenceMatcher(None, a, b, autojunk=False).get_matching_blocks():
+        for k in range(blk.size):
+            ini[blk.a + k] = marcas[blk.b + k][0]
+    if len(ini) < len(lineas) * 0.5:   # la letra no se parece a la sincronizada: mejor sin ventanas
+        return {}
+    ord_ = sorted(ini)
+    out = {}
+    for k, li in enumerate(ord_):
+        sig = next((ini[x] for x in ord_[k + 1:] if ini[x] > ini[li]), dur)
+        out[li] = (max(0, ini[li] - 1.0), min(dur, sig + 1.5), ini[li])   # con margen: las LRC no son exactas
+    # Las líneas sin marca: entre la anterior y la siguiente que sí tienen
+    for li in range(len(lineas)):
+        if li in out:
+            continue
+        prev = max((x for x in out if x < li), default=None)
+        nxt = min((x for x in out if x > li), default=None)
+        out[li] = (out[prev][0] if prev is not None else 0.0, out[nxt][1] if nxt is not None else dur, None)
+    return out
+
+
+def alinear(voz, sr, palabras, ventanas=None):
     import torch
     import torchaudio
     from torchaudio.pipelines import MMS_FA as bundle
@@ -175,11 +215,46 @@ def alinear(voz, sr, palabras):
     liberar()
     seg_por_trama = y.shape[1] / sr16 / em.shape[1]
     validas = [p for p in palabras if p[3]]
-    tok = bundle.get_tokenizer()(['*' if False else p[3] for p in validas])
-    spans = bundle.get_aligner()(em[0], tok)
+    tokenizar, alineador = bundle.get_tokenizer(), bundle.get_aligner()
     tiempos = {}
-    for p, sp in zip(validas, spans):
+    # Primero, alineación de toda la canción de una vez
+    tok = tokenizar([p[3] for p in validas])
+    for p, sp in zip(validas, alineador(em[0], tok)):
         tiempos[id(p)] = [(s.start * seg_por_trama, s.end * seg_por_trama, float(s.score)) for s in sp]
+    if ventanas:
+        # La letra sincronizada puede ser de otra versión (disco, videoclip con intro…): se mide el desfase con lo
+        # alineado. Si es constante, se corrige y cada línea se vuelve a buscar solo en su zona (así no se confunden
+        # estribillos repetidos ni se meten frases en los solos); si no casa, se queda la alineación global.
+        dif = []
+        for li in sorted({p[0] for p in validas}):
+            w = ventanas.get(li)
+            p0 = next((p for p in validas if p[0] == li), None)
+            if w and w[2] is not None and p0 and tiempos.get(id(p0)):
+                dif.append(tiempos[id(p0)][0][0] - w[2])
+        if len(dif) < 4:
+            return tiempos
+        d = float(np.median(dif))
+        casan = sum(abs(x - d) < 1.5 for x in dif) / len(dif)
+        log(f'  (letra sincronizada: desfase {d:+.1f} s, casan {casan:.0%} de las líneas)')
+        if casan < 0.6:
+            return tiempos
+        ventanas = {k: (max(0, a + d), b + d, s) for k, (a, b, s) in ventanas.items()}
+        globales = dict(tiempos)
+        tiempos = {}
+        try:
+            for li in sorted({p[0] for p in validas}):
+                ps = [p for p in validas if p[0] == li]
+                a, b, _ = ventanas[li]
+                f0, f1 = max(0, int(a / seg_por_trama)), min(em.shape[1], int(b / seg_por_trama))
+                tok = tokenizar([p[3] for p in ps])
+                if f1 - f0 < sum(len(x) for x in tok) * 2:
+                    raise ValueError('ventana corta')
+                for p, sp in zip(ps, alineador(em[0, f0:f1], tok)):
+                    tiempos[id(p)] = [((s.start + f0) * seg_por_trama, (s.end + f0) * seg_por_trama, float(s.score)) for s in sp]
+            return tiempos
+        except Exception as e:
+            log('  (sin ventanas:', e, ')')
+            return globales
     return tiempos
 
 
@@ -321,14 +396,15 @@ def analizar(audio, salida, progreso=lambda p, m: None):
     return voz, t, midi
 
 
-def crear(audio, letra, salida, titulo, artista, idioma='es', anio=None, mp3='audio.mp3', progreso=lambda p, m: None):
+def crear(audio, letra, salida, titulo, artista, idioma='es', anio=None, mp3='audio.mp3', progreso=lambda p, m: None, lrc=None):
     lineas = [l.strip() for l in letra.replace('\r', '').split('\n') if l.strip()]
     if not lineas:
         raise ValueError('La letra está vacía')
     voz, t, midi = analizar(audio, salida, progreso)
     progreso(75, 'Alineando la letra')
     pal = palabras_de(lineas)
-    tiempos = alinear(voz, SR, pal)
+    ven = ventanas_lrc(lineas, lrc, len(voz) / SR) if lrc else None
+    tiempos = alinear(voz, SR, pal, ven)
     progreso(90, 'Sílabas y notas')
     notas = construir(lineas, pal, tiempos, t, midi, idioma)
     txt = ultrastar(notas, titulo, artista, idioma, anio, mp3)
@@ -346,9 +422,11 @@ if __name__ == '__main__':
     ap.add_argument('--artista', default='Desconocido')
     ap.add_argument('--idioma', default='es')
     ap.add_argument('--anio')
+    ap.add_argument('--lrc', help='letra sincronizada (LRC) para guiar el encaje')
     a = ap.parse_args()
     if a.orden == 'analizar':
         analizar(a.audio, a.resto[0], lambda p, m: log(f'{p}% {m}'))
     else:
         letra = open(a.resto[0], encoding='utf-8').read()
-        crear(a.audio, letra, a.resto[1], a.titulo, a.artista, a.idioma, a.anio, os.path.basename(a.audio), lambda p, m: log(f'{p}% {m}'))
+        crear(a.audio, letra, a.resto[1], a.titulo, a.artista, a.idioma, a.anio, os.path.basename(a.audio), lambda p, m: log(f'{p}% {m}'),
+              open(a.lrc, encoding='utf-8').read() if a.lrc else None)
