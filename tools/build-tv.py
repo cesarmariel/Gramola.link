@@ -177,6 +177,7 @@ GRID_HTML = """      <div style="position:absolute;left:0;top:0;height:100%;tran
             <div style="position:relative;width:100%;height:{{ s.ch }}px;overflow:hidden;background:{{ s.bg }}">
               <div style="position:absolute;right:0;bottom:0;width:58%;height:46%;background:{{ s.blk }}"></div>
               <div style="position:absolute;left:6%;top:3%;font-weight:800;line-height:1;letter-spacing:-0.05em;font-size:{{ s.fs }}px;color:{{ s.fg }}">{{ s.ini }}</div>
+              <div style="display:{{ s.nw }};position:absolute;left:0;top:0;background:#ec3013;color:#fff;font-size:17px;font-weight:800;letter-spacing:.1em;padding:5px 9px">NUEVA</div>
             </div>
             <div style="padding:8px 12px 0;display:flex;flex-direction:column;gap:2px;min-width:0">
               <span style="font-size:22px;font-weight:800;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ s.c1 }}">{{ s.title }}</span>
@@ -191,6 +192,8 @@ GRID_HTML = """      <div style="position:absolute;left:0;top:0;height:100%;tran
         </sc-for>
       </div>"""
 sub(r'      <sc-for list="\{\{ covers \}\}" as="s" hint-placeholder-count="5">.*?</sc-for>', GRID_HTML.replace('\\', '\\\\'), regex=True, name='rejilla: plantilla')
+# --- novedades (marcadas en la administración): primero en la lista, en su grupo «★»
+sub("else l.sort((a,b)=>b.plays-a.plays);return l;}", "else l.sort((a,b)=>b.plays-a.plays);return GR.newFirst(l);}", name='novedades primero')
 sub("filters,covers,hasSongs:", "filters,covers,grid:GR.songGrid(this,list,sf),webHost:GR.webHost(),microHost:GR.microHost(),hasSongs:", name='rejilla y direcciones: datos')
 sub("else{if(a==='l')this.setState({songF:Math.max(0,s.songF-1)});else if(a==='r')this.setState({songF:Math.min(n-1,s.songF+1)});else if(a==='u')this.setState({zone:'filters',filterF:1});",
     "else{const nf=GR.gridMove(this,this.songsList(),s.songF,a);if(nf!=null){if(nf!==s.songF)this.setState({songF:nf});}else if(a==='u')this.setState({zone:'filters',filterF:1});", name='rejilla: teclas')

@@ -2,6 +2,10 @@
 
 Versiones con el esquema `1.AA.MMDD.HHMM` (fecha y hora del despliegue).
 
+## 1.26.1102.1107
+- **Novedades**: en el admin se seleccionan canciones con casillas y se marcan como Novedades (o desde la ficha); botón «★ Novedades» junto a «Retiradas». En la tele salen las primeras de la lista, en su grupo «★» y con la etiqueta NUEVA.
+- Admin: columna de idioma en corto (ES, EN, CA…) y «Añadida» con fecha y hora.
+
 ## 1.26.1102.1101
 - Admin: paginación en la lista de canciones (25, 50, 100 o todas; recuerda la página al volver de una ficha).
 - Admin: sin avisos de error falsos al cambiar de apartado mientras el anterior aún carga.

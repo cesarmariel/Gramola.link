@@ -8,7 +8,7 @@
 <link rel="apple-touch-icon" href="/assets/iconos/favicon-180.png">
 <style>html,body{margin:0;background:#0e0f0f;overflow:hidden;cursor:none}</style>
 <script src="/vendor/qrcode.js"></script>
-<script src="/tv/gramola-bridge.js?v=1.26.1102.1101"></script>
+<script src="/tv/gramola-bridge.js?v=1.26.1102.1107"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="./support.js"></script>
@@ -60,7 +60,7 @@ a{color:var(--color-accent-700)}a:hover{color:var(--color-accent-600)}
   <div style="display:flex;justify-content:space-between;align-items:center;border-top:2px solid var(--color-text);padding-top:20px;font-size:28px;font-weight:600">
     <img src="assets/nuvola/nuvola-tinta.png" alt="nuvola" style="display:block;height:44px;width:auto;position:relative;top:-7px">
     
-    <span style="color:var(--color-neutral-700)">Versión 1.26.1102.1101</span>
+    <span style="color:var(--color-neutral-700)">Versión 1.26.1102.1107</span>
   </div>
 </div>
 </sc-if>
@@ -192,6 +192,7 @@ a{color:var(--color-accent-700)}a:hover{color:var(--color-accent-600)}
             <div style="position:relative;width:100%;height:{{ s.ch }}px;overflow:hidden;background:{{ s.bg }}">
               <div style="position:absolute;right:0;bottom:0;width:58%;height:46%;background:{{ s.blk }}"></div>
               <div style="position:absolute;left:6%;top:3%;font-weight:800;line-height:1;letter-spacing:-0.05em;font-size:{{ s.fs }}px;color:{{ s.fg }}">{{ s.ini }}</div>
+              <div style="display:{{ s.nw }};position:absolute;left:0;top:0;background:#ec3013;color:#fff;font-size:17px;font-weight:800;letter-spacing:.1em;padding:5px 9px">NUEVA</div>
             </div>
             <div style="padding:8px 12px 0;display:flex;flex-direction:column;gap:2px;min-width:0">
               <span style="font-size:22px;font-weight:800;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ s.c1 }}">{{ s.title }}</span>
@@ -708,7 +709,7 @@ class Component extends DCLogic {
   toast(text){const id=Math.random();this.setState(s=>({toasts:[...s.toasts,{id,text}].slice(-3)}));setTimeout(()=>this.setState(s=>({toasts:s.toasts.filter(t=>t.id!==id)})),3000);}
   songsList(){const s=this.state;let l=SONGS.filter(x=>x.id);const q=norm(s.query||'');if(q)l=l.filter(x=>norm(x.title+' '+x.artist).includes(q));
     if(s.lng)l=l.filter(x=>x.lang===LANGS[s.lng]);if(s.dec){const y0=GR.decadeStart(DECS[s.dec]);l=l.filter(x=>x.year>=y0&&x.year<y0+10);}if(s.gen)l=l.filter(x=>x.genre===GENS[s.gen]);if(s.duoOnly)l=l.filter(x=>x.duo);
-    const o=ORDERS[s.ord],cmp=(a,b)=>a.localeCompare(b,'es');if(o==='A–Z')l.sort((a,b)=>cmp(a.title,b.title));else if(o==='Artista')l.sort((a,b)=>cmp(a.artist,b.artist));else if(o==='Década')l.sort((a,b)=>a.year-b.year);else l.sort((a,b)=>b.plays-a.plays);return l;}
+    const o=ORDERS[s.ord],cmp=(a,b)=>a.localeCompare(b,'es');if(o==='A–Z')l.sort((a,b)=>cmp(a.title,b.title));else if(o==='Artista')l.sort((a,b)=>cmp(a.artist,b.artist));else if(o==='Década')l.sort((a,b)=>a.year-b.year);else l.sort((a,b)=>b.plays-a.plays);return GR.newFirst(l);}
   searchKey(a){const f=this.state.search.f,KN=KB.length;let nf=f;const col=f<KN?f%10:(f===KN?1:f===KN+1?5:8);
     if(a==='l'){nf=f<KN?(f%10?f-1:f):Math.max(KN,f-1);}else if(a==='r'){nf=f<KN?(f%10<9?f+1:f):Math.min(KN+2,f+1);}
     else if(a==='u'){if(f>=KN)nf=30+col;else if(f>=10)nf=f-10;}else if(a==='d'){if(f<30)nf=f+10;else if(f<KN)nf=KN+(col<4?0:col<8?1:2);}

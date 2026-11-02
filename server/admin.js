@@ -500,6 +500,17 @@ module.exports = function admin(ctx) {
     const rec = ctx.records();
     json(res, 200, { id, song: s, header: headerOf(dir), txts: txtsOf(dir), ...songExtra(dir), plays: rec.plays[id] || 0, record: rec.songs[id] || null });
   });
+  // Novedades: marcar o quitar varias de golpe
+  on('POST', '/novedades', async (req, res) => {
+    const b = await body(req), nv = ctx.novedades();
+    const ids = (Array.isArray(b.ids) ? b.ids : []).map(String).filter(id => fs.existsSync(path.join(SONGS_DIR, safeName(id))));
+    if (!ids.length) throw httpErr(400, 'No hay canciones seleccionadas');
+    const now = Date.now();
+    for (const id of ids) { if (b.on) nv[id] = nv[id] || now; else delete nv[id]; }
+    ctx.saveNovedades();
+    ev('songs', `${b.on ? 'Marcadas como Novedades' : 'Quitadas de Novedades'}: ${ids.length} ${ids.length === 1 ? 'canción' : 'canciones'}${ids.length <= 5 ? ' (' + ids.join(', ') + ')' : ''}`);
+    json(res, 200, { ok: true, total: Object.keys(nv).length });
+  });
   on('PATCH', '/songs/([^/]+)/header', async (req, res, m) => {
     const id = decodeURIComponent(m[1]), dir = songDir(id), b = await body(req);
     if (!b.tags || typeof b.tags !== 'object') throw httpErr(400, 'Faltan los datos');
@@ -512,6 +523,8 @@ module.exports = function admin(ctx) {
     const dest = path.join(SONGS_DIR, to);
     if (fs.existsSync(dest)) throw httpErr(409, 'Ya hay una canción con ese nombre de carpeta');
     fs.renameSync(dir, dest);
+    const nv = ctx.novedades();
+    if (nv[id]) { nv[to] = nv[id]; delete nv[id]; ctx.saveNovedades(); }
     const rec = ctx.records();
     for (const k of ['plays', 'songs']) if (rec[k] && rec[k][id] !== undefined) { rec[k][to] = rec[k][id]; delete rec[k][id]; }
     ctx.saveRecords(); ctx.songsChanged();
@@ -524,6 +537,8 @@ module.exports = function admin(ctx) {
     let dest = path.join(RETIRED_DIR, id);
     if (fs.existsSync(dest)) dest += ' (' + Date.now() + ')';
     fs.renameSync(dir, dest);
+    const nv = ctx.novedades();
+    if (nv[id]) { delete nv[id]; ctx.saveNovedades(); }
     ctx.songsChanged();
     ev('songs', `Canción retirada: «${id}»`);
     json(res, 200, { ok: true });

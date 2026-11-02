@@ -33,6 +33,16 @@ function readText(file) {
 
 const num = s => parseFloat(String(s || '0').replace(',', '.')) || 0;
 let songsCache = { at: 0, list: [] };
+// Novedades: canciones marcadas desde la administración para que salgan primero en la tele ({ id: fecha })
+const NEW_FILE = path.join(DATA_DIR, 'novedades.json');
+let novedades = {};
+try { novedades = JSON.parse(fs.readFileSync(NEW_FILE, 'utf8')) || {}; } catch {}
+function saveNovedades() {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.writeFileSync(NEW_FILE + '.tmp', JSON.stringify(novedades));
+  fs.renameSync(NEW_FILE + '.tmp', NEW_FILE);
+  songsCache.at = 0;
+}
 
 // Tramo para el Megamix: megamix.mp3 (estribillo recortado por tools/megamix.py) + megamix.json con los tiempos
 function mtimeOf(f) { try { return Math.round(fs.statSync(f).mtimeMs / 1000).toString(36); } catch { return '0'; } }
@@ -95,6 +105,8 @@ function scanSongs(force) {
       cover: head.COVER ? base + encodeURIComponent(head.COVER) + '?v=' + mtimeOf(path.join(dir, head.COVER)) : null,
       hasVideo: !!head.VIDEO,
       megamix: megamixOf(dir, base),
+      isNew: !!novedades[d.name],
+      newAt: novedades[d.name] || null,
     });
   }
   out.sort((a, b) => a.title.localeCompare(b.title, 'es'));
@@ -246,7 +258,8 @@ const MICRO_FILES = { '/': '/m/index.html', '/manifest.webmanifest': '/m/manifes
 // ======================================================================= administración (subdominio admin.)
 const admin = require('./admin')({
   DATA_DIR, SONGS_DIR, WEB_DIR, rooms, COLORS,
-  scanSongs, songsChanged: () => { songsCache.at = 0; }, records: () => records, saveRecords, telemetry: () => telemetry,
+  scanSongs, songsChanged: () => { songsCache.at = 0; },
+  novedades: () => novedades, saveNovedades, records: () => records, saveRecords, telemetry: () => telemetry,
   sendTo: send, closeRoom: r => closeRoom(r), announce: r => announce(r), wsCount: () => wss.clients.size,
 });
 

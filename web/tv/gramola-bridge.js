@@ -211,7 +211,7 @@ window.GR = (() => {
         id: e.id, title: G.cleanTitle(e.title), artist: e.artist,
         dur: e.duration ? `${Math.floor(e.duration / 60)}:${String(e.duration % 60).padStart(2, '0')}` : '–',
         year: e.year || 0, lang: langName(e.language), diff: e.difficulty || 2, duo: !!e.duet || song.tracks.length > 1,
-        rec: '—', plays: 0, genre: e.genre || '', entry: e, song,
+        rec: '—', plays: 0, genre: e.genre || '', entry: e, song, isNew: !!e.isNew, newAt: e.newAt || 0,
         cv: e.cover ? ['url("' + e.cover + '") center / cover no-repeat #201e1d', 'transparent', 'transparent'] : CV[h % CV.length],
       });
     });
@@ -506,11 +506,13 @@ window.GR = (() => {
   const GRID = { W: 180, TH: 242, GAP: 12, ROWGAP: 10, GROUP: 72, LEFT: 96 + 64, VIEW: 1920 };
   let gridCache = null;
   const ORD_NAMES = ['A–Z', 'Artista', 'Década', 'Más cantadas'];
+  // Novedades (marcadas en la administración): primero, en su propio grupo «★», de la más reciente a la más antigua
+  G.newFirst = l => { const n = l.filter(S => S.isNew).sort((a, b) => (b.newAt || 0) - (a.newAt || 0)); return n.length ? n.concat(l.filter(S => !S.isNew)) : l; };
   const initialOf = t => { const ch = (t || '').trim().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/^[¡¿"'(.\s]+/, '').charAt(0).toUpperCase(); return /[A-ZÑ]/.test(ch) ? ch : '#'; };
   function gridLayout(list, ord) {
     if (gridCache && gridCache.list === list && gridCache.ord === ord && gridCache.n === list.length) return gridCache;
     const o = ORD_NAMES[ord] || 'A–Z';
-    const keyOf = S => o === 'A–Z' ? initialOf(S.title) : o === 'Artista' ? initialOf(S.artist) : o === 'Década' ? (S.year ? String(Math.floor(S.year / 10) * 10).slice(2) + 's' : '—') : '';
+    const keyOf = S => S.isNew ? '★' : o === 'A–Z' ? initialOf(S.title) : o === 'Artista' ? initialOf(S.artist) : o === 'Década' ? (S.year ? String(Math.floor(S.year / 10) * 10).slice(2) + 's' : '—') : '';
     const cols = [], pos = [], tags = [];
     let x = GRID.LEFT, key = null, inCol = 2;
     list.forEach((S, i) => {
@@ -542,7 +544,7 @@ window.GR = (() => {
         const S = list[i], on = i === sf && gz;
         tiles.push({ x: col.x, y: 8 + r * (GRID.TH + GRID.ROWGAP), w: GRID.W, h: GRID.TH, ch: GRID.W,
           bg: S.cv[0], blk: S.cv[1], fg: S.cv[2], ini: (S.title || '').split(' ').filter(w => w).slice(0, 2).map(w => w[0]).join('').toUpperCase(), fs: Math.round(GRID.W * 0.24),
-          title: S.title, artist: S.artist, tbg: on ? '#ec3013' : '#fff', c1: on ? '#fff' : '#201e1d', c2: on ? 'rgba(255,255,255,.85)' : '#6b6767',
+          title: S.title, artist: S.artist, nw: S.isNew ? 'block' : 'none', tbg: on ? '#ec3013' : '#fff', c1: on ? '#fff' : '#201e1d', c2: on ? 'rgba(255,255,255,.85)' : '#6b6767',
           sh: on ? '0 14px 34px rgba(32,30,29,.28)' : '0 1px 0 rgba(32,30,29,.08)', t: on ? 'scale(1.06)' : 'scale(1)', z: on ? 5 : 1,
           click: () => { if (on) c.startSetup(); else c.setState({ songF: i, zone: 'grid' }); } });
       });

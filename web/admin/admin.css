@@ -194,3 +194,14 @@ pre.out { background: var(--ink); color: #eee; padding: 10px; font-size: 12px; w
 .pager { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
 .pager .btn.sm { min-width: 34px; }
 .pager select.inp.sm { margin-left: 8px; }
+
+/* selección y novedades */
+.tbl td.ck, .tbl th.ck { width: 34px; padding-right: 0; cursor: pointer; }
+.tbl input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--red); cursor: pointer; vertical-align: middle; }
+.tbl tr.picked td { background: #fff3f0; }
+.selbar { position: sticky; top: 0; z-index: 4; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--ink); color: #fff; padding: 10px 14px; margin-bottom: 10px; }
+.selbar .btn.sm:not(.red) { background: transparent; color: #fff; border-color: #fff; }
+.selbar .link { color: #ddd; margin-left: auto; }
+#c-nn { font-weight: 600; }
+.tbl .lang { width: 52px; text-align: center; padding-left: 4px; padding-right: 4px; }
+.tbl .when { white-space: nowrap; min-width: 140px; }

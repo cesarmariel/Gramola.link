@@ -48,6 +48,10 @@
   const SCREENS = { splash: 'Arrancando', boot: 'Arrancando', welcome: 'Bienvenida', lobby: 'Sala (esperando jugadores)', menu: 'Menú', songs: 'Eligiendo canción', prepare: 'Preparando canción', countdown: 'Cuenta atrás', sing: 'Cantando', results: 'Resultados', records: 'Salón de la fama', settings: 'Ajustes', calibrate: 'Calibrando', party: 'Pásalo', duel: 'Duelo', megamix: 'Megamix', jukebox: 'Jukebox', pause: 'Pausa' };
   const scr = s => SCREENS[s] || s || '—';
   const MODES = { sing: 'Cantar', duel: 'Duelo', megamix: 'Megamix', party: 'Pásalo', jukebox: 'Jukebox' };
+  // Idioma en corto para la lista (el nombre completo va en el título al pasar el ratón)
+  const LANG = { español: 'ES', spanish: 'ES', castellano: 'ES', inglés: 'EN', ingles: 'EN', english: 'EN', catalán: 'CA', catala: 'CA', català: 'CA', catalan: 'CA', francés: 'FR', french: 'FR', italiano: 'IT', italian: 'IT', alemán: 'DE', german: 'DE', portugués: 'PT', portuguese: 'PT', gallego: 'GL', euskera: 'EU', japonés: 'JA', japanese: 'JA' };
+  const langShort = l => { if (!l) return '—'; const k = String(l).trim().toLowerCase(); return LANG[k] || String(l).slice(0, 2).toUpperCase(); };
+  const fechaHora = t => new Date(t).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   const cover = s => s && s.cover ? '/' + s.cover : '/assets/logo/simbolo-rojo.png';
   function modal(html) { $('modal-box').innerHTML = html; $('modal').hidden = false; return $('modal-box'); }
   function closeModal() { $('modal').hidden = true; $('modal-box').innerHTML = ''; }
@@ -242,6 +246,7 @@
 
   // ------------------------------------------------------------------ 03 · Canciones
   let songs = null;
+  const picked = new Set();   // canciones seleccionadas en la lista (se mantiene entre páginas)
   const sState = { q: '', f: 'todas', sort: 'title', dir: 1, page: 1, per: (() => { try { const v = localStorage.getItem('adm-per'); return v === null ? 50 : +v; } catch { return 50; } })() };
   const FILTERS = { todas: 'Todas', sinmegamix: 'Sin Megamix', sinnorm: 'Volumen sin igualar', portada: 'Portada original', duo: 'Dúos', nunca: 'Nunca cantadas', video: 'Con vídeo' };
   VIEWS.canciones = async ([id]) => {
@@ -251,11 +256,29 @@
     v.innerHTML = `<div class="head"><h1>Canciones</h1><span class="sub" id="c-sub"></span></div>
       <div class="tools"><input class="inp" id="c-q" placeholder="Buscar título, artista, año, carpeta…" value="${esc(sState.q)}">
         <div class="chips" id="c-f">${Object.entries(FILTERS).map(([k, t]) => `<button class="chip ${sState.f === k ? 'on' : ''}" data-f="${k}">${t}</button>`).join('')}</div>
-        <span class="grow"></span><button class="btn" id="c-ret">Retiradas</button><button class="btn red" id="c-new">+ Canción nueva</button></div>
+        <span class="grow"></span><button class="btn ${sState.f === 'novedades' ? 'dark' : ''}" id="c-nov">★ Novedades <b id="c-nn"></b></button><button class="btn" id="c-ret">Retiradas</button><button class="btn red" id="c-new">+ Canción nueva</button></div>
+      <div class="selbar" id="c-sel" hidden><b id="c-seln"></b><button class="btn sm red" data-nv="1">★ Marcar como Novedades</button><button class="btn sm" data-nv="0">Quitar de Novedades</button><button class="link small" data-nv="x">Deseleccionar</button></div>
       <div class="pager" id="c-pg1"></div><div id="c-list"></div><div class="pager" id="c-pg2"></div>`;
     $('c-q').oninput = () => { sState.q = $('c-q').value; sState.page = 1; draw(); };
-    $('c-f').onclick = e => { const b = e.target.closest('[data-f]'); if (!b) return; sState.f = b.dataset.f; sState.page = 1; $('c-f').querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x === b)); draw(); };
+    $('c-f').onclick = e => { const b = e.target.closest('[data-f]'); if (!b) return; sState.f = b.dataset.f; sState.page = 1; $('c-nov').classList.toggle('dark', sState.f === 'novedades'); $('c-f').querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x === b)); draw(); };
     $('c-ret').onclick = () => (location.hash = 'canciones/retiradas');
+    $('c-nov').onclick = () => {
+      sState.f = sState.f === 'novedades' ? 'todas' : 'novedades'; sState.page = 1;
+      $('c-nov').classList.toggle('dark', sState.f === 'novedades');
+      $('c-f').querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x.dataset.f === sState.f));
+      draw();
+    };
+    $('c-sel').onclick = async e => {
+      const b = e.target.closest('[data-nv]'); if (!b) return;
+      if (b.dataset.nv === 'x') { picked.clear(); return draw(); }
+      try {
+        const on = b.dataset.nv === '1';
+        await api('/novedades', { method: 'POST', json: { ids: [...picked], on } });
+        toast(`${picked.size} ${picked.size === 1 ? 'canción' : 'canciones'} ${on ? 'marcadas como Novedades' : 'quitadas de Novedades'}`);
+        picked.clear();
+        songs = await api('/songs'); draw();
+      } catch (err) { fail(err); }
+    };
     $('c-new').onclick = newSong;
     songs = await api('/songs');
     $('nav-songs').textContent = songs.length;
@@ -263,12 +286,15 @@
       const q = sState.q.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
       const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
       let l = songs.filter(s => !q || norm(`${s.title} ${s.artist} ${s.year} ${s.id} ${s.genre} ${s.language}`).includes(q));
-      const F = { sinmegamix: s => !s.megamix, sinnorm: s => !s.normalized, portada: s => s.coverSource === 'original', duo: s => s.duet, nunca: s => !s.plays, video: s => s.hasVideo };
+      const F = { novedades: s => s.isNew, sinmegamix: s => !s.megamix, sinnorm: s => !s.normalized, portada: s => s.coverSource === 'original', duo: s => s.duet, nunca: s => !s.plays, video: s => s.hasVideo };
       if (F[sState.f]) l = l.filter(F[sState.f]);
       const k = sState.sort, d = sState.dir;
       const val = s => k === 'record' ? (s.record ? s.record.score : -1) : k === 'megamix' ? (s.megamix ? 1 : 0) : s[k];
       l.sort((a, b) => { const x = val(a), y = val(b); return (typeof x === 'string' ? x.localeCompare(y, 'es') : (x ?? -1) - (y ?? -1)) * d; });
       $('c-sub').textContent = `${l.length} de ${songs.length} · ${mb(l.reduce((a, s) => a + s.size, 0))}`;
+      const nn = songs.filter(s => s.isNew).length; $('c-nn').textContent = nn ? `(${nn})` : '';
+      for (const id of [...picked]) if (!songs.some(s => s.id === id)) picked.delete(id);
+      $('c-sel').hidden = !picked.size; $('c-seln').textContent = `${picked.size} ${picked.size === 1 ? 'seleccionada' : 'seleccionadas'}`;
       // Paginación
       const per = sState.per || l.length || 1, pages = Math.max(1, Math.ceil(l.length / per));
       sState.page = Math.min(Math.max(1, sState.page), pages);
@@ -285,17 +311,28 @@
       };
       $('c-pg1').innerHTML = $('c-pg2').innerHTML = pager();
       const th = (key, t, cls = '') => `<th class="s ${cls}" data-s="${key}">${t}${sState.sort === key ? (sState.dir > 0 ? ' ↑' : ' ↓') : ''}</th>`;
-      $('c-list').innerHTML = `<table class="tbl"><thead><tr><th></th>${th('title', 'Canción')}${th('year', 'Año', 'r hide-m')}${th('language', 'Idioma', 'hide-m')}${th('duration', 'Dur.', 'r hide-m')}${th('difficulty', 'Dif.', 'hide-m')}${th('megamix', 'Megamix', 'hide-m')}${th('lufs', 'Volumen', 'r hide-m')}${th('plays', 'Cantada', 'r')}${th('record', 'Récord', 'r hide-m')}${th('size', 'Tamaño', 'r hide-m')}${th('added', 'Añadida', 'r hide-m')}</tr></thead><tbody>
-        ${l.map(s => `<tr class="click" data-id="${esc(s.id)}"><td><img class="cov" loading="lazy" src="${esc(cover(s))}" alt=""></td>
-          <td><div class="t-title">${esc(s.title)}${s.duet ? ' <span class="badge warn">dúo</span>' : ''}${s.hasVideo ? ' <span class="badge no">vídeo</span>' : ''}</div><div class="t-art">${esc(s.artist)}</div></td>
-          <td class="r hide-m">${s.year || '—'}</td><td class="hide-m small">${esc(s.language || '—')}</td><td class="r hide-m">${s.duration ? mmss(s.duration) : '—'}</td>
+      const allOn = l.length && l.every(s => picked.has(s.id));
+      $('c-list').innerHTML = `<table class="tbl"><thead><tr><th class="ck"><input type="checkbox" data-all ${allOn ? 'checked' : ''} title="Seleccionar las de esta página"></th><th></th>${th('title', 'Canción')}${th('year', 'Año', 'r hide-m')}${th('language', 'Idioma', 'hide-m lang')}${th('duration', 'Dur.', 'r hide-m')}${th('difficulty', 'Dif.', 'hide-m')}${th('megamix', 'Megamix', 'hide-m')}${th('lufs', 'Volumen', 'r hide-m')}${th('plays', 'Cantada', 'r')}${th('record', 'Récord', 'r hide-m')}${th('size', 'Tamaño', 'r hide-m')}${th('added', 'Añadida', 'r hide-m when')}</tr></thead><tbody>
+        ${l.map(s => `<tr class="click ${picked.has(s.id) ? 'picked' : ''}" data-id="${esc(s.id)}"><td class="ck"><input type="checkbox" data-pick ${picked.has(s.id) ? 'checked' : ''}></td><td><img class="cov" loading="lazy" src="${esc(cover(s))}" alt=""></td>
+          <td><div class="t-title">${esc(s.title)}${s.isNew ? ' <span class="badge red">★ nueva</span>' : ''}${s.duet ? ' <span class="badge warn">dúo</span>' : ''}${s.hasVideo ? ' <span class="badge no">vídeo</span>' : ''}</div><div class="t-art">${esc(s.artist)}</div></td>
+          <td class="r hide-m">${s.year || '—'}</td><td class="hide-m small lang" title="${esc(s.language || '')}">${esc(langShort(s.language))}</td><td class="r hide-m">${s.duration ? mmss(s.duration) : '—'}</td>
           <td class="hide-m"><span class="diff">${'●'.repeat(s.difficulty)}${'○'.repeat(3 - s.difficulty)}</span></td>
           <td class="hide-m">${s.megamix ? `<span class="badge ${s.megamixOrigin === 'detectado' ? 'warn' : 'ok'}">${esc(s.megamixOrigin || 'sí')}</span>` : '<span class="badge no">no</span>'}</td>
           <td class="r hide-m small">${s.normalized ? '<span class="badge ok">igualado</span>' : '<span class="badge no">original</span>'}</td>
           <td class="r">${s.plays || '—'}</td><td class="r hide-m small">${s.record ? `${nf(s.record.score)}<br><span class="muted">${esc(s.record.name)}</span>` : '—'}</td>
-          <td class="r hide-m small">${mb(s.size)}</td><td class="r hide-m small">${new Date(s.added).toLocaleDateString('es-ES')}</td></tr>`).join('')}</tbody></table>`;
+          <td class="r hide-m small">${mb(s.size)}</td><td class="r hide-m small when">${fechaHora(s.added)}</td></tr>`).join('')}</tbody></table>`;
     }
     $('c-list').onclick = e => {
+      // Casillas: seleccionar sin abrir la ficha
+      const ck = e.target.closest('td.ck, th.ck');
+      if (ck) {
+        const all = e.target.closest('[data-all]');
+        if (all) { const ids = [...$('c-list').querySelectorAll('tr[data-id]')].map(r => r.dataset.id); ids.forEach(id => all.checked ? picked.add(id) : picked.delete(id)); return draw(); }
+        const tr = ck.closest('tr[data-id]'); if (!tr) return;
+        const box = tr.querySelector('[data-pick]'); if (e.target !== box) box.checked = !box.checked;
+        box.checked ? picked.add(tr.dataset.id) : picked.delete(tr.dataset.id);
+        return draw();
+      }
       const h = e.target.closest('th[data-s]');
       if (h) { sState.page = 1; if (sState.sort === h.dataset.s) sState.dir *= -1; else { sState.sort = h.dataset.s; sState.dir = ['plays', 'size', 'added', 'record', 'year', 'lufs'].includes(h.dataset.s) ? -1 : 1; } return draw(); }
       const tr = e.target.closest('tr[data-id]'); if (tr) location.hash = 'canciones/' + enc(tr.dataset.id);
@@ -334,7 +371,7 @@
           <dt>Tamaño</dt><dd>${mb(d.size)}</dd>
           <dt>Volumen</dt><dd>${d.volumen ? `igualado (antes ${d.volumen.antes_lufs.toFixed(1)} LUFS)` : 'original'}</dd>
         </dl>
-        <div class="row" style="margin-top:14px"><button class="btn sm" id="s-ren">Renombrar carpeta</button><button class="btn sm danger" id="s-ret">Retirar</button></div>
+        <div class="row" style="margin-top:14px"><button class="btn sm ${s.isNew ? 'dark' : ''}" id="s-nov">${s.isNew ? '★ Novedad · quitar' : '★ Marcar como novedad'}</button><button class="btn sm" id="s-ren">Renombrar carpeta</button><button class="btn sm danger" id="s-ret">Retirar</button></div>
       </div><div>
         <h2 class="sec" style="margin-top:0">Escuchar</h2>
         ${audioUrl ? `<audio id="s-audio" controls preload="metadata" src="${audioUrl}"></audio>` : '<p class="red-t">Sin audio</p>'}
@@ -362,6 +399,7 @@
     if ($('s-rest')) $('s-rest').onclick = () => act(api(`/songs/${enc(id)}/cover`, { method: 'POST', json: { restore: true } }), 'Portada anterior recuperada');
     if ($('s-p0')) $('s-p0').onclick = async () => { if (await ask('¿Poner a 0 las veces cantada?', esc(s.title))) act(api('/records/plays/' + enc(id), { method: 'DELETE' })); };
     if ($('s-r0')) $('s-r0').onclick = async () => { if (await ask('¿Borrar el récord de esta canción?', esc(s.title))) act(api('/records/song/' + enc(id), { method: 'DELETE' })); };
+    $('s-nov').onclick = () => act(api('/novedades', { method: 'POST', json: { ids: [id], on: !s.isNew } }), s.isNew ? 'Quitada de Novedades' : 'Marcada como novedad');
     $('s-ren').onclick = async () => { const to = await prompt2('Renombrar carpeta', 'Nombre nuevo de la carpeta', id); if (to && to !== id) try { const r = await api(`/songs/${enc(id)}/rename`, { method: 'POST', json: { to } }); toast('Renombrada'); location.hash = 'canciones/' + enc(r.id); } catch (e) { fail(e); } };
     $('s-ret').onclick = async () => { if (await ask(`¿Retirar «${s.title}»?`, 'Deja de salir en el juego. Se guarda en «Retiradas» y se puede restaurar.', 'Retirar')) try { await api(`/songs/${enc(id)}/retire`, { method: 'POST', json: {} }); toast('Retirada'); location.hash = 'canciones'; } catch (e) { fail(e); } };
     const parseT = t => { const m = String(t).trim().match(/^(\d+):(\d{1,2}(?:\.\d+)?)$|^(\d+(?:\.\d+)?)$/); return m ? Math.round((m[3] ? +m[3] : +m[1] * 60 + +m[2]) * 1000) : NaN; };
