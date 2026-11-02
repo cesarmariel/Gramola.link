@@ -674,6 +674,18 @@ module.exports = function admin(ctx) {
     ev('songs', `Publicada: «${id}»${b.novedad !== false ? ' (en Novedades)' : ''}`);
     json(res, 200, { ok: true, id });
   });
+  // Volver a encajar (canción en preparación): se reutilizan su audio y su letra con el método actual
+  on('POST', '/songs/([^/]+)/reencajar', (req, res, m) => {
+    const id = decodeURIComponent(m[1]), dir = songDir(id);
+    if (!fs.existsSync(path.join(dir, 'borrador.json'))) throw httpErr(400, 'Solo se pueden volver a encajar las canciones en preparación');
+    const j = jobsAll().find(x => x.kind === 'crear' && x.song === id && fs.existsSync(jobPath(x.id, 'entrada.mp3')) && fs.existsSync(jobPath(x.id, 'letra.txt')));
+    if (!j) throw httpErr(404, 'No se encuentran el audio y la letra con los que se creó');
+    if (['pendiente', 'procesando'].includes(j.state)) return json(res, 200, j);
+    Object.assign(j, { state: 'pendiente', reencajar: true, progress: 0, msg: '', error: null });
+    jobPut(j);
+    ev('songs', `Volver a encajar pedido: «${id}»`);
+    json(res, 200, j);
+  });
   on('GET', '/preparacion', (req, res) => {
     const l = ctx.scanSongs(true).filter(s => s.draft).map(s => {
       const dir = path.join(SONGS_DIR, s.id), b = readJson(path.join(dir, 'borrador.json'), {});
@@ -1009,6 +1021,23 @@ module.exports = function admin(ctx) {
       const dir = songDir(j.song);
       for (const f of ['voz.mp3', 'voz-tono.json']) if (fs.existsSync(src(f))) fs.copyFileSync(src(f), path.join(dir, f));
       ev('songs', `Voz analizada: «${j.song}»`);
+      return;
+    }
+    // Volver a encajar una canción que sigue en preparación: mismas carpeta y portada; la versión anterior se guarda
+    if (j.reencajar && j.song && fs.existsSync(path.join(SONGS_DIR, j.song, 'borrador.json'))) {
+      const dir = path.join(SONGS_DIR, j.song), f = chartFile(dir), vd = verDir(j.song);
+      fs.mkdirSync(vd, { recursive: true });
+      fs.copyFileSync(path.join(dir, f), path.join(vd, new Date().toISOString().replace(/[:.]/g, '-') + '-antes-de-reencajar.txt'));
+      // la cabecera de la canción (portada, año, Megamix…) se conserva; solo cambian GAP, BPM y las notas
+      const nuevo = readText(src('cancion.txt')), viejo = readText(path.join(dir, f));
+      const cab = viejo.split(/\r?\n/).filter(l => /^#/.test(l) && !/^#(GAP|BPM|RELATIVE):/i.test(l));
+      const de = nuevo.split(/\r?\n/), cuerpo = de.filter(l => !/^#/.test(l)), gb = de.filter(l => /^#(GAP|BPM):/i.test(l));
+      fs.writeFileSync(path.join(dir, f), [...cab, ...gb, ...cuerpo].join('\r\n'), 'utf8');
+      for (const x of ['voz.mp3', 'voz-tono.json']) if (fs.existsSync(src(x))) fs.copyFileSync(src(x), path.join(dir, x));
+      j.reencajar = false;
+      ctx.songsChanged();
+      ev('songs', `Vuelta a encajar: «${j.song}» (la versión anterior está en Versiones)`);
+      py('import megamix; print(megamix.preparar(d, forzar=True, auto=True))', dir).catch(() => {});
       return;
     }
     const folder = fs.existsSync(path.join(SONGS_DIR, j.folder)) ? folderFor(j.artista, j.titulo) : j.folder;

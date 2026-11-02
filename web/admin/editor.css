@@ -41,3 +41,27 @@
 .ed-pv-tv { position: relative; aspect-ratio: 16 / 9; background: #000; }
 .ed-pv-tv iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 .ed-pv-load { position: absolute; inset: 0; display: grid; place-items: center; color: #9b9797; font-weight: 600; }
+
+/* Modo sencillo: frases a la izquierda, la frase grande con sus palabras y botones */
+.ed-main { display: grid; grid-template-columns: 1fr; gap: 14px; }
+.ed.sencillo .ed-main { grid-template-columns: 300px minmax(0, 1fr); }
+.ed .smp { display: none; }
+.ed.sencillo .smp { display: block; }
+.ed.sencillo .adv, .ed.sencillo .adv-g { display: none; }
+.ed-right { min-width: 0; }
+.ed-sl { max-height: 640px; overflow: auto; border: 2px solid var(--ink); background: var(--paper); }
+.ed-sp { padding: 8px 10px; border-bottom: 1px solid var(--n2); cursor: pointer; font-size: 14px; line-height: 1.3; }
+.ed-sp .mono { display: block; font-size: 11px; color: var(--n7); }
+.ed-sp:hover { background: var(--n1); }
+.ed-sp.on { background: var(--ink); color: #fff; } .ed-sp.on .mono { color: #bbb; }
+.ed-star { color: var(--gold, #e8a900); }
+.ed-sh { border: 2px solid var(--ink); border-bottom: 0; background: var(--paper); padding: 10px 12px; }
+.ed-sh .row { gap: 6px; }
+.ed-words { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.ed-w { border: 2px solid var(--ink); background: #fff; font: 800 20px/1.1 Archivo, sans-serif; padding: 6px 10px; cursor: pointer; }
+.ed-w:hover { background: var(--n1); }
+.ed-w.oro { background: #e8a900; border-color: #e8a900; }
+.ed-w.sel { outline: 3px solid var(--red); outline-offset: 1px; }
+.ed-sb { border: 2px solid var(--ink); border-top: 0; background: var(--paper); padding: 10px 12px; min-height: 52px; }
+.ed-sb .row { gap: 6px; }
+@media (max-width: 1100px) { .ed.sencillo .ed-main { grid-template-columns: 1fr; } .ed-sl { max-height: 220px; } }

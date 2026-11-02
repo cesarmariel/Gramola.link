@@ -2,6 +2,12 @@
 
 Versiones con el esquema `1.AA.MMDD.HHMM` (fecha y hora del despliegue).
 
+## 1.26.1102.1303
+- **Editor en modo sencillo** (por defecto): lista de frases; al elegir una, se ve solo ese fragmento con cada sílaba como un bloque con su texto; palabras de la frase como botones; escuchar la frase (en bucle si se quiere), moverla, alargarla o acortarla; alargar, acortar, subir o bajar cada sílaba; **palabras doradas** con un clic. El modo avanzado (línea de tiempo completa) sigue disponible.
+- **Notas largas**: el encaje alarga cada sílaba mientras suena la voz (energía de la voz separada + tono, sin cortar en respiraciones), recoloca sílabas que el alineador estiraba sobre los solos y solo parte una nota larga si la melodía cambia de verdad: el **vibrato** ya no la trocea y los saltos de octava del detector se corrigen. En «Volcán»: notas sobre la voz real del 77 % al 90 %, notas donde no se canta del 19 % al 2 %, sin notas de 25 s, y 106 notas largas enteras (antes 80).
+- **Volver a encajar** las canciones en preparación con el método actual (lo editado queda en Versiones).
+- Arreglado: al cerrar «Ver en el juego» seguía sonando de fondo; y el botón «Ver en el juego» compartía identificador con el selector de versiones.
+
 ## 1.26.1102.1242
 - Móvil: el micro **solo funciona con la app instalada** (PWA). En el navegador solo se ve cómo instalarla (sin «Seguir sin instalar») y, si se llega por el QR, el código de la sala para entrar desde la app. Fuera el atajo de pruebas `?pwa=1`.
 - Al reabrir la app durante una partida, vuelve a su sala con su color; si la sala ya no existe, va a escanear el QR sin avisos de error.

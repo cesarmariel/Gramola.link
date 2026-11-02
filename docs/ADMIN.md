@@ -39,6 +39,18 @@ Las estadísticas por día se guardan en `data/stats.json` (último año).
 
 Desde la ficha, **«✎ Abrir en el editor»** (`#editor/<carpeta>`). Edita el mismo `.txt` que lee la tele.
 
+**Modo sencillo** (el de por defecto; «Modo avanzado» lleva a la línea de tiempo completa de abajo):
+- a la izquierda, la lista de frases (★ si tiene palabras doradas); al hacer clic, la frase llena el lienzo con cada
+  sílaba como un bloque con su texto, a la altura de su nota, sobre la curva de la voz real;
+- arriba, las **palabras de la frase como botones**: un clic elige sus sílabas; **★ Dorada** las marca (dan más puntos)
+  y se ven en amarillo;
+- toda la frase: «▶ Escuchar la frase» (con «Repetir frase», en bucle), anterior/siguiente (o ← →), antes/después
+  (~50 ms), más corta/más larga (5 %) y «Ver en el juego desde aquí»;
+- la sílaba o palabra elegida: acortar, alargar (sin pisar la siguiente), subir/bajar tono, mover, dorada; los bordes
+  de los bloques también se arrastran.
+- Las canciones en preparación tienen **«Volver a encajar»**: rehace las notas desde su audio y su letra con el método
+  actual (lo editado queda en Versiones).
+
 - **Línea de tiempo**: notas a la altura de su tono, con la sílaba debajo; cortes de frase (líneas rojas, se arrastran);
   forma de onda de la canción o de **la voz sola**; **curva del tono de la voz real** (azul) si la canción está analizada;
   minimapa de toda la canción; regla en segundos.

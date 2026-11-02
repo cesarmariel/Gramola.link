@@ -97,17 +97,20 @@
     let ti = 0;                               // pista que se edita (dúos)
     const T = () => doc.tracks[ti];
 
-    view.innerHTML = `<div class="ed">
+    let modo = (() => { try { return localStorage.getItem('ed-modo') || 'sencillo'; } catch { return 'sencillo'; } })();
+    let cur = 0, finFrase = null;   // modo sencillo: frase elegida y fin de la escucha de la frase
+    view.innerHTML = `<div class="ed ${modo}">
       <div class="ed-top">
         <button class="btn ghost sm" data-go="${data.draft ? 'creacion' : 'canciones/' + esc(encodeURIComponent(id))}">← ${data.draft ? 'Creación' : 'Ficha'}</button>
         <div class="ed-title"><b>${esc(hv('TITLE') || id)}</b> <span>${esc(hv('ARTIST') || '')}</span></div>
         <span class="ed-dirty" id="ed-dirty" hidden>sin guardar</span>
         ${data.draft ? '<span class="badge warn" id="ed-draft">sin publicar · no sale en la tele</span>' : ''}
         <span class="grow"></span>
+        <button class="btn sm" id="ed-modo">${modo === 'sencillo' ? 'Modo avanzado' : 'Modo sencillo'}</button>
         <select class="inp sm" id="ed-ver" title="Versiones guardadas"><option value="">Versiones…</option></select>
         <button class="btn sm" id="ed-undo" title="⌘Z">Deshacer</button><button class="btn sm" id="ed-redo" title="⇧⌘Z">Rehacer</button>
         <button class="btn ${data.draft ? '' : 'red'}" id="ed-save">Guardar (⌘S)</button>
-        ${data.draft ? '<button class="btn red" id="ed-pub" title="Guarda los cambios y la pone en la tele (en Novedades)">Publicar</button>' : ''}
+        ${data.draft ? '<button class="btn sm" id="ed-reenc" title="Rehacer las notas desde el audio y la letra (lo actual queda en Versiones)">Volver a encajar</button><button class="btn red" id="ed-pub" title="Guarda los cambios y la pone en la tele (en Novedades)">Publicar</button>' : ''}
       </div>
       <div class="ed-bar">
         <button class="btn dark" id="ed-play" title="Espacio">▶</button>
@@ -115,25 +118,32 @@
         <select class="inp sm" id="ed-rate" title="Velocidad"><option value="1">1×</option><option value="0.75">0,75×</option><option value="0.5">0,5×</option></select>
         <label class="ed-ck"><input type="checkbox" id="ed-guide"> Tono guía</label>
         <label class="ed-ck"><input type="checkbox" id="ed-loop"> Repetir frase</label>
-        <label class="ed-ck"><input type="checkbox" id="ed-mic"> Probar con micro</label>
-        <button class="btn sm dark" id="ed-ver" title="La canción tal como está ahora, en la app de la tele">▶ Ver en el juego</button>
-        <span class="ed-sep"></span>
+        <label class="ed-ck adv"><input type="checkbox" id="ed-mic"> Probar con micro</label>
+        <button class="btn sm dark adv" id="ed-juego" title="La canción tal como está ahora, en la app de la tele">▶ Ver en el juego</button>
+        <span class="ed-sep adv"></span><span class="adv-g">
         <span class="small muted">GAP</span><button class="btn sm ghost" data-gap="-50">−50</button><button class="btn sm ghost" data-gap="-10">−10</button>
         <input class="inp sm mono" id="ed-gap" size="7"><button class="btn sm ghost" data-gap="10">+10</button><button class="btn sm ghost" data-gap="50">+50</button>
         <span class="small muted">BPM <b class="mono" id="ed-bpm"></b></span>
         <select class="inp sm" id="ed-tools" title="Herramientas de tiempos"><option value="">Tiempos…</option><option value="shift">Desplazar desde el cursor…</option><option value="stretch">Estirar o encoger la selección…</option><option value="bpm">Cambiar el BPM (sin mover nada)…</option></select>
-        ${doc.tracks.length > 1 ? `<select class="inp sm" id="ed-track">${doc.tracks.map((t, i) => `<option value="${i}">Voz ${i + 1}</option>`).join('')}</select>` : ''}
+        </span>${doc.tracks.length > 1 ? `<select class="inp sm" id="ed-track">${doc.tracks.map((t, i) => `<option value="${i}">Voz ${i + 1}</option>`).join('')}</select>` : ''}
         <span class="grow"></span>
-        <span class="small muted">Zoom</span><input type="range" id="ed-zoom" min="0" max="100" value="45">
+        <span class="adv-g"><span class="small muted">Zoom</span><input type="range" id="ed-zoom" min="0" max="100" value="45"></span>
         <label class="ed-ck"><input type="checkbox" id="ed-wv" ${data.vocals ? 'checked' : 'disabled'}> Voz sola</label>
       </div>
-      <canvas id="ed-mini" class="ed-mini" height="34"></canvas>
-      <div class="ed-wrap" id="ed-wrap"><canvas id="ed-cv"></canvas></div>
+      <div class="ed-main">
+        <div class="ed-sl smp" id="ed-sl"></div>
+        <div class="ed-right">
+          <div class="ed-sh smp" id="ed-sh"></div>
+          <canvas id="ed-mini" class="ed-mini adv" height="34"></canvas>
+          <div class="ed-wrap" id="ed-wrap"><canvas id="ed-cv"></canvas></div>
+          <div class="ed-sb smp" id="ed-sb"></div>
+        </div>
+      </div>
       <div class="ed-under">
         <div class="ed-kara" id="ed-kara"></div>
         <div class="ed-info" id="ed-info"></div>
       </div>
-      <div class="ed-low">
+      <div class="ed-low adv">
         <div><h2 class="sec" style="margin-top:6px">Frases</h2><div class="ed-phr" id="ed-phr"></div></div>
         <div><h2 class="sec" style="margin-top:6px">Atajos</h2><div class="ed-help">
           <b>Clic</b> elegir · <b>⇧ clic</b> añadir · <b>arrastrar fondo</b> elegir varias · <b>arrastrar nota</b> mover (tiempo y tono) · <b>bordes</b> alargar o acortar ·
@@ -204,9 +214,22 @@
     // ---------------- dibujo
     let raf = 0;
     function draw() { if (!raf) raf = requestAnimationFrame(paint); }
+    const sencillo = () => modo === 'sencillo';
+    const frases = () => phrasesOf(T());
+    function encuadre() {
+      // Modo sencillo: la frase elegida ocupa el lienzo (tiempo y tonos de sus notas)
+      const ph = frases(); if (!ph.length) return;
+      cur = clamp(cur, 0, ph.length - 1);
+      const p = ph[cur], a = b2ms(p.start) - 700, b = b2ms(p.end) + 700;
+      pxPerMs = W / Math.max(1000, b - a); viewMs = a;
+      const ps = p.notes.map(n => n.p);
+      pMin = Math.min(...ps) - 2; pMax = Math.max(...ps) + 2;
+      if (pMax - pMin < 9) { const c = (pMin + pMax) / 2; pMin = Math.floor(c - 4.5); pMax = Math.ceil(c + 4.5); }
+    }
     function paint() {
       raf = 0;
       const now = audio.currentTime * 1000;
+      if (sencillo()) encuadre();
       cx.clearRect(0, 0, W, H);
       cx.fillStyle = '#fff'; cx.fillRect(0, 0, W, H);
       // filas de tono
@@ -302,6 +325,16 @@
       if (n.t === 'F') { cx.setLineDash([3, 3]); cx.strokeStyle = INK; cx.strokeRect(x + .5, y + .5, w - 1, h - 1); cx.setLineDash([]); cx.globalAlpha = .5; cx.fillRect(x, y, w, h); cx.globalAlpha = 1; }
       else cx.fillRect(x, y, w, h);
       if (playing && !on) { cx.strokeStyle = RED; cx.lineWidth = 2; cx.strokeRect(x + 1, y + 1, w - 2, h - 2); cx.lineWidth = 1; }
+      if (sencillo()) {
+        const s = n.s.trim() || '·';
+        cx.font = '800 15px Archivo, sans-serif';
+        const tw = cx.measureText(s).width;
+        if (tw + 8 < w && h >= 18) { cx.fillStyle = n.t === '*' || n.t === 'G' ? INK : '#fff'; cx.fillText(s, x + 4, y + h / 2 + 5); }
+        else { cx.fillStyle = INK; cx.fillText(s, x + 2, y + h + 16); }
+        // asas para alargar o acortar (bordes)
+        if (on) { cx.fillStyle = '#fff'; cx.fillRect(x + 1, y + h / 2 - 7, 3, 14); cx.fillRect(x + w - 4, y + h / 2 - 7, 3, 14); }
+        return;
+      }
       if (w > 14) {
         cx.font = '600 12px Archivo, sans-serif'; cx.fillStyle = INK;
         const s = n.s.replace(/^ /, '·');
@@ -416,6 +449,7 @@
     });
     cv.addEventListener('wheel', e => {
       e.preventDefault();
+      if (sencillo()) return;
       if (e.metaKey || e.ctrlKey) {
         const { x } = at(e), at0 = msOf(x);
         const z = clamp(+$('#ed-zoom').value + (e.deltaY < 0 ? 3 : -3), 0, 100); $('#ed-zoom').value = z; pxPerMs = zoomFrom(z);
@@ -451,6 +485,7 @@
       if (k === ' ') { e.preventDefault(); return toggle(); }
       if (k === 'Home') { e.preventDefault(); return seek(Math.max(0, b2ms(T().notes[0] ? T().notes[0].b : 0) - 2000)); }
       if (k === 'Escape') { sel.clear(); return refresh(); }
+      if (!S.length && sencillo() && (k === 'ArrowLeft' || k === 'ArrowRight')) { e.preventDefault(); return irFrase(cur + (k === 'ArrowLeft' ? -1 : 1)); }
       if (!S.length) return;
       if (k === 'ArrowLeft' || k === 'ArrowRight') {
         const d = (k === 'ArrowLeft' ? -1 : 1) * (e.shiftKey ? 10 : 1);
@@ -514,9 +549,17 @@
       if (!cv.isConnected) return cleanup();
       if (!audio.paused) {
         const now = audio.currentTime * 1000;
-        if (now > msOf(W * 0.85)) viewMs = now - W / pxPerMs * 0.15;
+        if (!sencillo() && now > msOf(W * 0.85)) viewMs = now - W / pxPerMs * 0.15;
         const n = curNote(now); if (n !== lastGuide) { guide(n); lastGuide = n; }
         if (loopPh && ms2b(now) > loopPh.end + 4) { audio.currentTime = Math.max(0, b2ms(loopPh.start) / 1000 - 1); micTrace = []; }
+        if (finFrase != null && now > finFrase.fin) {
+          if ($('#ed-loop').checked) audio.currentTime = finFrase.ini / 1000; else { audio.pause(); finFrase = null; }
+        }
+        // Modo sencillo reproduciendo la canción: la frase que suena pasa a ser la elegida
+        if (sencillo() && finFrase == null) {
+          const b = ms2b(now), ph = frases(), k = ph.findIndex(p => b < p.end + 2);
+          if (k >= 0 && k !== cur && b >= ph[k].start - 8) { cur = k; panelSencillo(); }
+        }
         draw();
       }
       requestAnimationFrame(tick);
@@ -582,7 +625,94 @@
       const p = phrasesOf(T())[+d.dataset.i]; sel = new Set(p.notes);
       viewMs = b2ms(p.start) - 1500; audio.currentTime = Math.max(0, (b2ms(p.start) - 1000) / 1000); refresh();
     };
-    function refresh() { $('#ed-gap').value = Math.round(gap); $('#ed-bpm').textContent = bpm; info(); phrasesPanel(); draw(); }
+    function refresh() { $('#ed-gap').value = Math.round(gap); $('#ed-bpm').textContent = bpm; info(); phrasesPanel(); if (sencillo()) panelSencillo(); draw(); }
+
+    // ---------------- modo sencillo: frases a la izquierda, la frase grande con sus palabras y botones
+    const esOro = n => n.t === '*' || n.t === 'G';
+    function palabrasDe(p) {
+      const out = [];
+      for (const n of p.notes) {
+        if (!out.length || /^\s/.test(n.s)) out.push({ txt: '', notas: [] });
+        const w = out[out.length - 1]; w.notas.push(n); w.txt += n.s.replace(/~/g, '');
+      }
+      return out.map(w => ({ ...w, txt: w.txt.trim() || '…', oro: w.notas.every(esOro) }));
+    }
+    function panelSencillo() {
+      const ph = frases(); if (!ph.length) return;
+      cur = clamp(cur, 0, ph.length - 1);
+      const p = ph[cur];
+      $('#ed-sl').innerHTML = ph.map((q, i) => `<div class="ed-sp ${i === cur ? 'on' : ''}" data-f="${i}"><span class="mono">${fmt(b2ms(q.start)).replace(/\.\d+$/, '')}</span>${esc(q.notes.map(n => n.s).join('').replace(/~/g, '').trim() || '—')}${q.notes.some(esOro) ? ' <span class="ed-star">★</span>' : ''}</div>`).join('');
+      const on = $('#ed-sl .on'); if (on && !panelSencillo.noScroll) on.scrollIntoView({ block: 'nearest' });
+      $('#ed-sh').innerHTML = `<div class="row"><span class="kicker">Frase ${cur + 1} de ${ph.length}</span><span class="small muted mono">${fmt(b2ms(p.start))} – ${fmt(b2ms(p.end))}</span><span class="grow"></span>
+          <button class="btn sm" data-s="prev">◀ Anterior</button><button class="btn sm dark" data-s="play">▶ Escuchar la frase</button><button class="btn sm" data-s="next">Siguiente ▶</button></div>
+        <div class="ed-words">${palabrasDe(p).map((w, i) => `<button class="ed-w ${w.oro ? 'oro' : ''} ${w.notas.every(n => sel.has(n)) ? 'sel' : ''}" data-w="${i}" title="Elegir la palabra">${esc(w.txt)}</button>`).join('')}</div>
+        <div class="row small"><span class="muted">Toda la frase:</span><button class="btn sm" data-s="antes">⟵ Antes</button><button class="btn sm" data-s="despues">Después ⟶</button>
+          <button class="btn sm" data-s="corta">Más corta</button><button class="btn sm" data-s="larga">Más larga</button><button class="btn sm dark" data-s="juego">▶ Ver en el juego desde aquí</button></div>`;
+      const S = [...sel].sort((a, b) => a.b - b.b);
+      $('#ed-sb').innerHTML = S.length
+        ? `<div class="row"><b>«${esc(S.map(n => n.s).join('').replace(/~/g, '').trim())}»</b><span class="small muted">${S.length === 1 ? noteName(S[0].p) + ' · ' + Math.round(S[0].l * beatMs()) + ' ms' : S.length + ' sílabas'}</span><span class="grow"></span>
+            <button class="btn sm" data-n="acortar">Acortar</button><button class="btn sm" data-n="alargar">Alargar</button>
+            <button class="btn sm" data-n="bajar">Bajar tono</button><button class="btn sm" data-n="subir">Subir tono</button>
+            <button class="btn sm" data-n="antes">⟵</button><button class="btn sm" data-n="despues">⟶</button>
+            <button class="btn sm ${S.every(esOro) ? 'red' : ''}" data-n="oro">★ Dorada${S.every(esOro) ? ' (quitar)' : ''}</button></div>`
+        : '<p class="small muted" style="margin:0">Haz clic en una sílaba (o en una palabra de arriba) para retocarla: alargar, acortar, tono o dorada. También puedes arrastrar sus bordes con el ratón.</p>';
+    }
+    function irFrase(i, escuchar) {
+      const ph = frases(); if (!ph.length) return;
+      cur = clamp(i, 0, ph.length - 1); sel.clear(); finFrase = null;
+      audio.pause(); audio.currentTime = Math.max(0, (b2ms(ph[cur].start) - 600) / 1000);
+      refresh(); if (escuchar) escucharFrase();
+    }
+    async function escucharFrase() {
+      const p = frases()[cur]; if (!p) return;
+      await actx.resume();
+      const ini = Math.max(0, b2ms(p.start) - 600);
+      finFrase = { ini, fin: b2ms(p.end) + 500 };
+      audio.currentTime = ini / 1000; audio.playbackRate = +$('#ed-rate').value;
+      await audio.play(); $('#ed-play').textContent = '❚❚'; draw();
+    }
+    const paso = () => Math.max(1, Math.round(50 / beatMs()));   // ~50 ms
+    function cambiar(fn) { push(); fn(); T().notes.sort((a, b) => a.b - b.b); refresh(); }
+    $('#ed-sl').onclick = e => { const d = e.target.closest('[data-f]'); if (d) { panelSencillo.noScroll = true; irFrase(+d.dataset.f); panelSencillo.noScroll = false; } };
+    $('#ed-sh').onclick = e => {
+      const w = e.target.closest('[data-w]');
+      if (w) { const pw = palabrasDe(frases()[cur])[+w.dataset.w]; sel = new Set(pw.notas); return refresh(); }
+      const b = e.target.closest('[data-s]'); if (!b) return;
+      const a = b.dataset.s, p = frases()[cur];
+      if (a === 'prev' || a === 'next') return irFrase(cur + (a === 'prev' ? -1 : 1));
+      if (a === 'play') return audio.paused ? escucharFrase() : (audio.pause(), (finFrase = null));
+      if (a === 'juego') return verEnJuego(b2ms(p.start));
+      const d = paso();
+      if (a === 'antes' || a === 'despues') return cambiar(() => { const s = a === 'antes' ? -d : d; for (const n of p.notes) n.b += s; T().breaks = T().breaks.map(x => (x > p.start - 1 && x <= p.end + 1 ? x + s : x)); });
+      if (a === 'corta' || a === 'larga') return cambiar(() => {
+        const k = a === 'larga' ? 1.05 : 0.95, a0 = p.start;
+        for (const n of p.notes) { const e2 = n.b + n.l; n.b = a0 + Math.round((n.b - a0) * k); n.l = Math.max(1, Math.round(a0 + (e2 - a0) * k) - n.b); }
+      });
+    };
+    $('#ed-sb').onclick = e => {
+      const b = e.target.closest('[data-n]'); if (!b) return;
+      const S = [...sel].sort((a, b2) => a.b - b2.b), d = paso(), a = b.dataset.n;
+      const sig = n => T().notes.filter(x => x !== n && x.b >= n.b && !sel.has(x)).sort((x, y) => x.b - y.b)[0];
+      cambiar(() => {
+        for (const n of S) {
+          if (a === 'alargar') { const nx = sig(n); n.l = nx ? Math.max(n.l, Math.min(n.l + d, nx.b - n.b)) : n.l + d; }
+          if (a === 'acortar') n.l = Math.max(1, n.l - d);
+          if (a === 'subir') n.p += 1;
+          if (a === 'bajar') n.p -= 1;
+          if (a === 'antes') n.b -= d;
+          if (a === 'despues') n.b += d;
+        }
+        if (a === 'oro') { const todas = S.every(esOro); for (const n of S) n.t = todas ? (n.t === 'G' ? 'R' : ':') : (n.t === 'R' ? 'G' : '*'); }
+      });
+    };
+    $('#ed-modo').onclick = () => {
+      modo = sencillo() ? 'avanzado' : 'sencillo';
+      try { localStorage.setItem('ed-modo', modo); } catch {}
+      view.querySelector('.ed').classList.toggle('sencillo', sencillo()); view.querySelector('.ed').classList.toggle('avanzado', !sencillo());
+      $('#ed-modo').textContent = sencillo() ? 'Modo avanzado' : 'Modo sencillo';
+      if (!sencillo()) { range(); pxPerMs = zoomFrom(+$('#ed-zoom').value); viewMs = Math.max(-500, b2ms(frases()[cur] ? frases()[cur].start : 0) - 1500); }
+      sel.clear(); resize(); refresh();
+    };
     // GAP
     const setGap = v => { push(); gap = Math.round(v); setHead('GAP', gap); refresh(); };
     view.querySelectorAll('[data-gap]').forEach(b => (b.onclick = () => setGap(gap + +b.dataset.gap)));
@@ -606,6 +736,10 @@
       } catch (e) { fail(e); }
     }
     $('#ed-save').onclick = save;
+    if ($('#ed-reenc')) $('#ed-reenc').onclick = async () => {
+      if (!confirm('¿Volver a encajar la letra? Se rehacen las notas desde el audio y la letra (unos 5 minutos). Lo actual queda en Versiones.')) return;
+      try { if (dirty) await save(); const j = await api('/songs/' + encodeURIComponent(id) + '/reencajar', { method: 'POST', json: {} }); setDirty(false); location.hash = 'preparando/' + j.id; } catch (e) { fail(e); }
+    };
     if ($('#ed-pub')) $('#ed-pub').onclick = async () => {
       if (!confirm('¿Publicarla? Saldrá en la tele, en Novedades.')) return;
       try {
@@ -677,6 +811,8 @@
 
     // ---------------- ver en el juego (la app de la tele, en una ventana)
     let pv = null;
+    // Al cerrar, la ventana se destruye entera (con su audio): nada se queda sonando de fondo
+    function cerrarPv() { if (!pv) return; try { pv.querySelector('iframe').src = 'about:blank'; } catch {} pv.remove(); pv = null; }
     function verEnJuego(desdeMs) {
       audio.pause();
       if (!pv) {
@@ -689,7 +825,7 @@
         pv.onclick = e => {
           const b = e.target.closest('[data-pv]'); if (!b) return;
           const a = b.dataset.pv, f = pv.querySelector('iframe').contentWindow;
-          if (a === 'x') { f.postMessage({ type: 'gramola-preview-stop' }, location.origin); pv.hidden = true; return; }
+          if (a === 'x') { cerrarPv(); return; }
           if (a === 'pausa') { pv.paused = !pv.paused; b.textContent = pv.paused ? 'Seguir' : 'Pausa'; f.postMessage({ type: 'gramola-preview-pause', paused: pv.paused }, location.origin); return; }
           enviar(a === 'ini' ? 0 : pv.desde);
         };
@@ -708,7 +844,7 @@
       if (e.data && e.data.type === 'gramola-preview-error') toast(e.data.msg, true);
     };
     addEventListener('message', onPv);
-    $('#ed-ver').onclick = () => verEnJuego(audio.currentTime * 1000);
+    $('#ed-juego').onclick = () => verEnJuego(audio.currentTime * 1000);
     if (opts.verAlAbrir) setTimeout(() => verEnJuego(0), 300);
     if (doc.wasRelative) toast('La canción venía en formato relativo: se guardará en formato normal');
 
@@ -716,7 +852,7 @@
     function cleanup() {
       if (cleaned) return; cleaned = true;
       removeEventListener('keydown', onKey); removeEventListener('mousemove', onMove); removeEventListener('mouseup', onUp); removeEventListener('beforeunload', onLeave);
-      removeEventListener('message', onPv); if (pv) pv.remove();
+      removeEventListener('message', onPv); cerrarPv();
       ro.disconnect(); audio.pause(); audio.src = ''; stopMic(); if (mic) mic.st.getTracks().forEach(t => t.stop()); actx.close().catch(() => {});
     }
     // Al salir del editor (cambio de apartado) se para todo

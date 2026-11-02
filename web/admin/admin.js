@@ -688,6 +688,7 @@ Las líneas vacías no cuentan."></textarea>
       const id = b.dataset.j, a = b.dataset.a;
       try {
         if (a === 'cont') { const d = await api('/jobs'); const j = d.jobs.find(x => x.id === id); if (j) continuarBorrador(j); return; }
+        if (a === 'reencajar') { if (await ask('¿Volver a encajar la letra?', 'Se rehacen las notas desde el audio y la letra (unos 5 minutos). Lo que hayas editado queda guardado en Versiones por si quieres recuperarlo.', 'Volver a encajar', false)) { const j = await api(`/songs/${enc(id)}/reencajar`, { method: 'POST', json: {} }); location.hash = 'preparando/' + j.id; } return; }
         if (a === 'pub') { const nid = await publicar(id); if (nid) toast('Publicada: ya sale en la tele, en Novedades'); draw.firmaP = null; return draw(); }
         if (a === 'descartar') { if (await ask('¿Descartar esta canción?', 'Pasa a Retiradas (se puede recuperar desde Canciones → Retiradas).', 'Descartar')) { await api(`/songs/${enc(id)}/retire`, { method: 'POST', json: {} }); toast('Descartada'); draw.firmaP = null; } return draw(); }
         if (a === 'retry') await api(`/jobs/${id}/retry`, { method: 'POST', json: {} });
@@ -715,7 +716,7 @@ Las líneas vacías no cuentan."></textarea>
         $('j-p').innerHTML = prep.length ? `<table class="tbl"><tbody>${prep.map(s => `<tr><td style="width:64px"><img class="cov" style="width:52px;height:52px" src="${esc(cover(s))}" alt=""></td>
           <td><div class="t-title">${esc(s.title)}</div><div class="t-art">${esc(s.artist)}${s.year ? ' (' + s.year + ')' : ''} · ${s.duration ? mmss(s.duration) : ''} · ${nf(s.notes)} notas</div>${s.dup ? `<div class="small red-t">Ya hay otra igual publicada: ${esc(s.dup)} (al publicar podrás sustituirla)</div>` : ''}</td>
           <td class="small muted">Creada ${ago(s.creada)}<br>${s.editada ? `Editada (${s.editada} versiones)` : '<span class="red-t">Sin revisar</span>'}</td>
-          <td class="r"><a class="btn sm dark" href="#editor/${enc(s.id)}">✎ Editar</a> <a class="btn sm" href="#editor/${enc(s.id)}/ver">▶ Ver en el juego</a> <button class="btn sm red" data-j="${esc(s.id)}" data-a="pub">Publicar</button> <button class="btn sm danger" data-j="${esc(s.id)}" data-a="descartar">Descartar</button></td></tr>`).join('')}</tbody></table>`
+          <td class="r"><a class="btn sm dark" href="#editor/${enc(s.id)}">✎ Editar</a> <a class="btn sm" href="#editor/${enc(s.id)}/ver">▶ Ver en el juego</a> <button class="btn sm red" data-j="${esc(s.id)}" data-a="pub">Publicar</button> <button class="btn sm" data-j="${esc(s.id)}" data-a="reencajar" title="Rehacer las notas desde el audio y la letra con el método actual">Volver a encajar</button> <button class="btn sm danger" data-j="${esc(s.id)}" data-a="descartar">Descartar</button></td></tr>`).join('')}</tbody></table>`
           : '<div class="empty">Nada en preparación. Las canciones creadas aparecen aquí hasta que las publiques.</div>';
       }
       const bor = d.jobs.filter(j => j.state === 'borrador'), resto = d.jobs.filter(j => j.state !== 'borrador');

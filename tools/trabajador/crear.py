@@ -9,8 +9,13 @@ Pasos (todo en local, en el Mac):
   2. Mide el tono de la voz cada 10 ms con CREPE (pYIN de reserva) → voz-tono.json ([[ms, midi|null], …])
   3. (crear) Alinea la letra sobre la voz con el alineador forzado multilingüe MMS (wav2vec2): cada letra de la
      letra recibe su instante exacto. No transcribe: coloca el texto que se le da.
-  4. (crear) Parte las palabras en sílabas (pyphen, según el idioma), da a cada sílaba su inicio y su fin, y su
-     nota (mediana del tono cantado). Las sílabas largas que cambian de nota se parten en varias notas («~»).
+  4. (crear) Parte las palabras en sílabas (pyphen, según el idioma) y da a cada sílaba su inicio, su fin y su nota:
+     - el fin se alarga mientras suene la voz (energía de la voz separada + tono detectado, sin cortar en respiraciones
+       de menos de 0,12 s), así las NOTAS LARGAS quedan enteras hasta la siguiente sílaba o hasta que la voz calla;
+     - una sílaba que el alineador estiró sobre un silencio largo (un solo, una intro) se recoloca donde suena;
+     - la nota es el tono sostenido (sin el arranque, con los saltos de octava del detector corregidos);
+     - las sílabas largas solo se parten («~») si la melodía cambia de verdad: más de 1 semitono durante 0,25 s,
+       medido con una media de ~0,25 s para que el VIBRATO no cuente como cambio de nota.
   5. (crear) Escribe cancion.txt en formato UltraStar: una frase por línea de la letra.
 Requisitos: ver tools/trabajador/LEEME.md (torch y torchaudio 2.8, demucs, torchcrepe, librosa, pyphen, soundfile; ffmpeg).
 """
@@ -266,7 +271,52 @@ def silabas(palabra, idioma):
     return [x for x in partes if x]
 
 
-def construir(lineas, palabras, tiempos, t, midi, idioma):
+USA_VOZ = True
+
+
+def actividad(voz, n, sr=SR, paso=0.01):
+    """Cuándo suena la voz (energía de la voz separada cada 10 ms), con histéresis y sin huecos cortos."""
+    h = int(sr * paso)
+    m = len(voz) // h
+    e = np.sqrt(np.mean(voz[:m * h].reshape(m, h) ** 2, axis=1) + 1e-12)
+    db = 20 * np.log10(e)
+    ref = np.percentile(db, 95)
+    on, off = max(-48, ref - 26), max(-52, ref - 32)
+    act = np.zeros(m, bool)
+    s = False
+    for i, v in enumerate(db):
+        s = v > on if not s else v > off
+        act[i] = s
+    # huecos de menos de 120 ms (respiraciones, consonantes) no cortan
+    i = 0
+    while i < m:
+        if not act[i]:
+            j = i
+            while j < m and not act[j]:
+                j += 1
+            if 0 < i and j < m and (j - i) * paso < 0.12:
+                act[i:j] = True
+            i = j
+        else:
+            i += 1
+    out = np.zeros(n, bool)
+    out[:min(n, m)] = act[:min(n, m)]
+    return out
+
+
+def suavizar(midi, k=7):
+    """Mediana móvil que ignora los huecos (para que el vibrato y los saltos sueltos no cuenten)."""
+    out = np.full_like(midi, np.nan)
+    r = k // 2
+    for i in range(len(midi)):
+        w = midi[max(0, i - r):i + r + 1]
+        w = w[~np.isnan(w)]
+        if len(w) >= 2:
+            out[i] = np.median(w)
+    return out
+
+
+def construir(lineas, palabras, tiempos, t, midi, idioma, voz=None):
     """Notas: [{linea, ini, fin (s), texto, midi}]"""
     notas = []
     primera_de_linea = set()
@@ -289,72 +339,124 @@ def construir(lineas, palabras, tiempos, t, midi, idioma):
                     fin = b if fin is None else max(fin, b)
             pos += len(s)
             texto = ((' ' if k == 0 and id(p) not in primera_de_linea else '') + s)
-            if ini is None:   # sin letras alineables (números, signos): se pega a la sílaba anterior
+            if ini is None:
                 if notas and notas[-1]['linea'] == li:
                     notas[-1]['texto'] += texto
                 continue
             notas.append({'linea': li, 'ini': ini, 'fin': fin, 'texto': texto})
-    # Duraciones: hasta la siguiente sílaba si está cerca o mientras siga sonando la voz
-    sonando = ~np.isnan(midi)
+    # Cuándo suena la voz: energía de la voz separada (si la hay) o, si no, el tono detectado
+    paso = 0.01
+    con_tono = ~np.isnan(midi)
+    if voz is not None:
+        # Voz = energía de la voz separada Y tono detectado a menos de 0,15 s (los restos de orquesta no cuentan)
+        cerca = np.convolve(con_tono.astype(float), np.ones(31), 'same') > 0
+        suena = actividad(voz, len(t)) & cerca
+    else:
+        suena = con_tono
+    ms = suavizar(midi)
+    lento = suavizar(midi, 25)   # ~0,25 s: más que un ciclo de vibrato (4-7 por segundo), así el vibrato se compensa
+    # Sílabas que el alineador estiró sobre un silencio largo (un solo de guitarra, una intro): si arranca en silencio,
+    # se recoloca donde suena de verdad, justo antes de la siguiente; si arranca bien, se recorta al callarse la voz.
     for i, n in enumerate(notas):
-        sig = notas[i + 1]['ini'] if i + 1 < len(notas) else n['fin'] + 2
-        fin = max(n['fin'], n['ini'] + 0.12)
-        if sig - fin < 0.35:
-            fin = sig - 0.02
+        sig = notas[i + 1]['ini'] if i + 1 < len(notas) else n['fin']
+        a0, a1 = int(n['ini'] / paso), int(min(n['fin'], sig) / paso)
+        if a1 - a0 < 150 or suena[a0:a1].mean() >= 0.5:
+            continue
+        if not suena[a0:a0 + 30].any():
+            j = a1 - 1
+            while j > a0 and not suena[j]:
+                j -= 1
+            k = j
+            while k > a0 and suena[k - 1]:
+                k -= 1
+            if j > a0:
+                n['ini'], n['fin'] = max(k * paso, j * paso - 1.2), j * paso
         else:
-            j = np.searchsorted(t, fin)
-            while j < len(t) and t[j] < sig - 0.05 and sonando[j]:
+            j = a0
+            while j < a1 and suena[j]:
                 j += 1
-            fin = max(fin, t[min(j, len(t) - 1)])
-        n['fin'] = max(n['ini'] + 0.06, min(fin, sig - 0.02))
-    # Tono: mediana de lo cantado en la sílaba; las largas con cambios de nota estables se parten
-    out = []
-    ultimo = None
+            n['fin'] = max(n['ini'] + 0.12, j * paso)
+    # Fin de cada sílaba: se alarga mientras siga sonando la voz, hasta la siguiente sílaba (las notas largas, enteras)
+    for i, n in enumerate(notas):
+        sig = notas[i + 1]['ini'] if i + 1 < len(notas) else n['fin'] + 4
+        j = int(max(n['fin'], n['ini'] + 0.06) / paso)
+        while j < len(t) and j * paso < sig - 0.03 and suena[j]:
+            j += 1
+        fin = max(n['fin'], j * paso)
+        n['fin'] = max(n['ini'] + 0.08, min(fin, sig - 0.02))
+    # Tono: el que se sostiene (sin el arranque), y las notas largas solo se parten si el tono cambia de verdad
+    out, ultimo = [], None
     for n in notas:
-        sel = (t >= n['ini']) & (t < n['fin'])
-        m = midi[sel]
-        m = m[~np.isnan(m)]
-        if not len(m):
+        a = n['ini'] + min(0.06, (n['fin'] - n['ini']) * 0.2)
+        sel = (t >= a) & (t < n['fin'])
+        v = ms[sel]
+        v = v[~np.isnan(v)]
+        if not len(v):
             n['midi'] = ultimo if ultimo is not None else 60
             out.append(n)
             continue
-        n['midi'] = int(round(float(np.median(m))))
+        c0 = float(np.median(v))
+        v = c0 + ((v - c0 + 6) % 12) - 6
+        n['midi'] = int(round(float(np.median(v))))
         ultimo = n['midi']
-        seg = tramos(t[sel], midi[sel])
-        if n['fin'] - n['ini'] > 0.45 and len(seg) > 1:
-            for k, (a, b, p) in enumerate(seg):
-                out.append({'linea': n['linea'], 'ini': a, 'fin': b, 'texto': n['texto'] if k == 0 else '~', 'midi': p})
+        # Saltos de octava del detector: se llevan a la octava de la nota antes de decidir si cambia
+        vl = lento[sel].copy()
+        okv = ~np.isnan(vl)
+        vl[okv] = n['midi'] + ((vl[okv] - n['midi'] + 6) % 12) - 6
+        seg = tramos(t[sel], vl, umbral=1.0, minimo=0.25) if n['fin'] - n['ini'] > 0.6 else []
+        if len(seg) > 1:
+            for k, (a2, b2, p) in enumerate(seg):
+                out.append({'linea': n['linea'], 'ini': n['ini'] if k == 0 else a2, 'fin': n['fin'] if k == len(seg) - 1 else b2,
+                            'texto': n['texto'] if k == 0 else '~', 'midi': p})
             ultimo = seg[-1][2]
         else:
             out.append(n)
     return out
 
 
-def tramos(ts, ms, minimo=0.16):
-    """Tramos estables de una misma nota dentro de una sílaba: [(ini, fin, midi)]."""
-    r = np.round(ms)
+def tramos(ts, ms, umbral=0.8, minimo=0.18):
+    """Tramos de nota estable dentro de una sílaba larga: [(ini, fin, midi)]. Un tramo nuevo solo empieza si el tono
+    se aparta más de «umbral» semitonos de la nota del tramo y se mantiene al menos «minimo» segundos (el vibrato no parte)."""
+    ok = ~np.isnan(ms)
+    if ok.sum() < 3:
+        return []
     segs = []
+    cur_i, cur_p = None, None
     i = 0
-    while i < len(r):
-        if np.isnan(r[i]):
-            i += 1
+    idx = np.where(ok)[0]
+    vals = ms[ok]
+    k = 0
+    while k < len(idx):
+        if cur_p is None:
+            cur_i, cur_p = k, vals[k]
+            k += 1
             continue
-        j = i
-        while j + 1 < len(r) and (np.isnan(r[j + 1]) or r[j + 1] == r[i]):
-            j += 1
-        segs.append([ts[i], ts[j] + 0.01, int(r[i])])
-        i = j + 1
-    segs = [s for s in segs if s[1] - s[0] >= minimo]
-    fus = []
-    for s in segs:
-        if fus and fus[-1][2] == s[2]:
-            fus[-1][1] = s[1]
+        if abs(vals[k] - cur_p) > umbral:
+            # ¿se mantiene lejos lo bastante?
+            m = k
+            while m < len(idx) and abs(vals[m] - cur_p) > umbral and ts[idx[m]] - ts[idx[k]] < minimo:
+                m += 1
+            if m < len(idx) and ts[idx[m]] - ts[idx[k]] >= minimo or (m == len(idx) and ts[idx[-1]] - ts[idx[k]] >= minimo):
+                segs.append((cur_i, k))
+                cur_i, cur_p = k, float(np.median(vals[k:min(len(vals), k + int(minimo * 100))]))
+            k = m if m > k else k + 1
+            continue
+        cur_p = float(np.median(vals[cur_i:k + 1]))
+        k += 1
+    segs.append((cur_i, len(idx)))
+    out = []
+    for a, b in segs:
+        p = int(round(float(np.median(vals[a:b]))))
+        ta, tb = ts[idx[a]], ts[idx[b - 1]] + 0.01
+        if out and out[-1][2] == p:
+            out[-1] = (out[-1][0], tb, p)
+        elif tb - ta >= minimo * 0.8 or not out:
+            out.append((ta, tb, p))
         else:
-            fus.append(s)
-    if len(fus) > 1:   # sin huecos: cada tramo llega hasta el siguiente
-        for a, b in zip(fus, fus[1:]):
-            a[1] = b[0]
-    return [tuple(s) for s in fus]
+            out[-1] = (out[-1][0], tb, out[-1][2])
+    for x in range(len(out) - 1):   # sin huecos entre tramos
+        out[x] = (out[x][0], out[x + 1][0], out[x][2])
+    return out
 
 
 # ---------------------------------------------------------------------------- 5. UltraStar
@@ -406,7 +508,7 @@ def crear(audio, letra, salida, titulo, artista, idioma='es', anio=None, mp3='au
     ven = ventanas_lrc(lineas, lrc, len(voz) / SR) if lrc else None
     tiempos = alinear(voz, SR, pal, ven)
     progreso(90, 'Sílabas y notas')
-    notas = construir(lineas, pal, tiempos, t, midi, idioma)
+    notas = construir(lineas, pal, tiempos, t, midi, idioma, voz)
     txt = ultrastar(notas, titulo, artista, idioma, anio, mp3)
     open(os.path.join(salida, 'cancion.txt'), 'w', encoding='utf-8').write(txt)
     progreso(100, f'{len(notas)} notas en {len(lineas)} frases')
