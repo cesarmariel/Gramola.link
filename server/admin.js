@@ -721,6 +721,8 @@ module.exports = function admin(ctx) {
         'content-type': type, 'cache-control': 'no-cache', 'x-frame-options': 'DENY', 'referrer-policy': 'no-referrer', 'x-robots-tag': 'noindex, nofollow',
         'content-security-policy': "default-src 'self'; img-src 'self' data: blob: https://*.mzstatic.com https://*.dzcdn.net; media-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self'; frame-ancestors 'none'",
       });
+      // La página lleva la versión en las direcciones de sus ficheros: cada despliegue obliga a bajarlos de nuevo
+      if (f === 'index.html') { try { res.end(fs.readFileSync(file, 'utf8').replaceAll('%%V%%', versionNow())); } catch { res.end(); } return true; }
       fs.createReadStream(file).on('error', () => res.end()).pipe(res);
       return true;
     }
