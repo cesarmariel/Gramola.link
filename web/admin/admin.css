@@ -189,3 +189,8 @@ pre.out { background: var(--ink); color: #eee; padding: 10px; font-size: 12px; w
   .ev { grid-template-columns: 1fr; gap: 2px; }
   .tbl .hide-m { display: none; }
 }
+
+/* paginación */
+.pager { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+.pager .btn.sm { min-width: 34px; }
+.pager select.inp.sm { margin-left: 8px; }

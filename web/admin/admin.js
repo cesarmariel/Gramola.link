@@ -106,16 +106,19 @@
   // ------------------------------------------------------------------ navegación
   let timers = [];
   const stopTimers = () => { timers.forEach(clearInterval); timers = []; };
-  const every = (fn, ms) => { fn(); timers.push(setInterval(fn, ms)); };
+  const every = (fn, ms) => { const g = viewGen, run = () => Promise.resolve().then(fn).catch(e => { if (g === viewGen) fail(e); }); run(); timers.push(setInterval(run, ms)); };
   const VIEWS = {};
+  let viewGen = 0;
   function route() {
     stopTimers();
+    const gen = ++viewGen;
     const [v, ...rest] = (location.hash.slice(1) || 'resumen').split('/');
     document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('on', a.dataset.v === v));
     const fn = VIEWS[v] || VIEWS.resumen;
     $('view').innerHTML = '';
     window.scrollTo(0, 0);
-    fn(rest.map(decodeURIComponent)).catch(fail);
+    // Si se cambia de apartado mientras el anterior aún carga, su error (ya no tiene dónde pintar) se ignora
+    fn(rest.map(decodeURIComponent)).catch(e => { if (gen === viewGen) fail(e); });
   }
   addEventListener('hashchange', route);
   document.addEventListener('click', e => { const g = e.target.closest('[data-go]'); if (g) location.hash = g.dataset.go; });
@@ -239,7 +242,7 @@
 
   // ------------------------------------------------------------------ 03 · Canciones
   let songs = null;
-  const sState = { q: '', f: 'todas', sort: 'title', dir: 1 };
+  const sState = { q: '', f: 'todas', sort: 'title', dir: 1, page: 1, per: (() => { try { const v = localStorage.getItem('adm-per'); return v === null ? 50 : +v; } catch { return 50; } })() };
   const FILTERS = { todas: 'Todas', sinmegamix: 'Sin Megamix', sinnorm: 'Volumen sin igualar', portada: 'Portada original', duo: 'Dúos', nunca: 'Nunca cantadas', video: 'Con vídeo' };
   VIEWS.canciones = async ([id]) => {
     if (id === 'retiradas') return retiradas();
@@ -249,9 +252,9 @@
       <div class="tools"><input class="inp" id="c-q" placeholder="Buscar título, artista, año, carpeta…" value="${esc(sState.q)}">
         <div class="chips" id="c-f">${Object.entries(FILTERS).map(([k, t]) => `<button class="chip ${sState.f === k ? 'on' : ''}" data-f="${k}">${t}</button>`).join('')}</div>
         <span class="grow"></span><button class="btn" id="c-ret">Retiradas</button><button class="btn red" id="c-new">+ Canción nueva</button></div>
-      <div id="c-list"></div>`;
-    $('c-q').oninput = () => { sState.q = $('c-q').value; draw(); };
-    $('c-f').onclick = e => { const b = e.target.closest('[data-f]'); if (!b) return; sState.f = b.dataset.f; $('c-f').querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x === b)); draw(); };
+      <div class="pager" id="c-pg1"></div><div id="c-list"></div><div class="pager" id="c-pg2"></div>`;
+    $('c-q').oninput = () => { sState.q = $('c-q').value; sState.page = 1; draw(); };
+    $('c-f').onclick = e => { const b = e.target.closest('[data-f]'); if (!b) return; sState.f = b.dataset.f; sState.page = 1; $('c-f').querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x === b)); draw(); };
     $('c-ret').onclick = () => (location.hash = 'canciones/retiradas');
     $('c-new').onclick = newSong;
     songs = await api('/songs');
@@ -266,6 +269,21 @@
       const val = s => k === 'record' ? (s.record ? s.record.score : -1) : k === 'megamix' ? (s.megamix ? 1 : 0) : s[k];
       l.sort((a, b) => { const x = val(a), y = val(b); return (typeof x === 'string' ? x.localeCompare(y, 'es') : (x ?? -1) - (y ?? -1)) * d; });
       $('c-sub').textContent = `${l.length} de ${songs.length} · ${mb(l.reduce((a, s) => a + s.size, 0))}`;
+      // Paginación
+      const per = sState.per || l.length || 1, pages = Math.max(1, Math.ceil(l.length / per));
+      sState.page = Math.min(Math.max(1, sState.page), pages);
+      const from = (sState.page - 1) * per, all = l.length;
+      l = sState.per ? l.slice(from, from + per) : l;
+      const pager = () => {
+        const p = sState.page, nums = [];
+        for (let i = 1; i <= pages; i++) if (i === 1 || i === pages || Math.abs(i - p) <= 2) nums.push(i); else if (nums[nums.length - 1] !== '…') nums.push('…');
+        return `<span class="small muted">${all ? `${from + 1}–${from + l.length} de ${all}` : 'Sin resultados'}</span><span class="grow"></span>
+          ${pages > 1 ? `<button class="btn sm ghost" data-pg="${p - 1}" ${p === 1 ? 'disabled' : ''}>‹ Anterior</button>
+          ${nums.map(n => n === '…' ? '<span class="muted">…</span>' : `<button class="btn sm ${n === p ? 'dark' : 'ghost'}" data-pg="${n}">${n}</button>`).join('')}
+          <button class="btn sm ghost" data-pg="${p + 1}" ${p === pages ? 'disabled' : ''}>Siguiente ›</button>` : ''}
+          <select class="inp sm" data-per>${[25, 50, 100, 0].map(n => `<option value="${n}" ${n === sState.per ? 'selected' : ''}>${n ? n + ' por página' : 'Todas'}</option>`).join('')}</select>`;
+      };
+      $('c-pg1').innerHTML = $('c-pg2').innerHTML = pager();
       const th = (key, t, cls = '') => `<th class="s ${cls}" data-s="${key}">${t}${sState.sort === key ? (sState.dir > 0 ? ' ↑' : ' ↓') : ''}</th>`;
       $('c-list').innerHTML = `<table class="tbl"><thead><tr><th></th>${th('title', 'Canción')}${th('year', 'Año', 'r hide-m')}${th('language', 'Idioma', 'hide-m')}${th('duration', 'Dur.', 'r hide-m')}${th('difficulty', 'Dif.', 'hide-m')}${th('megamix', 'Megamix', 'hide-m')}${th('lufs', 'Volumen', 'r hide-m')}${th('plays', 'Cantada', 'r')}${th('record', 'Récord', 'r hide-m')}${th('size', 'Tamaño', 'r hide-m')}${th('added', 'Añadida', 'r hide-m')}</tr></thead><tbody>
         ${l.map(s => `<tr class="click" data-id="${esc(s.id)}"><td><img class="cov" loading="lazy" src="${esc(cover(s))}" alt=""></td>
@@ -279,9 +297,13 @@
     }
     $('c-list').onclick = e => {
       const h = e.target.closest('th[data-s]');
-      if (h) { if (sState.sort === h.dataset.s) sState.dir *= -1; else { sState.sort = h.dataset.s; sState.dir = ['plays', 'size', 'added', 'record', 'year', 'lufs'].includes(h.dataset.s) ? -1 : 1; } return draw(); }
+      if (h) { sState.page = 1; if (sState.sort === h.dataset.s) sState.dir *= -1; else { sState.sort = h.dataset.s; sState.dir = ['plays', 'size', 'added', 'record', 'year', 'lufs'].includes(h.dataset.s) ? -1 : 1; } return draw(); }
       const tr = e.target.closest('tr[data-id]'); if (tr) location.hash = 'canciones/' + enc(tr.dataset.id);
     };
+    for (const pg of [$('c-pg1'), $('c-pg2')]) {
+      pg.onclick = e => { const b = e.target.closest('[data-pg]'); if (!b) return; sState.page = +b.dataset.pg; draw(); if (pg.id === 'c-pg2') $('c-pg1').scrollIntoView({ block: 'start' }); };
+      pg.onchange = e => { if (!e.target.matches('[data-per]')) return; sState.per = +e.target.value; sState.page = 1; try { localStorage.setItem('adm-per', sState.per); } catch {} draw(); };
+    }
     draw();
   };
 

@@ -2,6 +2,10 @@
 
 Versiones con el esquema `1.AA.MMDD.HHMM` (fecha y hora del despliegue).
 
+## 1.26.1102.1101
+- Admin: paginación en la lista de canciones (25, 50, 100 o todas; recuerda la página al volver de una ficha).
+- Admin: sin avisos de error falsos al cambiar de apartado mientras el anterior aún carga.
+
 ## 1.26.1102.1059
 - **Administración** en el subdominio `admin.`, con entrada solo por Touch ID (passkeys): salas y jugadores en directo (mensaje, echar, cerrar, recargar la tele, aviso a todas), canciones (búsqueda, filtros, ficha con audio, carátulas de iTunes y Deezer, imagen propia, Megamix automático o a mano, medir e igualar el volumen, cabecera del .txt, ficheros, canción nueva, renombrar, retirar y restaurar), récords (renombrar, fusionar, borrar, vaciar con copia), actividad, estadísticas por día, telemetría, estado del servidor, copia de los datos y reinicio.
 - La tele muestra los avisos de la administración y obedece la orden de recargar; los móviles muestran los avisos en una franja.
