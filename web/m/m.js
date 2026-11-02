@@ -32,10 +32,16 @@ addEventListener('contextmenu', e => { if (!e.target.closest('input, textarea'))
 addEventListener('dragstart', e => { if (e.target.closest('img, video, canvas')) e.preventDefault(); });
 addEventListener('selectstart', e => { if (!e.target.closest || !e.target.closest('input, textarea')) e.preventDefault(); });
 
+// El micro SOLO funciona con la app instalada (PWA): en el navegador, únicamente la pantalla de instalar
+function isApp() {
+  return matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches || navigator.standalone === true;
+}
+
 // Volver atrás: los botones «← Volver» y el gesto de volver del móvil (historial) hacen lo mismo
 const BACK = {};
 let fromPop = false;
 function show(id) {
+  if (!isApp() && id !== 's-install') id = 's-install';
   if (BACK[id] && !fromPop && id !== screen && !(history.state && history.state.g === id)) history.pushState({ g: id }, '');
   screen = id;
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
@@ -72,7 +78,14 @@ const net = new Net(onMessage, st => {
 let hello = null;
 net.connect(() => hello);
 
+let autoVuelta = false;   // volver sola a la sala al reabrir la app (si ya no existe, a escanear, sin error)
 function onMessage(m) {
+  if (m.type === 'error' && autoVuelta) {
+    autoVuelta = false; peek = null; hello = null; LS.del('g-code');
+    codeInputs.forEach(c => (c.value = ''));
+    return show('s-scan');
+  }
+  if (m.type === 'peek' || m.type === 'joined') autoVuelta = false;
   if (m.type === 'error') {
     if (m.code === 'color-taken') {
       $('err-color').textContent = m.msg;
@@ -325,15 +338,15 @@ document.addEventListener('visibilitychange', () => {
   const c = initial;
   const tok = c && LS.get('g-token-' + c);
   const recent = Date.now() - (+LS.get('g-when') || 0) < 3 * 3600 * 1000;
-  const inApp = matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches || navigator.standalone === true || params.get('pwa') === '1';
-  if (tok && recent && !inApp && $('name').value && !params.get('s')) {
+  if (tok && recent && isApp() && $('name').value && !params.get('s')) {
+    autoVuelta = true;
     peek = { code: c, taken: [] };
     net.send({ type: 'peek', code: c, token: tok });
   }
 })();
 
 // ---------------------------------------------------------------- PWA: instalar, escanear el QR
-const standalone = matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches || navigator.standalone === true || params.get('pwa') === '1';
+const standalone = isApp();
 const fromQR = !!params.get('s');
 const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
@@ -343,7 +356,10 @@ addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = 
 addEventListener('appinstalled', () => { $('b-install').hidden = true; $('install-steps').hidden = false; $('install-steps').innerHTML = '<li>¡Instalado! Ábrelo desde tu pantalla de inicio: se llama «Gramola».</li>'; });
 
 function startScreen() {
-  if (!standalone && !SS_get('g-install-skip')) {
+  if (!standalone) {
+    // Desde el QR en el navegador: el código, para entrar luego desde la app (en iPhone no comparte datos con Safari)
+    const c = (params.get('s') || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
+    if (c.length === 4) { $('inst-room').hidden = false; $('inst-code').textContent = c; }
     // iPhone: Safari no tiene botón de instalar; se explican los pasos
     if (isIOS || !('BeforeInstallPromptEvent' in window)) {
       $('install-steps').hidden = false;
@@ -365,7 +381,6 @@ $('b-install').onclick = async () => {
   installEvt = null;
   if (r && r.outcome === 'accepted') { $('b-install').hidden = true; }
 };
-$('b-skip').onclick = () => { SS_set('g-install-skip', '1'); show('s-join'); if (!$('name').value) $('name').focus(); };
 $('b-manual').onclick = () => { show('s-join'); codeInputs[0].focus(); };
 
 // Lector de QR: el del propio móvil (BarcodeDetector) o jsQR si no lo tiene (iPhone)

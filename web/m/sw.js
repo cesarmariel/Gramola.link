@@ -1,6 +1,6 @@
 // Service worker de la web del micro (PWA). Red primero; si no hay red, lo último guardado.
 // Así la app abre al instante desde la pantalla de inicio y muestra «Reconectando…» sin red.
-const CACHE = 'gramola-micro-v14';
+const CACHE = 'gramola-micro-v15';
 const SHELL = [
   '/', '/m.css', '/m.js', '/despierto.mp4', '/js/net.js', '/js/pitch.js', '/js/wake.js', '/vendor/jsQR.js',
   '/assets/logo/horizontal-claro.png', '/assets/nuvola/tinta.png',

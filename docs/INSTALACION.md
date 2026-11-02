@@ -26,8 +26,9 @@ Variables de entorno:
 | `DATA_DIR` | `server/data` | Récords (`records.json`), estadísticas, actividad, llaves del admin y canciones retiradas. |
 | `ADMIN_HOST` | — | Host del portal de administración. Sin ella, cualquier host que empiece por `admin.` (en local, `admin.localhost:8877`). |
 
-En `localhost` el micro funciona porque los navegadores lo tratan como seguro, así que puedes probar la web del micro
-en el mismo ordenador (`http://localhost:8877/m/`).
+En `localhost` el micro funciona porque los navegadores lo tratan como seguro. Como el micro solo funciona **instalado
+como app** (en el navegador solo enseña cómo instalarlo), para probarlo en el ordenador ábrelo en Chrome
+(`http://localhost:8877/m/`) e instálalo con el icono de instalar de la barra de direcciones.
 
 ## En un servidor
 

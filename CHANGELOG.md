@@ -2,6 +2,10 @@
 
 Versiones con el esquema `1.AA.MMDD.HHMM` (fecha y hora del despliegue).
 
+## 1.26.1102.1242
+- Móvil: el micro **solo funciona con la app instalada** (PWA). En el navegador solo se ve cómo instalarla (sin «Seguir sin instalar») y, si se llega por el QR, el código de la sala para entrar desde la app. Fuera el atajo de pruebas `?pwa=1`.
+- Al reabrir la app durante una partida, vuelve a su sala con su color; si la sala ya no existe, va a escanear el QR sin avisos de error.
+
 ## 1.26.1102.1238
 - Móvil: sin copiar contenido. Ni selección de texto, ni menú de pulsación larga (copiar, guardar imagen) ni arrastrar imágenes; los campos de nombre y código se siguen pudiendo escribir y seleccionar.
 

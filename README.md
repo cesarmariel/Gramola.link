@@ -11,7 +11,7 @@
 La tele es el escenario (**funciona en el navegador**) y cada móvil es un micrófono:
 escaneas el QR, eliges tu color y cantas. Gramola escucha el tono de cada voz y puntúa lo afinado que vas.
 
-![Versión](https://img.shields.io/badge/versi%C3%B3n-1.26.1102.1238-ec3013)
+![Versión](https://img.shields.io/badge/versi%C3%B3n-1.26.1102.1242-ec3013)
 ![Navegador](https://img.shields.io/badge/navegador-Edge%20%C2%B7%20Chrome%20%C2%B7%20Safari-1f6feb)
 ![PWA](https://img.shields.io/badge/micro-web%20%2B%20PWA-ec3013)
 ![Node.js 22+](https://img.shields.io/badge/Node.js-22%2B-5fa04e?logo=nodedotjs&logoColor=white)
@@ -81,9 +81,13 @@ escaneas el QR, eliges tu color y cantas. Gramola escucha el tono de cada voz y 
 - **Mando**: las ayudas muestran los botones del mando de PlayStation (✕ ○ □ △ L1 R1); también funciona el mando de la tele.
 - **Aviso al arrancar**: tras el logo de nuvola, ~6 s indicando que es un proyecto gratuito, sin ánimo de lucro y sin relación con los artistas.
 
-## 📱 El micro (web + PWA)
+## 📱 El micro (PWA)
 
-- No se instala nada: el QR abre el subdominio `micro.` de la web. Se puede **añadir a la pantalla de inicio** y abre a pantalla completa como una app.
+- El micro **solo funciona con la app instalada** (PWA: «Añadir a pantalla de inicio»), que abre a pantalla completa. En el
+  navegador, el QR del subdominio `micro.` solo muestra cómo instalarla (con los pasos de Safari en iPhone) y el código
+  de la sala, para entrar desde la app escaneando otra vez o escribiéndolo. Dentro de la app se escanea el QR de la tele.
+- Al reabrir la app durante una partida (los móviles a veces la cierran en segundo plano) vuelve a su sala con su color.
+- Sin copiar contenido: ni selección de texto ni menú de pulsación larga (salvo en los campos para escribir).
 - **El tono se calcula en el propio móvil** (YIN) y solo viajan unos bytes 25 veces por segundo.
 - **La pantalla no se apaga** mientras se canta (Screen Wake Lock, con un plan B para móviles sin él): si se apagara, el micro dejaría de oír.
 - Se reconecta solo con el mismo color si se corta la wifi o se recarga.
