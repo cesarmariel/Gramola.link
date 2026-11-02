@@ -185,7 +185,7 @@ def ventanas_lrc(lineas, lrc, dur):
     out = {}
     for k, li in enumerate(ord_):
         sig = next((ini[x] for x in ord_[k + 1:] if ini[x] > ini[li]), dur)
-        out[li] = (max(0, ini[li] - 1.0), min(dur, sig + 1.5), ini[li])   # con margen: las LRC no son exactas
+        out[li] = (max(0, ini[li] - 0.6), min(dur, sig + 0.4), ini[li])   # margen pequeño: sin invadir la frase siguiente
     # Las líneas sin marca: entre la anterior y la siguiente que sí tienen
     for li in range(len(lineas)):
         if li in out:
@@ -247,15 +247,17 @@ def alinear(voz, sr, palabras, ventanas=None):
         globales = dict(tiempos)
         tiempos = {}
         try:
+            fin_prev = 0   # cada frase empieza después de donde acabó la anterior: no se mezclan palabras de dos frases
             for li in sorted({p[0] for p in validas}):
                 ps = [p for p in validas if p[0] == li]
                 a, b, _ = ventanas[li]
-                f0, f1 = max(0, int(a / seg_por_trama)), min(em.shape[1], int(b / seg_por_trama))
+                f0, f1 = max(0, int(a / seg_por_trama), fin_prev), min(em.shape[1], int(b / seg_por_trama))
                 tok = tokenizar([p[3] for p in ps])
                 if f1 - f0 < sum(len(x) for x in tok) * 2:
                     raise ValueError('ventana corta')
                 for p, sp in zip(ps, alineador(em[0, f0:f1], tok)):
                     tiempos[id(p)] = [((s.start + f0) * seg_por_trama, (s.end + f0) * seg_por_trama, float(s.score)) for s in sp]
+                    fin_prev = max(fin_prev, f0 + max(s.end for s in sp))
             return tiempos
         except Exception as e:
             log('  (sin ventanas:', e, ')')
