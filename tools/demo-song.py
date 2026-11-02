@@ -7,12 +7,14 @@ Crea web/songs/demo-musicbox/ con:
   - cover.png (portada generada)
 
 Uso:  python3 tools/demo-song.py        (necesita ffmpeg en el PATH para el .mp3 y la portada)
+      python3 tools/demo-song.py --wav-only  (demo de audio sin ffmpeg, portada ni vídeo)
 """
 import math
 import os
 import random
 import struct
 import subprocess
+import sys
 import wave
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -147,6 +149,15 @@ def main():
     write_txt(os.path.join(OUT, 'demo.txt'), txt_lines)
     wav = os.path.join(OUT, 'demo.wav')
     write_wav(wav, synth(notes, total))
+    if '--wav-only' in sys.argv:
+        txt = os.path.join(OUT, 'demo.txt')
+        with open(txt, encoding='utf-8') as f:
+            lines = f.readlines()
+        with open(txt, 'w', encoding='utf-8') as f:
+            f.writelines(line.replace('demo.mp3', 'demo.wav') for line in lines
+                         if not line.startswith(('#COVER:', '#VIDEO:', '#VIDEOGAP:')))
+        print('Demo WAV creada en', OUT)
+        return
     subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', wav, '-c:a', 'libmp3lame', '-b:a', '128k', os.path.join(OUT, 'demo.mp3')], check=True)
     os.remove(wav)
     # Vídeo de prueba (original): degradado de colores en movimiento, para comprobar el videoclip y su sincronía

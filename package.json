@@ -1,0 +1,11 @@
+{
+  "name": "gramola-personal",
+  "private": true,
+  "scripts": {
+    "start": "node --env-file-if-exists=.env.local server/server.js",
+    "test": "npm --prefix server test",
+    "demo": "python3 tools/demo-song.py --wav-only",
+    "upstream:check": "node tools/check-upstream.cjs"
+  },
+  "engines": { "node": ">=22.9" }
+}
