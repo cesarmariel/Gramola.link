@@ -14,6 +14,8 @@ Solo modifica PS4: Makefile, arranque e interfaz, reloj, módulos, diagnóstico 
 
 ## Procedimiento
 
+Monitor diario configurado en Codex a las 09:00, zona Europe/Madrid. Revisa y avisa de novedades relevantes; no incorpora ni ejecuta automáticamente cambios. Requiere que el entorno local de Codex pueda ejecutar la revisión programada.
+
 En Terminal del Mac, cuenta cesarmariel, desde la carpeta de este fork: `npm run upstream:check`.
 
 Ese comando hace fetch y muestra los commits y archivos pendientes sin mezclarlos. Revisar el diff completo, dependencias, scripts de instalación, red, permisos y compatibilidad con nuestros cambios. Registrar conclusiones aquí y ejecutar las pruebas pertinentes. Solo entonces incorporar cambios y avanzar la referencia upstream-reviewed. Nunca ejecutar automáticamente código recién descargado.

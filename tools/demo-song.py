@@ -7,6 +7,7 @@ Crea web/songs/demo-musicbox/ con:
   - cover.png (portada generada)
 
 Uso:  python3 tools/demo-song.py        (necesita ffmpeg en el PATH para el .mp3 y la portada)
+      python3 tools/demo-song.py --wav-only  (demo de audio sin ffmpeg, portada ni vídeo)
 """
 import math
 import os

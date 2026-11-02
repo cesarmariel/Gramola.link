@@ -129,7 +129,7 @@ window.GR = (() => {
   // El micro vive en el subdominio micro.; en pruebas locales (IP o localhost), en /m/index.html.
   const local = () => /^(localhost|\d+\.\d+\.\d+\.\d+)$/.test(location.hostname);
   G.webHost = () => location.hostname.replace(/^(www|micro)\./, '');
-  G.microHost = () => local() ? location.host + '/m' : 'micro.' + G.webHost();
+  G.microHost = () => location.hostname === 'localhost' ? 'micro.' + location.host : local() ? location.host + '/m' : 'micro.' + G.webHost();
   G.microUrl = () => location.hostname === 'localhost'
     ? location.protocol + '//micro.localhost' + (location.port ? ':' + location.port : '') + '/'
     : local() ? location.origin + '/m/index.html' : 'https://' + G.microHost() + '/';
