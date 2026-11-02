@@ -2,6 +2,9 @@
 
 Versiones con el esquema `1.AA.MMDD.HHMM` (fecha y hora del despliegue).
 
+## 1.26.1102.1237
+- Móvil: botón «← Volver» al poner el nombre (vuelve a escanear el QR, para cambiar de sala), al elegir color (vuelve al nombre) y en la foto (vuelve a los colores). El gesto de volver del móvil hace lo mismo en vez de cerrar la app.
+
 ## 1.26.1102.1233
 - **Creación = taller completo**: sección «En preparación» (creadas sin publicar) con Editar, Ver en el juego, Publicar y Descartar; el editor de una canción en preparación vive dentro de Creación.
 - **Ver en el juego** desde el editor: la app de la tele en una ventana con lo que hay en el editor (aunque no esté guardado), desde el principio o desde el cursor, con pausa.

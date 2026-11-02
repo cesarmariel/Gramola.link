@@ -27,7 +27,11 @@ codeInputs.forEach((el, i) => (el.value = initial[i] || ''));
 $('code-hint').textContent = params.get('s') ? 'Rellenado desde el QR de la tele' : 'Lo verás en la tele';
 $('name').value = LS.get('g-name') || '';
 
+// Volver atrás: los botones «← Volver» y el gesto de volver del móvil (historial) hacen lo mismo
+const BACK = {};
+let fromPop = false;
 function show(id) {
+  if (BACK[id] && !fromPop && id !== screen && !(history.state && history.state.g === id)) history.pushState({ g: id }, '');
   screen = id;
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
   document.querySelector('meta[name=theme-color]').content = id === 's-sing' ? '#f3f2f2' : '#f3f2f2';
@@ -418,7 +422,35 @@ function roomFound(code) {
   if ($('name').value.trim()) $('b-next').click(); else $('name').focus();
 }
 $('b-scan').onclick = startScanner;
-$('b-cam-cancel').onclick = () => { stopScanner(); show('s-scan'); };
+
+// ---------------------------------------------------------------- volver atrás
+function backFromJoin() {
+  // A escanear otro QR (o escribir otro código): se olvida la sala elegida
+  codeInputs.forEach(c => { c.value = ''; c.classList.remove('bad'); });
+  $('err-join').textContent = ''; $('err-scan').textContent = '';
+  $('code-hint').textContent = 'Lo verás en la tele';
+  LS.del('g-code');
+  if (/[?&]s=/.test(location.search)) history.replaceState(history.state, '', location.pathname);
+  show('s-scan');
+}
+function backFromColor() { peek = null; chosen = 0; $('err-color').textContent = ''; show('s-join'); }
+BACK['s-join'] = backFromJoin;
+BACK['s-color'] = backFromColor;
+BACK['s-selfie'] = () => closeSelfie();
+BACK['s-camera'] = () => { stopScanner(); show('s-scan'); };
+function goBack() {
+  if (history.state && history.state.g === screen) history.back();   // el popstate hace el resto
+  else if (BACK[screen]) BACK[screen]();
+}
+addEventListener('popstate', () => {
+  if (!BACK[screen]) return;
+  fromPop = true;
+  try { BACK[screen](); } finally { fromPop = false; }
+});
+$('b-join-back').onclick = goBack;
+$('b-color-back').onclick = goBack;
+$('b-sf-back').onclick = goBack;
+$('b-cam-cancel').onclick = () => goBack();
 
 startScreen();
 
@@ -502,7 +534,7 @@ function closeSelfie() {
   show(joined ? 's-wait' : 's-color');
 }
 $('b-photo').onclick = openSelfie;
-$('b-sf-cancel').onclick = closeSelfie;
+$('b-sf-cancel').onclick = goBack;
 $('b-sf-again').onclick = () => sfMode(false);
 $('b-sf-shot').onclick = () => {
   const v = $('sf-video'), vw = v.videoWidth, vh = v.videoHeight;

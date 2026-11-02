@@ -130,3 +130,9 @@ html.rot .mic img, html.rot .vu { width: min(100%, 62vw); }
 /* Aviso desde la administración */
 .aviso { position: fixed; left: 12px; right: 12px; top: max(12px, env(safe-area-inset-top)); z-index: 50; background: var(--ink, #201e1d); color: #fff; padding: 14px 16px; font-weight: 600; font-size: 15px; line-height: 1.35; transform: translateY(-140%); transition: transform .3s; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
 .aviso.on { transform: none; }
+
+/* Volver atrás (nombre, color, foto) */
+.bar .back { border: 2px solid var(--ink); background: transparent; color: var(--ink); font: 700 14px/1 inherit; font-family: inherit; padding: 10px 12px; min-height: 40px; margin-right: 12px; cursor: pointer; }
+.bar .back:active { background: var(--ink); color: #fff; }
+#s-color .bar .who { margin-left: auto; }
+.back.on-dark { position: absolute; z-index: 3; left: 22px; top: max(18px, env(safe-area-inset-top)); border: 2px solid #fff; background: rgba(0,0,0,.35); color: #fff; font: 700 14px/1 inherit; font-family: inherit; padding: 10px 12px; min-height: 40px; }

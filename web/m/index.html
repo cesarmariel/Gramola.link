@@ -30,7 +30,7 @@
 <meta name="twitter:image" content="%%ORIGEN%%/assets/og/gramola-og.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/m/m.css?v=1793589434">
+<link rel="stylesheet" href="/m/m.css?v=1793619446">
 </head>
 <body>
   <!-- MOV-00 Instalar (desde el navegador) -->
@@ -69,6 +69,7 @@
 
   <!-- MOV-02c Foto (cámara frontal): lo que se ve dentro del cuadro es exactamente la foto -->
   <section id="s-selfie" class="screen cam selfie">
+    <button class="back on-dark" id="b-sf-back" aria-label="Volver">← Volver</button>
     <div class="sf-box" id="sf-box"><video id="sf-video" playsinline muted autoplay></video><img id="sf-img" alt="" hidden></div>
     <p class="cam-txt sf-txt" id="sf-txt">Pon tu cara dentro del cuadro</p>
     <div class="sf-bar">
@@ -81,7 +82,7 @@
 
   <!-- MOV-01 Unirse -->
   <section id="s-join" class="screen">
-    <header class="bar"><img class="logo" src="/assets/logo/horizontal-claro.png" alt="gramola"></header>
+    <header class="bar"><button class="back" id="b-join-back" aria-label="Volver a escanear el QR">← Volver</button><img class="logo" src="/assets/logo/horizontal-claro.png" alt="gramola"></header>
     <h1 class="big">Tu móvil<br>es el <b>micro.</b></h1>
     <label class="lbl" for="name">Tu nombre</label>
     <input id="name" class="field" maxlength="16" autocomplete="nickname" enterkeyhint="next" placeholder="Tu nombre">
@@ -101,7 +102,7 @@
 
   <!-- MOV-02 Elegir color -->
   <section id="s-color" class="screen">
-    <header class="bar"><img class="logo" src="/assets/logo/horizontal-claro.png" alt="gramola"><span class="who" id="who-color"></span></header>
+    <header class="bar"><button class="back" id="b-color-back" aria-label="Volver al nombre y la sala">← Volver</button><span class="who" id="who-color"></span></header>
     <p class="step">Paso 2 de 2</p>
     <h2 class="mid">Elige tu color</h2>
     <p class="txt">Será tu micro y tu color en la tele. Cada color es de una sola persona.</p>
@@ -200,6 +201,6 @@
     <button class="cta" id="b-other">Unirme a otra sala <span>→</span></button>
   </section>
 
-<script type="module" src="/m/m.js?v=1793589434"></script>
+<script type="module" src="/m/m.js?v=1793619446"></script>
 </body>
 </html>
