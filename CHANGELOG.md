@@ -2,6 +2,9 @@
 
 Versiones con el esquema `1.AA.MMDD.HHMM` (fecha y hora del despliegue).
 
+## 1.26.1102.1238
+- Móvil: sin copiar contenido. Ni selección de texto, ni menú de pulsación larga (copiar, guardar imagen) ni arrastrar imágenes; los campos de nombre y código se siguen pudiendo escribir y seleccionar.
+
 ## 1.26.1102.1237
 - Móvil: botón «← Volver» al poner el nombre (vuelve a escanear el QR, para cambiar de sala), al elegir color (vuelve al nombre) y en la foto (vuelve a los colores). El gesto de volver del móvil hace lo mismo en vez de cerrar la app.
 

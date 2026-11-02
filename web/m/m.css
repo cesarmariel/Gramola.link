@@ -136,3 +136,9 @@ html.rot .mic img, html.rot .vu { width: min(100%, 62vw); }
 .bar .back:active { background: var(--ink); color: #fff; }
 #s-color .bar .who { margin-left: auto; }
 .back.on-dark { position: absolute; z-index: 3; left: 22px; top: max(18px, env(safe-area-inset-top)); border: 2px solid #fff; background: rgba(0,0,0,.35); color: #fff; font: 700 14px/1 inherit; font-family: inherit; padding: 10px 12px; min-height: 40px; }
+
+/* Sin copiar: ni selección de texto, ni menú de pulsación larga (copiar, guardar imagen…), ni arrastrar imágenes.
+   Los campos para escribir (nombre, código) sí se pueden seleccionar y editar. */
+html, body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+img, video, canvas { -webkit-user-drag: none; user-drag: none; -webkit-touch-callout: none; }
+input, textarea { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }

@@ -27,6 +27,11 @@ codeInputs.forEach((el, i) => (el.value = initial[i] || ''));
 $('code-hint').textContent = params.get('s') ? 'Rellenado desde el QR de la tele' : 'Lo verás en la tele';
 $('name').value = LS.get('g-name') || '';
 
+// Sin menú de pulsación larga (copiar, guardar imagen…) ni arrastrar imágenes; en los campos de texto, sí
+addEventListener('contextmenu', e => { if (!e.target.closest('input, textarea')) e.preventDefault(); });
+addEventListener('dragstart', e => { if (e.target.closest('img, video, canvas')) e.preventDefault(); });
+addEventListener('selectstart', e => { if (!e.target.closest || !e.target.closest('input, textarea')) e.preventDefault(); });
+
 // Volver atrás: los botones «← Volver» y el gesto de volver del móvil (historial) hacen lo mismo
 const BACK = {};
 let fromPop = false;
