@@ -255,7 +255,7 @@
   let songs = null;
   const picked = new Set();   // canciones seleccionadas en la lista (se mantiene entre páginas)
   const sState = { q: '', f: 'todas', sort: 'title', dir: 1, page: 1, per: (() => { try { const v = localStorage.getItem('adm-per'); return v === null ? 50 : +v; } catch { return 50; } })() };
-  const FILTERS = { todas: 'Todas', borradores: 'Borradores', sinmegamix: 'Sin Megamix', sinnorm: 'Volumen sin igualar', portada: 'Portada original', duo: 'Dúos', nunca: 'Nunca cantadas', video: 'Con vídeo' };
+  const FILTERS = { todas: 'Todas', borradores: 'Sin publicar', sinmegamix: 'Sin Megamix', sinnorm: 'Volumen sin igualar', portada: 'Portada original', duo: 'Dúos', nunca: 'Nunca cantadas', video: 'Con vídeo' };
   VIEWS.canciones = async ([id]) => {
     if (id === 'retiradas') return retiradas();
     if (id) return songSheet(id);
@@ -322,7 +322,7 @@
       const allOn = l.length && l.every(s => picked.has(s.id));
       $('c-list').innerHTML = `<table class="tbl"><thead><tr><th class="ck"><input type="checkbox" data-all ${allOn ? 'checked' : ''} title="Seleccionar las de esta página"></th><th></th>${th('title', 'Canción')}${th('year', 'Año', 'r hide-m')}${th('language', 'Idioma', 'hide-m lang')}${th('duration', 'Dur.', 'r hide-m')}${th('difficulty', 'Dif.', 'hide-m')}${th('megamix', 'Megamix', 'hide-m')}${th('lufs', 'Volumen', 'r hide-m')}${th('plays', 'Cantada', 'r')}${th('record', 'Récord', 'r hide-m')}${th('size', 'Tamaño', 'r hide-m')}${th('added', 'Añadida', 'r hide-m when')}</tr></thead><tbody>
         ${l.map(s => `<tr class="click ${picked.has(s.id) ? 'picked' : ''}" data-id="${esc(s.id)}"><td class="ck"><input type="checkbox" data-pick ${picked.has(s.id) ? 'checked' : ''}></td><td><img class="cov" loading="lazy" src="${esc(cover(s))}" alt=""></td>
-          <td><div class="t-title">${esc(s.title)}${s.draft ? ' <span class="badge warn">borrador</span>' : ''}${s.isNew ? ' <span class="badge red">★ nueva</span>' : ''}${s.duet ? ' <span class="badge warn">dúo</span>' : ''}${s.hasVideo ? ' <span class="badge no">vídeo</span>' : ''}</div><div class="t-art">${esc(s.artist)}</div></td>
+          <td><div class="t-title">${esc(s.title)}${s.draft ? ' <span class="badge warn">sin publicar</span>' : ''}${s.isNew ? ' <span class="badge red">★ nueva</span>' : ''}${s.duet ? ' <span class="badge warn">dúo</span>' : ''}${s.hasVideo ? ' <span class="badge no">vídeo</span>' : ''}</div><div class="t-art">${esc(s.artist)}</div></td>
           <td class="r hide-m">${s.year || '—'}</td><td class="hide-m small lang" title="${esc(s.language || '')}">${esc(langShort(s.language))}</td><td class="r hide-m">${s.duration ? mmss(s.duration) : '—'}</td>
           <td class="hide-m"><span class="diff">${'●'.repeat(s.difficulty)}${'○'.repeat(3 - s.difficulty)}</span></td>
           <td class="hide-m">${s.megamix ? `<span class="badge ${s.megamixOrigin === 'detectado' ? 'warn' : 'ok'}">${esc(s.megamixOrigin || 'sí')}</span>` : '<span class="badge no">no</span>'}</td>
@@ -381,7 +381,7 @@
         </dl>
         <div class="row" style="margin-top:14px"><button class="btn sm ${s.isNew ? 'dark' : ''}" id="s-nov">${s.isNew ? '★ Novedad · quitar' : '★ Marcar como novedad'}</button><button class="btn sm" id="s-ren">Renombrar carpeta</button><button class="btn sm danger" id="s-ret">Retirar</button></div>
       </div><div>
-        ${d.files.some(f => f.name === 'borrador.json') ? `<div class="card" style="border-color:var(--warn);margin-bottom:12px"><b>Borrador:</b> creada automáticamente; no sale en la tele hasta que la publiques. Revísala en el editor.
+        ${d.files.some(f => f.name === 'borrador.json') ? `<div class="card" style="border-color:var(--warn);margin-bottom:12px"><b>Sin publicar:</b> creada automáticamente; no sale en la tele hasta que la publiques. Revísala en el editor.
           <div class="row" style="margin-top:8px"><button class="btn red" id="s-pub">Publicar</button><label class="row small"><input type="checkbox" id="s-pubnv" checked> y ponerla en Novedades</label></div></div>` : ''}
         <div class="row" style="margin-bottom:6px"><a class="btn dark" href="#editor/${enc(id)}">✎ Abrir en el editor</a><button class="btn" id="s-voz">${d.files.some(f => f.name === 'voz-tono.json') ? 'Volver a analizar la voz' : 'Analizar la voz'}</button><span class="small muted">La voz sola y su tono ayudan a encajar las notas en el editor</span></div>
         <h2 class="sec" style="margin-top:8px">Escuchar</h2>
@@ -540,17 +540,75 @@
 
   // ------------------------------------------------------------------ Creación de canciones (trabajador en el propio servidor)
   const IDIOMAS = { es: 'Castellano', en: 'Inglés', ca: 'Catalán', fr: 'Francés', it: 'Italiano', pt: 'Portugués', de: 'Alemán', gl: 'Gallego', eu: 'Euskera' };
+  // Buscar la letra (LRCLIB y, de reserva, Genius y songlyrics) y ponerla en el cuadro
+  async function buscarLetraUI(dur) {
+    const a = $('k-art').value.trim(), ti = $('k-tit').value.trim(), box = $('k-letra'), st = $('k-lst');
+    if (!a || !ti) return toast('Pon antes el artista y el título', true);
+    if (box.value.trim() && !confirm('¿Cambiar la letra que hay por la que se encuentre?')) return;
+    st.textContent = 'Buscando…';
+    try {
+      const r = await api(`/letras?artista=${enc(a)}&titulo=${enc(ti)}${dur ? '&duracion=' + dur : ''}`);
+      box.value = r.texto;
+      st.textContent = `Encontrada en ${r.fuente}${r.sincronizada ? ' (sincronizada)' : ''} · ${r.texto.split('\n').length} líneas. Revísala: cada línea será una frase en la tele.`;
+    } catch (e) { st.textContent = e.message; }
+  }
+
+  // Importar desde Spotify: SOLO una canción suelta; se descarga y queda en Borradores (en Creación)
+  function importarSpotify() {
+    modal(`<h3>Crear canción</h3>
+      <div class="chips" style="margin:6px 0 14px"><button class="chip" id="t-up">Subir audio</button><button class="chip on">Importar desde Spotify</button></div>
+      <p class="small muted">Pega el enlace de <b>una canción</b> de Spotify (en la app: Compartir → Copiar enlace de la canción). No se admiten álbumes, listas ni artistas.
+      La canción se descarga y queda en <b>Borradores</b>, en el apartado Creación, para seguir cuando quieras (falta pegar la letra).</p>
+      <label class="lbl">Enlace de la canción</label><input class="inp" id="sp-url" placeholder="https://open.spotify.com/track/…">
+      <p class="small muted" id="sp-st"></p>
+      <div class="row" style="margin-top:12px"><button class="btn red" id="sp-go">Descargar</button><button class="btn ghost" id="sp-x">Cancelar</button></div>`);
+    $('t-up').onclick = crearCancion; $('sp-x').onclick = closeModal; $('sp-url').focus();
+    const ok = u => /^(https?:\/\/open\.spotify\.com\/(intl-[a-z-]+\/)?track\/|spotify:track:)[A-Za-z0-9]{22}/.test(u.trim());
+    $('sp-url').oninput = () => { const u = $('sp-url').value.trim(); $('sp-st').textContent = !u || ok(u) ? '' : /spotify/i.test(u) ? 'Solo enlaces de una canción (…/track/…), no de álbum, lista ni artista.' : 'No parece un enlace de Spotify.'; };
+    const go = async () => {
+      const url = $('sp-url').value.trim();
+      if (!ok(url)) return toast('Pega el enlace de una canción de Spotify', true);
+      $('sp-go').disabled = true;
+      try { await api('/jobs', { method: 'POST', json: { kind: 'spotify', url } }); closeModal(); toast('Descargando: quedará en Borradores'); location.hash = 'creacion'; }
+      catch (e) { fail(e); $('sp-go').disabled = false; }
+    };
+    $('sp-go').onclick = go; $('sp-url').onkeydown = e => { if (e.key === 'Enter') go(); };
+  }
+  // Continuar un borrador (audio ya descargado): datos + letra → a la cola de creación
+  async function continuarBorrador(j) {
+    let letra = '';
+    try { letra = await (await fetch(`/api/admin/jobs/${j.id}/letra`)).text(); if (letra.startsWith('{')) letra = ''; } catch {}
+    modal(`<h3>Continuar: ${esc(j.titulo)}</h3>
+      <div class="row" style="align-items:flex-start;gap:14px"><img src="/api/admin/jobs/${j.id}/portada" style="width:120px;height:120px;object-fit:cover;border:2px solid var(--ink);background:var(--n2)" alt="">
+        <div class="grow"><p class="small muted" style="margin:0 0 6px">De Spotify${j.album ? ' · ' + esc(j.album) : ''}${j.duracion ? ' · ' + mmss(j.duracion) : ''}</p>
+        <audio controls preload="none" src="/api/admin/jobs/${j.id}/audio"></audio>
+        ${j.dup ? `<p class="small red-t">Ya hay una canción igual en la biblioteca: <a href="#canciones/${enc(j.dup)}">${esc(j.dup)}</a></p>` : ''}</div></div>
+      <div class="grid2"><div><label class="lbl">Artista</label><input class="inp" id="k-art" value="${esc(j.artista)}"></div><div><label class="lbl">Título</label><input class="inp" id="k-tit" value="${esc(j.titulo)}"></div></div>
+      <div class="grid2"><div><label class="lbl">Idioma de la letra</label><select class="inp" id="k-lang">${Object.entries(IDIOMAS).map(([k, v]) => `<option value="${k}" ${k === (j.idioma || 'es') ? 'selected' : ''}>${v}</option>`).join('')}</select></div><div><label class="lbl">Año</label><input class="inp" id="k-year" maxlength="4" value="${esc(j.anio || '')}"></div></div>
+      <div class="row" style="justify-content:space-between;align-items:flex-end"><label class="lbl">Letra · una frase por línea (como se verá en la tele)</label><button class="btn sm" id="k-buscar" type="button">Buscar la letra</button></div><p class="small muted" id="k-lst" style="margin:0 0 6px"></p><textarea class="inp" id="k-letra" rows="12">${esc(letra)}</textarea>
+      <div class="row" style="margin-top:12px"><button class="btn red" id="k-go">Crear</button><button class="btn" id="k-save">Guardar y seguir luego</button><button class="btn ghost" id="k-x">Cerrar</button></div>`);
+    $('k-buscar').onclick = () => buscarLetraUI(j.duracion);
+    if (j.letraFuente && letra) $('k-lst').textContent = `Letra encontrada en ${j.letraFuente}. Revísala: cada línea será una frase en la tele.`;
+    else if (!letra) $('k-lst').textContent = 'No se encontró la letra automáticamente: pulsa «Buscar la letra» o pégala.';
+    const datos = () => ({ artista: $('k-art').value, titulo: $('k-tit').value, idioma: $('k-lang').value, anio: $('k-year').value, letra: $('k-letra').value });
+    $('k-x').onclick = closeModal;
+    $('k-save').onclick = async () => { try { await api(`/jobs/${j.id}`, { method: 'PATCH', json: datos() }); closeModal(); toast('Guardado en Borradores'); route(); } catch (e) { fail(e); } };
+    $('k-go').onclick = async () => { try { await api(`/jobs/${j.id}/continuar`, { method: 'POST', json: datos() }); closeModal(); toast('En la cola de creación'); route(); } catch (e) { fail(e); } };
+  }
   function crearCancion() {
     const b = modal(`<h3>Crear canción</h3>
-      <p class="small muted">Sube el audio y pega la letra: el servidor separa la voz, encaja cada sílaba en su sitio y saca las notas. Queda como <b>borrador</b> para revisarla en el editor antes de publicarla.</p>
+      <div class="chips" style="margin:6px 0 14px"><button class="chip on">Subir audio</button><button class="chip" id="t-sp">Importar desde Spotify</button></div>
+      <p class="small muted">Sube el audio y pega la letra: el servidor separa la voz, encaja cada sílaba en su sitio y saca las notas. Queda <b>sin publicar</b> para revisarla en el editor antes de que salga en la tele.</p>
       <div class="grid2"><div><label class="lbl">Artista</label><input class="inp" id="k-art"></div><div><label class="lbl">Título</label><input class="inp" id="k-tit"></div></div>
       <div class="grid2"><div><label class="lbl">Idioma de la letra</label><select class="inp" id="k-lang">${Object.entries(IDIOMAS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div><div><label class="lbl">Año</label><input class="inp" id="k-year" maxlength="4" placeholder="opcional"></div></div>
       <label class="lbl">Audio (MP3, M4A, WAV…)</label><input type="file" id="k-audio" accept="audio/*,.mp3,.m4a,.wav,.flac,.ogg" class="inp">
-      <label class="lbl">Letra · una frase por línea (como se verá en la tele)</label><textarea class="inp" id="k-letra" rows="12" placeholder="Cada línea será una frase en pantalla.
+      <div class="row" style="justify-content:space-between;align-items:flex-end"><label class="lbl">Letra · una frase por línea (como se verá en la tele)</label><button class="btn sm" id="k-buscar" type="button">Buscar la letra</button></div><p class="small muted" id="k-lst" style="margin:0 0 6px"></p><textarea class="inp" id="k-letra" rows="12" placeholder="Cada línea será una frase en pantalla.
 Las líneas vacías no cuentan."></textarea>
       <div class="progress"><i id="k-p"></i></div><p class="small muted" id="k-st"></p>
       <div class="row" style="margin-top:12px"><button class="btn red" id="k-go">Crear</button><button class="btn ghost" id="k-x">Cancelar</button></div>`);
     $('k-x').onclick = closeModal;
+    $('t-sp').onclick = importarSpotify;
+    $('k-buscar').onclick = () => buscarLetraUI(0);
     $('k-audio').onchange = () => {
       const f = $('k-audio').files[0]; if (!f || $('k-tit').value) return;
       const m = f.name.replace(/\.[^.]+$/, '').split(/\s+-\s+/);
@@ -574,16 +632,17 @@ Las líneas vacías no cuentan."></textarea>
       } catch (e) { fail(e); $('k-go').disabled = false; }
     };
   }
-  const ESTADO = { subiendo: ['Subiendo', 'no'], pendiente: ['En cola', 'warn'], procesando: ['Procesando', 'red'], hecho: ['Hecho', 'ok'], error: ['Error', 'red'] };
+  const ESTADO = { borrador: ['Borrador', 'warn'], subiendo: ['Subiendo', 'no'], pendiente: ['En cola', 'warn'], procesando: ['Procesando', 'red'], hecho: ['Hecho', 'ok'], error: ['Error', 'red'] };
   VIEWS.creacion = async () => {
     const v = $('view');
     v.innerHTML = `<div class="head"><h1>Creación</h1><span class="sub"><button class="btn red" id="j-new">✨ Crear canción</button></span></div>
-      <div class="card" id="j-w"></div><h2 class="sec">Trabajos</h2><div id="j-l"></div>`;
+      <div class="card" id="j-w"></div><h2 class="sec">Borradores</h2><div id="j-b"></div><h2 class="sec">Trabajos</h2><div id="j-l"></div>`;
     $('j-new').onclick = crearCancion;
     v.onclick = async e => {
       const b = e.target.closest('[data-j]'); if (!b) return;
       const id = b.dataset.j, a = b.dataset.a;
       try {
+        if (a === 'cont') { const d = await api('/jobs'); const j = d.jobs.find(x => x.id === id); if (j) continuarBorrador(j); return; }
         if (a === 'retry') await api(`/jobs/${id}/retry`, { method: 'POST', json: {} });
         if (a === 'del' && await ask('¿Borrar este trabajo?', 'Se borra de la cola con sus ficheros (la canción, si ya se creó, se queda).')) await api(`/jobs/${id}`, { method: 'DELETE' });
         if (a === 'token') {
@@ -602,10 +661,21 @@ Las líneas vacías no cuentan."></textarea>
         <span class="muted small">${w.seen ? `${esc(w.host || 'servidor')} · último contacto ${ago(w.seen)}${w.version ? ' · v' + esc(w.version) : ''}` : w.configured ? 'Aún no se ha conectado' : 'Sin clave configurada'}</span>
         <span class="grow"></span><button class="btn sm ghost" data-j="-" data-a="token">Clave del trabajador</button></div>
         ${vivo ? '' : '<p class="small muted" style="margin:8px 0 0">El trabajador corre en el propio servidor (servicio gramola-trabajador). Si no está conectado, los trabajos esperan en la cola.</p>'}`;
+      const bor = d.jobs.filter(j => j.state === 'borrador'), resto = d.jobs.filter(j => j.state !== 'borrador');
+      const firmaB = JSON.stringify(bor.map(j => [j.id, j.titulo, j.artista, j.dup, j.updated, j.letraFuente]));
+      if (firmaB !== draw.firmaB) {   // no se repinta si no cambia (para no cortar el audio de la vista previa)
+        draw.firmaB = firmaB;
+        $('j-b').innerHTML = bor.length ? `<table class="tbl"><tbody>${bor.map(j => `<tr><td style="width:64px"><img class="cov" style="width:52px;height:52px" src="/api/admin/jobs/${j.id}/portada" alt=""></td>
+          <td><div class="t-title">${esc(j.titulo)}</div><div class="t-art">${esc(j.artista)}${j.album ? ' · ' + esc(j.album) : ''}${j.anio ? ' (' + esc(j.anio) + ')' : ''}</div>${j.dup ? `<div class="small red-t">Ya está en la biblioteca: ${esc(j.dup)}</div>` : ''}</td>
+          <td class="small muted">De Spotify · ${ago(j.finished || j.created)}<br>${j.letraFuente ? 'Letra: ' + esc(j.letraFuente) : '<span class="red-t">Sin letra</span>'}</td>
+          <td class="r"><button class="btn sm red" data-j="${j.id}" data-a="cont">Continuar</button> <button class="btn sm danger" data-j="${j.id}" data-a="del">Borrar</button></td></tr>`).join('')}</tbody></table>`
+          : '<div class="empty">No hay borradores. «Crear canción → Importar desde Spotify» deja aquí la canción descargada para seguir cuando quieras.</div>';
+      }
+      d.jobs = resto;
       $('j-l').innerHTML = d.jobs.length ? `<table class="tbl"><thead><tr><th>Canción</th><th>Tipo</th><th>Estado</th><th>Pedido</th><th></th></tr></thead><tbody>${d.jobs.map(j => {
         const [et, ec] = ESTADO[j.state] || [j.state, 'no'];
         return `<tr><td><div class="t-title">${esc(j.titulo)}</div><div class="t-art">${esc(j.artista)}${j.idioma ? ' · ' + esc(IDIOMAS[j.idioma] || j.idioma) : ''}</div></td>
-          <td class="small">${j.kind === 'crear' ? 'Crear canción' : 'Analizar voz'}</td>
+          <td class="small">${j.kind === 'crear' ? 'Crear canción' + (j.origen === 'spotify' ? ' (Spotify)' : '') : j.kind === 'spotify' ? 'Descargar de Spotify' : 'Analizar voz'}</td>
           <td style="min-width:220px"><span class="badge ${ec}">${et}</span> ${j.state === 'procesando' ? `<div class="progress" style="margin-top:6px"><i style="width:${j.progress || 0}%"></i></div><span class="small muted">${esc(j.msg || '')}</span>` : j.state === 'error' ? `<div class="small red-t" style="margin-top:4px;max-width:420px;overflow-wrap:anywhere">${esc((j.error || '').slice(-300))}</div>` : j.state === 'hecho' ? `<span class="small muted">${esc(j.msg || '')}${j.finished && j.started ? ' · ' + dur((j.finished - j.started) / 1000) : ''}</span>` : ''}</td>
           <td class="small muted">${ago(j.created)}</td>
           <td class="r">${j.state === 'hecho' && j.song ? `<a class="btn sm dark" href="#editor/${enc(j.song)}">Editor</a> <a class="btn sm" href="#canciones/${enc(j.song)}">Ficha</a> ` : ''}${j.state === 'error' ? `<button class="btn sm" data-j="${j.id}" data-a="retry">Reintentar</button> ` : ''}<button class="btn sm danger" data-j="${j.id}" data-a="del">Borrar</button></td></tr>`;

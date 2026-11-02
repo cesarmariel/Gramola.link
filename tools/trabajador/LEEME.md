@@ -43,6 +43,13 @@ admin, *Creación → Clave del trabajador*; el servidor solo guarda su huella:
 Servicio: copiar `deploy/gramola-trabajador.service` a `/etc/systemd/system/` (cambiando `USUARIO` y `DOMINIO`) y
 `systemctl enable --now gramola-trabajador`. Registro: `journalctl -u gramola-trabajador`.
 
+## Spotify (importar una canción)
+
+El trabajador también atiende «Importar desde Spotify» con el motor del antiguo Gramola, copiado tal cual (zotify
+`08d844f` y librespot `1810462` con sus parches) en `/opt/gramola-trabajador/spotify`: su propio `venv` con
+Python 3.14 (las versiones de `requirements` de aquel proyecto), `credentials.json` y `spotify_app.json` (600, del
+usuario del servicio) y `home/` para la configuración de zotify. Solo canciones sueltas.
+
 ## A mano (sin admin)
 
 ```bash

@@ -564,7 +564,15 @@ module.exports = function admin(ctx) {
   on('POST', '/jobs', async (req, res) => {
     const b = await body(req), id = Date.now().toString(36) + crypto.randomBytes(3).toString('hex');
     let j;
-    if (b.kind === 'analizar') {
+    if (b.kind === 'spotify') {
+      // Solo una canción suelta: nada de álbumes, listas, artistas ni vídeos
+      const u = String(b.url || '').trim();
+      const m = u.match(/^(?:https?:\/\/open\.spotify\.com\/(?:intl-[a-z-]+\/)?track\/|spotify:track:)([A-Za-z0-9]{22})(?:[/?#].*)?$/);
+      if (!m) throw httpErr(400, /spotify/i.test(u) ? 'Solo se puede importar una canción suelta (enlace de canción, no de álbum, lista ni artista)' : 'Pega el enlace de una canción de Spotify');
+      const dup = jobsAll().find(x => x.kind === 'spotify' && x.trackId === m[1] && ['pendiente', 'procesando'].includes(x.state));
+      if (dup) throw httpErr(409, 'Esa canción ya se está descargando');
+      j = { id, kind: 'spotify', trackId: m[1], url: 'https://open.spotify.com/track/' + m[1], titulo: 'Canción de Spotify', artista: '', state: 'pendiente', created: Date.now() };
+    } else if (b.kind === 'analizar') {
       const sid = String(b.song || ''); songDir(sid);
       j = { id, kind: 'analizar', song: sid, titulo: headerOf(songDir(sid)).TITLE || sid, artista: headerOf(songDir(sid)).ARTIST || '', state: 'pendiente', created: Date.now() };
     } else {
@@ -596,6 +604,40 @@ module.exports = function admin(ctx) {
     j.state = 'pendiente'; j.size = buf.length; jobPut(j);
     json(res, 200, j);
   });
+  // Borrador (audio ya descargado): se completa con la letra y pasa a la cola de creación
+  on('POST', '/jobs/([^/]+)/continuar', async (req, res, m) => {
+    const j = jobGet(m[1]), b = await body(req);
+    if (j.state !== 'borrador') throw httpErr(400, 'Este trabajo no es un borrador');
+    const titulo = String(b.titulo || '').trim().slice(0, 120), artista = String(b.artista || '').trim().slice(0, 120), letra = String(b.letra || '').slice(0, 30000);
+    if (!titulo || !artista) throw httpErr(400, 'Faltan el título o el artista');
+    if (letra.split('\n').filter(l => l.trim()).length < 2) throw httpErr(400, 'Pega la letra (una frase por línea)');
+    fs.writeFileSync(jobPath(j.id, 'letra.txt'), letra);
+    const folder = folderFor(artista, titulo);
+    Object.assign(j, { kind: 'crear', origen: 'spotify', titulo, artista, idioma: String(b.idioma || 'es').slice(0, 5), anio: String(b.anio || '').slice(0, 4), folder, audioName: folder + '.mp3', state: 'pendiente', progress: 0, msg: '' });
+    jobPut(j);
+    ev('songs', `Creación pedida (desde Spotify): «${artista} - ${titulo}»`);
+    json(res, 200, j);
+  });
+  on('PATCH', '/jobs/([^/]+)', async (req, res, m) => {   // guardar a medias lo escrito en un borrador
+    const j = jobGet(m[1]), b = await body(req);
+    if (j.state !== 'borrador') throw httpErr(400, 'Solo se pueden editar los borradores');
+    for (const k of ['titulo', 'artista', 'idioma', 'anio']) if (b[k] != null) j[k] = String(b[k]).slice(0, 120);
+    if (b.letra != null) fs.writeFileSync(jobPath(j.id, 'letra.txt'), String(b.letra).slice(0, 30000));
+    jobPut(j); json(res, 200, j);
+  });
+  on('GET', '/jobs/([^/]+)/(audio|portada|letra)', (req, res, m) => {
+    const j = jobGet(m[1]), f = jobPath(j.id, m[2] === 'audio' ? 'entrada.mp3' : m[2] === 'portada' ? 'portada.jpg' : 'letra.txt');
+    if (!fs.existsSync(f)) throw httpErr(404, 'No hay');
+    const st = fs.statSync(f), type = m[2] === 'audio' ? 'audio/mpeg' : m[2] === 'portada' ? 'image/jpeg' : 'text/plain; charset=utf-8';
+    const rg = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+    if (rg && m[2] === 'audio' && (rg[1] || rg[2])) {
+      const a = rg[1] ? +rg[1] : st.size - +rg[2], e = rg[1] && rg[2] ? Math.min(+rg[2], st.size - 1) : st.size - 1;
+      res.writeHead(206, { 'content-type': type, 'accept-ranges': 'bytes', 'content-range': `bytes ${a}-${e}/${st.size}`, 'content-length': e - a + 1, 'cache-control': 'no-store' });
+      return fs.createReadStream(f, { start: a, end: e }).pipe(res);
+    }
+    res.writeHead(200, { 'content-type': type, 'accept-ranges': 'bytes', 'content-length': st.size, 'cache-control': 'no-store' });
+    fs.createReadStream(f).pipe(res);
+  });
   on('POST', '/jobs/([^/]+)/retry', (req, res, m) => { const j = jobGet(m[1]); j.state = 'pendiente'; j.error = null; j.progress = 0; j.msg = ''; jobPut(j); json(res, 200, j); });
   on('DELETE', '/jobs/([^/]+)', async (req, res, m) => { jobGet(m[1]); await fsp.rm(path.join(JOBS, safeName(m[1])), { recursive: true, force: true }); json(res, 200, { ok: true }); });
   on('POST', '/worker/token', (req, res) => {
@@ -612,6 +654,85 @@ module.exports = function admin(ctx) {
     ctx.songsChanged();
     ev('songs', `Publicada: «${id}»${b.novedad !== false ? ' (en Novedades)' : ''}`);
     json(res, 200, { ok: true });
+  });
+
+  // ===================================================================== letras
+  // Búsqueda de la letra por artista y título: LRCLIB (base abierta, a menudo sincronizada por líneas) y, de reserva,
+  // Genius y songlyrics (dos de las fuentes de SimonIT/spotifylyrics). Se devuelve una frase por línea, sin marcas
+  // tipo [Estribillo]; si es sincronizada, también el LRC.
+  const UA = { 'user-agent': 'Gramola karaoke (+https://github.com/nuvolacat/Gramola.link)' };
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  async function getJson(u, tries = 3) {
+    for (let k = 0; k < tries; k++) {
+      try {
+        const r = await fetch(u, { headers: UA, signal: AbortSignal.timeout(15000) });
+        if (r.status === 404) return null;
+        if (r.ok) return await r.json();
+      } catch {}
+      await sleep(1500 * (k + 1));
+    }
+    return null;
+  }
+  const decodeHtml = s => s.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&#x27;|&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').replace(/&#(\d+);/g, (m, n) => String.fromCharCode(+n));
+  function limpiarLetra(txt) {
+    return String(txt || '').replace(/\r/g, '').split('\n')
+      .map(l => l.replace(/^\[\d+:\d+(?:[.:]\d+)?\]\s*/g, '').replace(/^\[\d+:\d+(?:[.:]\d+)?\]\s*/g, '').trim())
+      .filter(l => l && !/^\[.*\]$/.test(l) && !/^\(.*\)$/.test(l) && !/^(instrumental|♪+)$/i.test(l))
+      .join('\n');
+  }
+  async function lrclib(artista, titulo, dur) {
+    const base = 'https://lrclib.net/api/';
+    const q = new URLSearchParams({ artist_name: artista, track_name: titulo });
+    if (dur) q.set('duration', Math.round(dur));
+    let r = await getJson(base + 'get?' + q);
+    if (!r || !(r.syncedLyrics || r.plainLyrics)) {
+      const s = await getJson(base + 'search?' + new URLSearchParams({ artist_name: artista, track_name: titulo }));
+      const ok = (Array.isArray(s) ? s : []).filter(x => !x.instrumental && (x.syncedLyrics || x.plainLyrics));
+      // Con duración conocida, la versión más parecida (evita directos y remezclas); si no, la primera sincronizada
+      ok.sort((a, b) => (dur ? Math.abs((a.duration || 0) - dur) - Math.abs((b.duration || 0) - dur) : 0) || (!!b.syncedLyrics - !!a.syncedLyrics));
+      r = ok[0] || null;
+    }
+    if (!r || !(r.syncedLyrics || r.plainLyrics)) return null;
+    return { fuente: 'LRCLIB', sincronizada: !!r.syncedLyrics, lrc: r.syncedLyrics || null, texto: limpiarLetra(r.syncedLyrics || r.plainLyrics) };
+  }
+  async function genius(artista, titulo) {
+    const s = await getJson('https://genius.com/api/search/song?' + new URLSearchParams({ q: `${artista} ${titulo}`, per_page: '5' }), 2);
+    const hits = (s && s.response && s.response.sections && s.response.sections[0] && s.response.sections[0].hits) || [];
+    const a = normKey(artista).slice(0, 6);
+    const h = hits.map(x => x.result).find(x => x && normKey(x.primary_artist && x.primary_artist.name).includes(a) && x.url);
+    if (!h) return null;
+    const r = await fetch(h.url, { headers: UA, signal: AbortSignal.timeout(15000) }).catch(() => null);
+    if (!r || !r.ok) return null;
+    const html = await r.text();
+    const parts = [...html.matchAll(/<div[^>]+data-lyrics-container="true"[^>]*>([\s\S]*?)<\/div>(?=\s*(?:<div[^>]+data-lyrics-container|<div class="(?:LyricsFooter|RightSidebar)|<\/div>))/g)].map(m => decodeHtml(m[1]));
+    // Fuera la cabecera de la página («20 Contributors … Lyrics», «Translations», idiomas…) de las primeras líneas
+    const L = limpiarLetra(parts.join('\n')).split('\n');
+    while (L.length && (/contributors?|lyrics$|^translations?$|^(english|español|deutsch|français|italiano|português|català)$/i.test(L[0]))) L.shift();
+    const texto = L.filter(l => !/^\d+\s+contributors?/i.test(l) && !/^you might also like/i.test(l) && !/embed$/i.test(l)).join('\n');
+    return texto.split('\n').length >= 4 ? { fuente: 'Genius', sincronizada: false, texto } : null;
+  }
+  async function songlyrics(artista, titulo) {
+    const slug = s => normKeySpaced(s).replace(/ /g, '-');
+    const r = await fetch(`https://www.songlyrics.com/${slug(artista)}/${slug(titulo)}-lyrics/`, { headers: UA, signal: AbortSignal.timeout(15000) }).catch(() => null);
+    if (!r || !r.ok) return null;
+    const m = (await r.text()).match(/<p id="songLyricsDiv"[^>]*>([\s\S]*?)<\/p>/);
+    const texto = m ? limpiarLetra(decodeHtml(m[1])) : '';
+    return texto.split('\n').length >= 4 && !/we do not have the lyrics/i.test(texto) ? { fuente: 'songlyrics', sincronizada: false, texto } : null;
+  }
+  const normKeySpaced = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  async function buscarLetra(artista, titulo, dur) {
+    const t = String(titulo).replace(/\s*[([].*?[)\]]\s*/g, ' ').replace(/\s+-\s+.*(remaster|version|live|mix|edit).*$/i, '').trim();
+    for (const f of [() => lrclib(artista, t, dur), () => genius(artista, t), () => songlyrics(artista, t)]) {
+      try { const r = await f(); if (r && r.texto) return r; } catch {}
+    }
+    return null;
+  }
+  on('GET', '/letras', async (req, res, m, url) => {
+    const a = String(url.searchParams.get('artista') || '').trim(), ti = String(url.searchParams.get('titulo') || '').trim();
+    if (!a || !ti) throw httpErr(400, 'Pon el artista y el título');
+    const r = await buscarLetra(a, ti, +url.searchParams.get('duracion') || 0);
+    if (!r) throw httpErr(404, 'No se ha encontrado la letra en LRCLIB, Genius ni songlyrics');
+    json(res, 200, r);
   });
 
   // Novedades: marcar o quitar varias de golpe
@@ -837,8 +958,24 @@ module.exports = function admin(ctx) {
     const w = readJson(WORKER_FILE, null), m = String(req.headers.authorization || '').match(/^Bearer (.+)$/);
     return !!(w && m && crypto.timingSafeEqual(Buffer.from(hash(m[1])), Buffer.from(w.hash)));
   }
+  const normKey = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\(.*?\)|\[.*?\]/g, '').replace(/[^a-z0-9]+/g, '');
   async function instalar(j) {
     const src = p => jobPath(j.id, p);
+    if (j.kind === 'spotify') {
+      // Descargada: queda como BORRADOR de creación (falta la letra), con sus datos y la carátula de Spotify
+      const meta = readJson(src('meta.json'), {});
+      Object.assign(j, { titulo: meta.titulo || j.titulo, artista: meta.artista || '', album: meta.album || '', anio: meta.anio || '', duracion: meta.duracion || 0 });
+      const k = normKey(j.artista) + '|' + normKey(j.titulo);
+      const same = ctx.scanSongs(true).find(s => normKey(s.artist) + '|' + normKey(s.title) === k);
+      j.dup = same ? same.id : null;
+      try {
+        const l = await buscarLetra(j.artista, j.titulo, j.duracion);
+        if (l) { fs.writeFileSync(src('letra.txt'), l.texto); if (l.lrc) fs.writeFileSync(src('letra.lrc'), l.lrc); j.letraFuente = l.fuente + (l.sincronizada ? ' (sincronizada)' : ''); }
+      } catch {}
+      j.state = 'borrador';
+      ev('songs', `Descargada de Spotify: «${j.artista} - ${j.titulo}» (borrador)${j.dup ? ' · ya existe en la biblioteca' : ''}`);
+      return;
+    }
     if (j.kind === 'analizar') {
       const dir = songDir(j.song);
       for (const f of ['voz.mp3', 'voz-tono.json']) if (fs.existsSync(src(f))) fs.copyFileSync(src(f), path.join(dir, f));
@@ -855,9 +992,11 @@ module.exports = function admin(ctx) {
     j.song = folder;
     ctx.songsChanged();
     ev('songs', `Canción creada (borrador): «${folder}»`);
-    // Portada (primera de iTunes), volumen igualado y tramo del Megamix: en segundo plano
+    // Portada (la de Spotify si viene de allí; si no, la primera de iTunes), volumen igualado y Megamix: en segundo plano
+    const portadaSpotify = fs.existsSync(src('portada.jpg'));
+    if (portadaSpotify) { fs.copyFileSync(src('portada.jpg'), path.join(dir, 'cover-spotify.jpg')); setCover(dir, 'cover-spotify.jpg', { origen: 'spotify', disco: j.album || null, año: j.anio || null }); }
     (async () => {
-      try {
+      if (!portadaSpotify) try {
         const r = (await coverSearch(`${j.artista} ${j.titulo}`, 'itunes'))[0];
         if (r) {
           const buf = Buffer.from(await (await fetch(r.art, { signal: AbortSignal.timeout(20000) })).arrayBuffer());
@@ -876,7 +1015,8 @@ module.exports = function admin(ctx) {
     worker = { seen: Date.now(), host: String(b.host || '').slice(0, 60), job: worker.job, version: String(b.version || '').slice(0, 20) };
     // Un trabajo que lleva 20 min sin dar señales (el trabajador se reinició a medias) vuelve a la cola
     for (const x of jobsAll()) if (x.state === 'procesando' && Date.now() - (x.updated || 0) > 20 * 60e3) { x.state = 'pendiente'; x.msg = 'Vuelve a la cola'; jobPut(x); }
-    const j = jobsAll().reverse().find(x => x.state === 'pendiente');
+    const pend = jobsAll().reverse().filter(x => x.state === 'pendiente');
+    const j = pend.find(x => x.kind === 'spotify') || pend[0];   // las descargas de Spotify son rápidas: primero
     if (!j) return json(res, 200, {});
     j.state = 'procesando'; j.started = Date.now(); j.progress = 0; j.msg = 'Empezando'; j.worker = worker.host; jobPut(j);
     worker.job = j.id;
@@ -901,7 +1041,7 @@ module.exports = function admin(ctx) {
   });
   won('PUT', '/jobs/([^/]+)/result/([^/]+)', async (req, res, m) => {
     const j = jobGet(m[1]), name = decodeURIComponent(m[2]);
-    if (!['cancion.txt', 'voz.mp3', 'voz-tono.json'].includes(name)) throw httpErr(400, 'Fichero no admitido');
+    if (!['cancion.txt', 'voz.mp3', 'voz-tono.json', 'entrada.mp3', 'portada.jpg', 'meta.json'].includes(name)) throw httpErr(400, 'Fichero no admitido');
     fs.writeFileSync(jobPath(j.id, name), await readRaw(req, 40 * 1024 * 1024));
     json(res, 200, { ok: true });
   });
@@ -909,7 +1049,7 @@ module.exports = function admin(ctx) {
     const j = jobGet(m[1]), b = await body(req);
     worker.job = null; worker.seen = Date.now();
     if (b.ok) {
-      try { await instalar(j); j.state = 'hecho'; j.progress = 100; j.msg = String(b.msg || 'Hecho').slice(0, 200); }
+      try { await instalar(j); if (j.state !== 'borrador') j.state = 'hecho'; j.progress = 100; j.msg = String(b.msg || 'Hecho').slice(0, 200); }
       catch (e) { j.state = 'error'; j.error = 'Al instalar: ' + e.message; }
     } else { j.state = 'error'; j.error = String(b.error || 'Error').slice(0, 2000); }
     j.finished = Date.now(); jobPut(j);

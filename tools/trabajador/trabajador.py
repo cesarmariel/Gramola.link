@@ -9,10 +9,13 @@ Configuración (GRAMOLA_TRABAJADOR_CFG o ~/.gramola-trabajador.json):
 «host» hace falta cuando se habla con el servidor por dentro (127.0.0.1): el admin solo responde en su subdominio.
 La clave se genera en el admin, apartado Creación → «Clave del trabajador».
 """
+import base64
+import glob
 import json
 import os
 import platform
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
@@ -45,6 +48,51 @@ def pedir(method, ruta, data=None, raw=None, timeout=60):
         return json.loads(b) if r.headers.get('content-type', '').startswith('application/json') else b
 
 
+# ---------------------------------------------------------------------------- Spotify (una canción suelta)
+# Mismo motor que el antiguo Gramola: zotify + librespot (parcheados) con la cuenta de credentials.json, en su propio
+# entorno de Python. Ruta en la configuración: "spotify": "/opt/gramola-trabajador/spotify"
+def spotify(j, out, progreso):
+    sp = CFG.get('spotify') or '/opt/gramola-trabajador/spotify'
+    os.makedirs(out + '.tmp', exist_ok=True)
+    env = dict(os.environ, HOME=os.path.join(sp, 'home'), TQDM_DISABLE='1', PYTHONUNBUFFERED='1')
+    try:
+        app = json.load(open(os.path.join(sp, 'spotify_app.json')))
+        env.update(SPOTIFY_CLIENT_ID=app['client_id'], SPOTIFY_CLIENT_SECRET=app['client_secret'])
+    except Exception:
+        app = None
+    progreso(10, 'Descargando de Spotify')
+    cmd = [os.path.join(sp, 'venv/bin/python'), '-m', 'zotify', '--credentials-location', os.path.join(sp, 'credentials.json'),
+           '--root-path', out, '--temp-download-dir', out + '.tmp', '--download-format', 'mp3', '--download-quality', 'auto',
+           '--download-real-time', 'False', '--skip-existing', 'False', '--skip-previously-downloaded', 'False',
+           '--retry-attempts', '2', '--download-lyrics', 'False', '--bulk-wait-time', '1', '--print-splash', 'False',
+           '--print-progress-info', 'False', '--print-download-progress', 'False', '--print-downloads', 'True',
+           '--print-errors', 'True', '--output', '{artist} - {song_name}.{ext}', j['url']]
+    r = subprocess.run(cmd, capture_output=True, text=True, cwd=sp, env=env, timeout=600)
+    mp3s = glob.glob(os.path.join(out, '**', '*.mp3'), recursive=True)
+    if not mp3s:
+        raise RuntimeError('Spotify no ha dado la canción: ' + (r.stdout + r.stderr).strip()[-600:])
+    mp3 = mp3s[0]
+    progreso(80, 'Leyendo los datos')
+    info = json.loads(subprocess.run(['ffprobe', '-v', 'error', '-print_format', 'json', '-show_format', mp3], capture_output=True, text=True).stdout or '{}')
+    tags = {k.lower(): v for k, v in (info.get('format', {}).get('tags') or {}).items()}
+    meta = {'titulo': tags.get('title', ''), 'artista': tags.get('artist', ''), 'album': tags.get('album', ''),
+            'anio': (tags.get('date') or tags.get('year') or '')[:4], 'duracion': round(float(info.get('format', {}).get('duration') or 0))}
+    if not meta['anio'] and app:   # año del disco por la Web API (si responde)
+        try:
+            tok = json.loads(urllib.request.urlopen(urllib.request.Request('https://accounts.spotify.com/api/token', data=b'grant_type=client_credentials',
+                headers={'Authorization': 'Basic ' + base64.b64encode(f"{app['client_id']}:{app['client_secret']}".encode()).decode()}), timeout=15).read())['access_token']
+            tr = json.loads(urllib.request.urlopen(urllib.request.Request('https://api.spotify.com/v1/tracks/' + j['trackId'], headers={'Authorization': 'Bearer ' + tok}), timeout=15).read())
+            meta['anio'] = (tr.get('album', {}).get('release_date') or '')[:4]
+        except Exception:
+            pass
+    portada = os.path.join(out, 'portada.jpg')
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', mp3, '-an', '-c:v', 'copy', '-frames:v', '1', portada], capture_output=True)
+    shutil.move(mp3, os.path.join(out, 'entrada.mp3'))
+    json.dump(meta, open(os.path.join(out, 'meta.json'), 'w'), ensure_ascii=False)
+    nombres = ['entrada.mp3', 'meta.json'] + (['portada.jpg'] if os.path.exists(portada) and os.path.getsize(portada) > 1000 else [])
+    return nombres, f"{meta['artista']} - {meta['titulo']}"
+
+
 def atender(j):
     tmp = tempfile.mkdtemp(prefix='gramola-')
     try:
@@ -56,10 +104,18 @@ def atender(j):
                     raise KeyboardInterrupt('cancelado desde el admin')
             except urllib.error.URLError:
                 pass
+        out = os.path.join(tmp, 'salida')
+        if j['kind'] == 'spotify':
+            os.makedirs(out, exist_ok=True)
+            nombres, msg = spotify(j, out, progreso)
+            for n in nombres:
+                pedir('PUT', f'/jobs/{j["id"]}/result/{n}', raw=open(os.path.join(out, n), 'rb').read(), timeout=300)
+            pedir('POST', f'/jobs/{j["id"]}/done', {'ok': True, 'msg': msg})
+            crear.log('✓ Descargada:', msg)
+            return
         progreso(1, 'Descargando el audio')
         audio = os.path.join(tmp, 'audio.mp3')
         open(audio, 'wb').write(pedir('GET', f'/jobs/{j["id"]}/input', timeout=300))
-        out = os.path.join(tmp, 'salida')
         if j['kind'] == 'analizar':
             crear.analizar(audio, out, progreso)
             nombres = ['voz.mp3', 'voz-tono.json']

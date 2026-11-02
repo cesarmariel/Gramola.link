@@ -2,6 +2,13 @@
 
 Versiones con el esquema `1.AA.MMDD.HHMM` (fecha y hora del despliegue).
 
+## 1.26.1102.1202
+- **Letras automáticas**: al importar de Spotify la letra se busca sola, y en «Crear canción» hay un botón «Buscar la letra». Fuentes: LRCLIB (a menudo sincronizada por líneas) y, de reserva, Genius y songlyrics (como SimonIT/spotifylyrics). Se deja una frase por línea, sin marcas ni cabeceras.
+
+## 1.26.1102.1157
+- **Importar desde Spotify** en «Crear canción»: se pega el enlace de una canción (solo canciones sueltas) y se descarga en el servidor con el motor del antiguo Gramola (MP3 320 kbps con carátula y datos). Queda en **Borradores** (apartado Creación) para seguir cuando se quiera: escucharla, completar datos y letra, guardar a medias o mandarla a crear.
+- Las canciones creadas pendientes de revisar se llaman ahora «Sin publicar».
+
 ## 1.26.1102.1150
 - **Editor de canciones** en el admin (tipo DAW): notas a la altura de su tono, frases, forma de onda (también de la voz sola) y curva de la voz real; mover, alargar, partir, unir, cambiar sílabas, notas doradas/libres/rap, cortes de frase, GAP; deshacer y rehacer; reproducción lenta, tono guía, repetir frase, vista de karaoke y prueba con el micro con % por frase; versiones de cada guardado.
 - **Creación de canciones** a partir del audio y la letra: cola en el admin que atiende un trabajador en el propio servidor (servicio con prioridad mínima y límites; separación de voz con Demucs, alineación forzada MMS, tono con CREPE, sílabas con pyphen; ~5 min por canción). Quedan como **borrador** (no salen en la tele) con portada, volumen y Megamix; se revisan en el editor y se publican (entrando en Novedades).

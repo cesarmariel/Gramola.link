@@ -57,12 +57,33 @@ Desde la ficha, **«✎ Abrir en el editor»** (`#editor/<carpeta>`). Edita el m
 
 **«✨ Crear canción»** (en *Canciones* o en *Creación*): artista, título, idioma, año, audio y la letra con **una frase por línea**.
 El trabajo va a una cola que atiende el **trabajador** (`tools/trabajador/`, servicio `gramola-trabajador` en el mismo servidor, con prioridad mínima): separa la voz, encaja la letra
-sílaba a sílaba, saca las notas y devuelve el `.txt`. El servidor la instala como **borrador** (`borrador.json` en la
-carpeta: no sale en la tele), le pone la primera portada de iTunes, iguala el volumen y busca el estribillo del Megamix.
+sílaba a sílaba, saca las notas y devuelve el `.txt`. El servidor la instala **sin publicar** (`borrador.json` en la
+carpeta: no sale en la tele; filtro «Sin publicar» en Canciones), le pone la primera portada de iTunes, iguala el volumen y busca el estribillo del Megamix.
 Se revisa en el editor y se **publica** desde la ficha (por defecto, entrando en Novedades).
 
 En una canción de prueba con su `.txt` hecho a mano: los inicios de palabra a una mediana de 65 ms (el 92 % a menos de
 150 ms) y el 76 % de las notas a ±1 semitono. Tarda unos 5 minutos por canción en el servidor.
+
+### Importar desde Spotify
+
+En **«✨ Crear canción»**, pestaña **«Importar desde Spotify»**: se pega el enlace de **una canción** (`…/track/…`;
+álbumes, listas, artistas y vídeos se rechazan) y «Descargar». El trabajador la baja con el mismo motor que el antiguo
+Gramola (zotify + librespot parcheados y la cuenta de `credentials.json`, en `/opt/gramola-trabajador/spotify`, con
+su propio Python 3.14): MP3 a 320 kbps con su carátula, título, artista, disco y año. Tarda unos segundos y pasa por
+delante de las creaciones en la cola.
+
+La canción queda en **Borradores** (apartado *Creación*) con su audio para escucharla y un aviso si ya está en la
+biblioteca. **«Continuar»** abre los datos y la letra: «Guardar y seguir luego» la deja en Borradores; **«Crear»** la manda
+a la cola de creación (y al instalarla usa la carátula de Spotify).
+
+### Letras
+
+Al descargar de Spotify la letra **se busca sola**; en los formularios hay además **«Buscar la letra»** (por artista y
+título, `GET /api/admin/letras`). Fuentes, en orden: **LRCLIB** (base abierta, sin clave; a menudo sincronizada por
+líneas, y con la duración se elige la versión que encaja), **Genius** y **songlyrics** (dos de las fuentes de
+[SimonIT/spotifylyrics](https://github.com/SimonIT/spotifylyrics)). Se limpia a una frase por línea, sin marcas como
+«[Estribillo]» ni cabeceras de la web. Conviene revisarla: cada línea será una frase en la tele. Si es sincronizada,
+el LRC se guarda junto al trabajo (`letra.lrc`).
 
 **«Analizar la voz»** (en la ficha) hace solo la parte de la voz para una canción que ya existe: deja `voz.mp3` y
 `voz-tono.json`, que el editor usa para encajar mejor.
