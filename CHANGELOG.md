@@ -2,6 +2,11 @@
 
 Versiones con el esquema `1.AA.MMDD.HHMM` (fecha y hora del despliegue).
 
+## 1.26.1102.1646
+- **Editor · frases**: con palabras elegidas, «✂ Separar en otra frase», «⤒ Pasar a la frase anterior» y «⤓ Pasar a la frase siguiente»; «Unir con la siguiente» junta dos frases.
+- **Editor · trozo sin cantar**: se marca arrastrando (botón «⌇ Marcar trozo sin cantar» o sobre la forma de onda), se puede escuchar y «Dejar sin cantar» aparta las sílabas que caían dentro (antes o después del trozo) y deja un corte de frase en el hueco.
+- Versiones del editor con etiqueta («UltraSinger», «antes de volver a encajar»).
+
 ## 1.26.1102.1303
 - **Editor en modo sencillo** (por defecto): lista de frases; al elegir una, se ve solo ese fragmento con cada sílaba como un bloque con su texto; palabras de la frase como botones; escuchar la frase (en bucle si se quiere), moverla, alargarla o acortarla; alargar, acortar, subir o bajar cada sílaba; **palabras doradas** con un clic. El modo avanzado (línea de tiempo completa) sigue disponible.
 - **Notas largas**: el encaje alarga cada sílaba mientras suena la voz (energía de la voz separada + tono, sin cortar en respiraciones), recoloca sílabas que el alineador estiraba sobre los solos y solo parte una nota larga si la melodía cambia de verdad: el **vibrato** ya no la trocea y los saltos de octava del detector se corrigen. En «Volcán»: notas sobre la voz real del 77 % al 90 %, notas donde no se canta del 19 % al 2 %, sin notas de 25 s, y 106 notas largas enteras (antes 80).

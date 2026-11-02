@@ -135,7 +135,7 @@
         <div class="ed-right">
           <div class="ed-sh smp" id="ed-sh"></div>
           <canvas id="ed-mini" class="ed-mini adv" height="34"></canvas>
-          <div class="ed-wrap" id="ed-wrap"><canvas id="ed-cv"></canvas></div>
+          <div class="ed-wrap" id="ed-wrap"><canvas id="ed-cv"></canvas><div class="ed-hb" id="ed-hb" hidden></div></div>
           <div class="ed-sb smp" id="ed-sb"></div>
         </div>
       </div>
@@ -149,7 +149,7 @@
           <b>Clic</b> elegir · <b>⇧ clic</b> añadir · <b>arrastrar fondo</b> elegir varias · <b>arrastrar nota</b> mover (tiempo y tono) · <b>bordes</b> alargar o acortar ·
           <b>doble clic</b> en nota: cambiar sílaba; en el fondo: nota nueva · <b>← →</b> mover 1 tiempo (⇧ 10) · <b>↑ ↓</b> tono (⇧ octava) · <b>⌥ ← →</b> acortar / alargar ·
           <b>S</b> partir · <b>M</b> unir con la siguiente · <b>B</b> corte de frase antes de la nota · <b>G</b> dorada · <b>F</b> libre · <b>R</b> rap · <b>N</b> normal ·
-          <b>Supr</b> borrar · <b>⌘A</b> todas · <b>Espacio</b> reproducir · <b>Inicio</b> al principio · arrastrar las <span style="color:${RED}">líneas rojas</span> mueve los cortes de frase ·
+          <b>Supr</b> borrar · <b>⌘A</b> todas · <b>Espacio</b> reproducir · <b>Inicio</b> al principio · arrastrar las <span style="color:${RED}">líneas rojas</span> mueve los cortes de frase · <b>arrastrar sobre la onda</b> marcar un trozo sin cantar ·
           rueda: desplazar · <b>⌘ rueda</b> zoom · clic en la regla: saltar ahí</div>
           <div class="ed-score" id="ed-score"></div></div>
       </div>
@@ -177,6 +177,7 @@
     // ---------------- vista
     let pxPerMs = 0.12, viewMs = 0, H = 520, W = 1000;
     let sel = new Set(), hist = [], fut = [], dirty = false, drag = null, hover = null;
+    let hueco = null, marcando = false;   // trozo sin cantar marcado {a, b} en ms, y si el próximo arrastre lo marca
     const zoomFrom = v => 0.015 * Math.pow(1.06, v);   // 0..100 → 0.015..5 px/ms
     pxPerMs = zoomFrom(+$('#ed-zoom').value);
     const RULER = 26, WAVE = 80, PAD = 8;
@@ -220,7 +221,9 @@
       // Modo sencillo: la frase elegida ocupa el lienzo (tiempo y tonos de sus notas)
       const ph = frases(); if (!ph.length) return;
       cur = clamp(cur, 0, ph.length - 1);
-      const p = ph[cur], a = b2ms(p.start) - 700, b = b2ms(p.end) + 700;
+      const p = ph[cur], a = b2ms(p.start) - 700;
+      let b = b2ms(p.end) + 700;
+      if (marcando || hueco) { const nx = ph[cur + 1]; b = Math.max(b, Math.min(nx ? b2ms(nx.start) + 1500 : durMs || b, b2ms(p.end) + 30000)); if (hueco) b = Math.max(b, hueco.b + 700); }
       pxPerMs = W / Math.max(1000, b - a); viewMs = a;
       const ps = p.notes.map(n => n.p);
       pMin = Math.min(...ps) - 2; pMax = Math.max(...ps) + 2;
@@ -272,6 +275,18 @@
         if (x < -10 || x > W + 10) continue;
         cx.strokeStyle = RED; cx.setLineDash([4, 4]); cx.beginPath(); cx.moveTo(x + .5, RULER); cx.lineTo(x + .5, wy); cx.stroke(); cx.setLineDash([]);
         cx.fillStyle = RED; cx.beginPath(); cx.moveTo(x - 6, RULER); cx.lineTo(x + 6, RULER); cx.lineTo(x, RULER + 9); cx.fill();
+      }
+      // trozo sin cantar (marcándolo o ya marcado)
+      const hz = drag && drag.kind === 'hueco' ? { a: msOf(Math.min(drag.x0, drag.x1)), b: msOf(Math.max(drag.x0, drag.x1)) } : hueco;
+      if (hz) {
+        const x0 = xOf(hz.a), x1 = xOf(hz.b);
+        cx.save(); cx.beginPath(); cx.rect(x0, RULER, x1 - x0, H - RULER); cx.clip();
+        cx.fillStyle = 'rgba(32,30,29,.07)'; cx.fillRect(x0, RULER, x1 - x0, H - RULER);
+        cx.strokeStyle = 'rgba(32,30,29,.18)'; cx.lineWidth = 1;
+        for (let x = x0 - H; x < x1; x += 12) { cx.beginPath(); cx.moveTo(x, H); cx.lineTo(x + H, 0); cx.stroke(); }
+        cx.restore();
+        cx.fillStyle = INK; cx.fillRect(x0, RULER, 2, H - RULER); cx.fillRect(x1 - 2, RULER, 2, H - RULER);
+        cx.font = '800 12px Archivo, sans-serif'; cx.fillText('SIN CANTAR', x0 + 6, RULER + 16);
       }
       // curva de la voz real (análisis) y del micro
       if (pitchCurve) curve(pitchCurve, 'rgba(44,111,214,.85)', 2);
@@ -382,7 +397,7 @@
         if (bi != null) { push(); drag = { kind: 'break', i: bi }; return; }
         seek(msOf(x)); return;
       }
-      if (y > H - WAVE) { seek(msOf(x)); return; }
+      if (y > H - WAVE || marcando) { drag = { kind: 'hueco', x0: x, x1: x, onda: y > H - WAVE }; return; }
       const bi = hitBreak(x, RULER);
       const h = hit(x, y);
       if (!h && bi != null && Math.abs(xOf(b2ms(T().breaks[bi])) - x) < 4) { push(); drag = { kind: 'break', i: bi }; return; }
@@ -404,7 +419,7 @@
       const { x, y } = at(e);
       if (!drag) {
         const h = y > RULER && y < H - WAVE ? hit(x, y) : null;
-        cv.style.cursor = (y < RULER + 14 && hitBreak(x, y) != null) ? 'ew-resize' : h ? (h.edge ? 'ew-resize' : 'grab') : y < RULER || y > H - WAVE ? 'pointer' : 'crosshair';
+        cv.style.cursor = marcando && y > RULER ? 'col-resize' : (y < RULER + 14 && hitBreak(x, y) != null) ? 'ew-resize' : h ? (h.edge ? 'ew-resize' : 'grab') : y > H - WAVE ? 'col-resize' : y < RULER ? 'pointer' : 'crosshair';
         return;
       }
       const dB = Math.round((x - (drag.x0 ?? x)) / pxPerMs / beatMs());
@@ -418,6 +433,8 @@
       } else if (drag.kind === 'resize-l') {
         for (const o of drag.orig) { const nb = Math.min(o.b + o.l - 1, o.b + dB); o.n.l = o.l + (o.b - nb); o.n.b = nb; }
         drag.moved = true;
+      } else if (drag.kind === 'hueco') {
+        drag.x1 = x;
       } else if (drag.kind === 'break') {
         T().breaks[drag.i] = Math.round(ms2b(msOf(x)));
       } else if (drag.kind === 'marquee') {
@@ -433,6 +450,12 @@
     addEventListener('mouseup', onUp);
     function onUp() {
       if (!drag) return;
+      if (drag.kind === 'hueco') {
+        const d = drag; drag = null;
+        if (Math.abs(d.x1 - d.x0) < 5) { if (d.onda && !marcando) seek(msOf(d.x0)); return draw(); }
+        hueco = { a: Math.max(0, msOf(Math.min(d.x0, d.x1))), b: msOf(Math.max(d.x0, d.x1)) }; marcando = false;
+        return barraHueco();
+      }
       if ((drag.kind === 'move' || drag.kind.startsWith('resize')) && !drag.moved) { hist.pop(); setDirty(drag.wasDirty); }
       if (drag.kind === 'break') T().breaks.sort((a, b) => a - b);
       if (drag.kind === 'move') { T().notes.sort((a, b) => a.b - b.b); range(); }
@@ -484,7 +507,7 @@
       if (mod && k.toLowerCase() === 'a') { e.preventDefault(); sel = new Set(T().notes); return refresh(); }
       if (k === ' ') { e.preventDefault(); return toggle(); }
       if (k === 'Home') { e.preventDefault(); return seek(Math.max(0, b2ms(T().notes[0] ? T().notes[0].b : 0) - 2000)); }
-      if (k === 'Escape') { sel.clear(); return refresh(); }
+      if (k === 'Escape') { if (hueco || marcando) { hueco = null; marcando = false; barraHueco(); } sel.clear(); return refresh(); }
       if (!S.length && sencillo() && (k === 'ArrowLeft' || k === 'ArrowRight')) { e.preventDefault(); return irFrase(cur + (k === 'ArrowLeft' ? -1 : 1)); }
       if (!S.length) return;
       if (k === 'ArrowLeft' || k === 'ArrowRight') {
@@ -647,14 +670,21 @@
           <button class="btn sm" data-s="prev">◀ Anterior</button><button class="btn sm dark" data-s="play">▶ Escuchar la frase</button><button class="btn sm" data-s="next">Siguiente ▶</button></div>
         <div class="ed-words">${palabrasDe(p).map((w, i) => `<button class="ed-w ${w.oro ? 'oro' : ''} ${w.notas.every(n => sel.has(n)) ? 'sel' : ''}" data-w="${i}" title="Elegir la palabra">${esc(w.txt)}</button>`).join('')}</div>
         <div class="row small"><span class="muted">Toda la frase:</span><button class="btn sm" data-s="antes">⟵ Antes</button><button class="btn sm" data-s="despues">Después ⟶</button>
-          <button class="btn sm" data-s="corta">Más corta</button><button class="btn sm" data-s="larga">Más larga</button><button class="btn sm dark" data-s="juego">▶ Ver en el juego desde aquí</button></div>`;
+          <button class="btn sm" data-s="corta">Más corta</button><button class="btn sm" data-s="larga">Más larga</button><button class="btn sm dark" data-s="juego">▶ Ver en el juego desde aquí</button>
+          <span class="grow"></span>${cur < ph.length - 1 ? '<button class="btn sm" data-s="unir" title="Junta esta frase y la siguiente en una sola">Unir con la siguiente</button>' : ''}
+          <button class="btn sm ${marcando ? 'red' : ''}" data-s="hueco" title="Marca un trozo de la canción donde no se canta (un solo, una parte instrumental) y aparta de ahí las sílabas">${marcando ? 'Arrastra sobre el trozo… (Esc cancela)' : '⌇ Marcar trozo sin cantar'}</button></div>`;
+      const sp = ubicar([...sel]);
       const S = [...sel].sort((a, b) => a.b - b.b);
       $('#ed-sb').innerHTML = S.length
         ? `<div class="row"><b>«${esc(S.map(n => n.s).join('').replace(/~/g, '').trim())}»</b><span class="small muted">${S.length === 1 ? noteName(S[0].p) + ' · ' + Math.round(S[0].l * beatMs()) + ' ms' : S.length + ' sílabas'}</span><span class="grow"></span>
             <button class="btn sm" data-n="acortar">Acortar</button><button class="btn sm" data-n="alargar">Alargar</button>
             <button class="btn sm" data-n="bajar">Bajar tono</button><button class="btn sm" data-n="subir">Subir tono</button>
             <button class="btn sm" data-n="antes">⟵</button><button class="btn sm" data-n="despues">⟶</button>
-            <button class="btn sm ${S.every(esOro) ? 'red' : ''}" data-n="oro">★ Dorada${S.every(esOro) ? ' (quitar)' : ''}</button></div>`
+            <button class="btn sm ${S.every(esOro) ? 'red' : ''}" data-n="oro">★ Dorada${S.every(esOro) ? ' (quitar)' : ''}</button></div>
+          ${sp ? `<div class="row" style="margin-top:6px"><span class="small muted">Frase:</span>
+            ${sp.ini && sp.k > 0 ? '<button class="btn sm" data-n="aAnt" title="Estas palabras pasan al final de la frase anterior">⤒ Pasar a la frase anterior</button>' : ''}
+            ${!(sp.ini && sp.fin) ? '<button class="btn sm" data-n="separar" title="Estas palabras pasan a ser una frase aparte">✂ Separar en otra frase</button>' : ''}
+            ${sp.fin && sp.k < frases().length - 1 ? '<button class="btn sm" data-n="aSig" title="Estas palabras pasan al principio de la frase siguiente">⤓ Pasar a la frase siguiente</button>' : ''}</div>` : ''}`
         : '<p class="small muted" style="margin:0">Haz clic en una sílaba (o en una palabra de arriba) para retocarla: alargar, acortar, tono o dorada. También puedes arrastrar sus bordes con el ratón.</p>';
     }
     function irFrase(i, escuchar) {
@@ -673,6 +703,95 @@
     }
     const paso = () => Math.max(1, Math.round(50 / beatMs()));   // ~50 ms
     function cambiar(fn) { push(); fn(); T().notes.sort((a, b) => a.b - b.b); refresh(); }
+    // ---- cortes de frase: un corte separa ns[i-1] de ns[i] si cae en (ns[i-1].b, ns[i].b]
+    const notasOrden = () => T().notes.slice().sort((a, b) => a.b - b.b);
+    function quitaCortes(ns, i) {
+      if (i <= 0 || i >= ns.length) return;
+      const lo = ns[i - 1].b, hi = ns[i].b;
+      T().breaks = T().breaks.filter(b => { const fuera = !(b > lo && b <= hi); if (!fuera && T().br2) delete T().br2[b]; return fuera; });
+    }
+    function ponCorte(ns, i) {
+      if (i <= 0 || i >= ns.length) return;
+      const pv = ns[i - 1], nx = ns[i];
+      if (T().breaks.some(b => b > pv.b && b <= nx.b)) return;
+      T().breaks.push(clamp(pv.b + pv.l, pv.b + 1, nx.b)); T().breaks.sort((a, b) => a - b);
+    }
+    // Dónde está la selección dentro de su frase (null si no es un trozo seguido de una sola frase)
+    function ubicar(S) {
+      if (!S.length) return null;
+      S = S.slice().sort((a, b) => a.b - b.b);
+      const ph = frases(), k = ph.findIndex(p => p.notes.includes(S[0]));
+      if (k < 0) return null;
+      const ns = ph[k].notes, i = ns.indexOf(S[0]);
+      if (!S.every((n, j) => ns[i + j] === n)) return null;
+      return { k, ini: i === 0, fin: i + S.length === ns.length };
+    }
+    // ---- trozo sin cantar: las sílabas que caen dentro se apartan a un lado u otro y queda un corte de frase
+    function barraHueco() {
+      const hb = $('#ed-hb');
+      if (!hueco) { hb.hidden = true; if (sencillo()) panelSencillo(); return draw(); }
+      const A = Math.round(ms2b(hueco.a)), B = Math.max(A + 1, Math.round(ms2b(hueco.b))), dentro = T().notes.filter(n => n.b < B && n.b + n.l > A).length;
+      hb.innerHTML = `<b>Trozo sin cantar</b> <span class="mono">${fmt(hueco.a)} – ${fmt(hueco.b)}</span> <span class="muted">(${((hueco.b - hueco.a) / 1000).toFixed(1).replace('.', ',')} s · ${dentro ? dentro + (dentro === 1 ? ' sílaba dentro' : ' sílabas dentro') : 'no hay nada cantado'})</span>
+        <button class="btn sm" data-h="oir">▶ Escuchar</button><button class="btn sm red" data-h="ok" ${dentro ? '' : 'disabled'}>Dejar sin cantar</button><button class="btn sm ghost" data-h="no">Cancelar</button>`;
+      hb.hidden = false;
+      if (sencillo()) panelSencillo();
+      draw();
+    }
+    $('#ed-hb').onclick = async e => {
+      const b = e.target.closest('[data-h]'); if (!b || !hueco) return;
+      if (b.dataset.h === 'no') { hueco = null; return barraHueco(); }
+      if (b.dataset.h === 'oir') {
+        await actx.resume(); finFrase = { ini: Math.max(0, hueco.a - 1500), fin: hueco.b + 1500 };
+        audio.currentTime = finFrase.ini / 1000; audio.playbackRate = +$('#ed-rate').value; await audio.play(); $('#ed-play').textContent = '❚❚'; return draw();
+      }
+      const n = dejarSinCantar(hueco.a, hueco.b);
+      hueco = null; barraHueco();
+      toast(n ? `Hecho: ${n} ${n === 1 ? 'sílaba apartada' : 'sílabas apartadas'} del trozo sin cantar` : 'En ese trozo no se cantaba nada');
+    };
+    function dejarSinCantar(aMs, bMs) {
+      const A = Math.round(ms2b(aMs)), B = Math.max(A + 1, Math.round(ms2b(bMs))), mid = (A + B) / 2;
+      const toca = n => n.b < B && n.b + n.l > A;
+      const ph = frases();
+      if (!ph.some(p => p.notes.some(toca))) return 0;
+      push();
+      const izq = [], der = [];
+      for (const p of ph) {
+        const t = p.notes.filter(toca); if (!t.length) continue;
+        const antes = p.start < A, despues = p.end > B;
+        for (const n of t) {
+          // la frase manda si solo asoma por un lado; si cruza el trozo entero (o cae dentro), decide el centro de la sílaba
+          const lado = antes && !despues ? 'i' : despues && !antes ? 'd' : (n.b + n.l / 2 < mid ? 'i' : 'd');
+          (lado === 'i' ? izq : der).push(n);
+        }
+      }
+      const ns = notasOrden(), fuera = ns.filter(n => !izq.includes(n) && !der.includes(n));
+      const encaja = (grupo, s0, e0, s1, e1) => {   // lleva [s0, e0] a [s1, e1] proporcionalmente
+        const k = e0 > s0 ? (e1 - s1) / (e0 - s0) : 1;
+        for (const n of grupo) { const ni = Math.round(s1 + (n.b - s0) * k), nf = Math.round(s1 + (n.b + n.l - s0) * k); n.b = ni; n.l = Math.max(1, nf - ni); }
+      };
+      if (izq.length) {
+        izq.sort((a, b) => a.b - b.b);
+        const s0 = izq[0].b, e0 = Math.max(...izq.map(n => n.b + n.l));
+        const tope = Math.max(-1e9, ...fuera.filter(n => n.b < s0).map(n => n.b + n.l));
+        const s1 = s0 < A ? s0 : Math.max(tope, A - (e0 - s0), A - izq.length * 2);
+        encaja(izq, s0, e0, Math.min(s1, A - izq.length), A);
+      }
+      if (der.length) {
+        der.sort((a, b) => a.b - b.b);
+        const s0 = der[0].b, e0 = Math.max(...der.map(n => n.b + n.l));
+        const sigue = Math.min(1e9, ...fuera.filter(n => n.b >= B).map(n => n.b));
+        const e1 = e0 > B ? e0 : Math.min(sigue, B + (e0 - s0));
+        encaja(der, s0, e0, B, Math.max(e1, B + der.length));
+      }
+      // un único corte de frase entre lo de antes y lo de después del trozo
+      T().notes.sort((a, b) => a.b - b.b);
+      const ns2 = notasOrden(), j = ns2.findIndex(n => n.b >= B);
+      if (j > 0) { quitaCortes(ns2, j); ponCorte(ns2, j); }
+      range();
+      const k = frases().findIndex(p => p.notes.includes(ns2[j])); if (sencillo() && j > 0 && k > 0) cur = k - 1;
+      refresh();
+      return izq.length + der.length;
+    }
     $('#ed-sl').onclick = e => { const d = e.target.closest('[data-f]'); if (d) { panelSencillo.noScroll = true; irFrase(+d.dataset.f); panelSencillo.noScroll = false; } };
     $('#ed-sh').onclick = e => {
       const w = e.target.closest('[data-w]');
@@ -682,6 +801,8 @@
       if (a === 'prev' || a === 'next') return irFrase(cur + (a === 'prev' ? -1 : 1));
       if (a === 'play') return audio.paused ? escucharFrase() : (audio.pause(), (finFrase = null));
       if (a === 'juego') return verEnJuego(b2ms(p.start));
+      if (a === 'hueco') { marcando = !marcando; hueco = null; barraHueco(); return refresh(); }
+      if (a === 'unir') return cambiar(() => { const ns = notasOrden(), i = ns.indexOf(p.notes[p.notes.length - 1]); quitaCortes(ns, i + 1); });
       const d = paso();
       if (a === 'antes' || a === 'despues') return cambiar(() => { const s = a === 'antes' ? -d : d; for (const n of p.notes) n.b += s; T().breaks = T().breaks.map(x => (x > p.start - 1 && x <= p.end + 1 ? x + s : x)); });
       if (a === 'corta' || a === 'larga') return cambiar(() => {
@@ -693,6 +814,17 @@
       const b = e.target.closest('[data-n]'); if (!b) return;
       const S = [...sel].sort((a, b2) => a.b - b2.b), d = paso(), a = b.dataset.n;
       const sig = n => T().notes.filter(x => x !== n && x.b >= n.b && !sel.has(x)).sort((x, y) => x.b - y.b)[0];
+      if (a === 'separar' || a === 'aAnt' || a === 'aSig') {
+        const sp = ubicar(S); if (!sp) return;
+        cambiar(() => {
+          const ns = notasOrden(), i0 = ns.indexOf(S[0]), i1 = ns.indexOf(S[S.length - 1]) + 1;   // i1: primera nota tras la selección
+          if (a === 'separar') { ponCorte(ns, i0); ponCorte(ns, i1); }
+          if (a === 'aAnt') { quitaCortes(ns, i0); ponCorte(ns, i1); }
+          if (a === 'aSig') { quitaCortes(ns, i1); ponCorte(ns, i0); }
+        });
+        const k = frases().findIndex(p => p.notes.includes(S[0])); if (k >= 0) { cur = k; refresh(); }
+        return;
+      }
       cambiar(() => {
         for (const n of S) {
           if (a === 'alargar') { const nx = sig(n); n.l = nx ? Math.max(n.l, Math.min(n.l + d, nx.b - n.b)) : n.l + d; }
@@ -751,10 +883,17 @@
         if (nid !== id) location.hash = 'editor/' + encodeURIComponent(nid);   // sustituyó a la anterior: ahora vive en su carpeta
       } catch (e) { fail(e); }
     };
+    // «2026-11-02T12-09-50-262Z-antes-de-reencajar.txt» → «02/11/2026 12:09:50 · antes de reencajar»
+    function etiquetaVersion(n) {
+      const m = n.match(/^(\d{4})-(\d\d)-(\d\d)T(\d\d)-(\d\d)-(\d\d)[^-]*-?\d*Z?-?(.*)\.txt$/);
+      if (!m) return n;
+      const extra = { ultrasinger: 'UltraSinger', 'antes-de-reencajar': 'antes de volver a encajar' }[m[7]] || m[7].replace(/-/g, ' ');
+      return `${m[3]}/${m[2]}/${m[1]} ${m[4]}:${m[5]}:${m[6]}${extra ? ' · ' + extra : ''}`;
+    }
     async function loadVersions() {
       try {
         const l = await api('/songs/' + encodeURIComponent(id) + '/versions');
-        $('#ed-ver').innerHTML = `<option value="">Versiones (${l.length})…</option>` + l.map(v => `<option value="${esc(v.name)}">${esc(v.name.replace(/T(\d\d)-(\d\d)-(\d\d).*/, ' $1:$2:$3').replace(/^(\d{4})-(\d\d)-(\d\d)/, '$3/$2/$1'))}</option>`).join('');
+        $('#ed-ver').innerHTML = `<option value="">Versiones (${l.length})…</option>` + l.map(v => `<option value="${esc(v.name)}">${esc(etiquetaVersion(v.name))}</option>`).join('');
       } catch {}
     }
     $('#ed-ver').onchange = async () => {

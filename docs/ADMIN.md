@@ -48,6 +48,13 @@ Desde la ficha, **«✎ Abrir en el editor»** (`#editor/<carpeta>`). Edita el m
   (~50 ms), más corta/más larga (5 %) y «Ver en el juego desde aquí»;
 - la sílaba o palabra elegida: acortar, alargar (sin pisar la siguiente), subir/bajar tono, mover, dorada; los bordes
   de los bloques también se arrastran.
+- **Frases**: con palabras elegidas, «✂ Separar en otra frase» las deja en una frase aparte; si están al principio o al
+  final de la frase, «⤒ Pasar a la frase anterior» / «⤓ Pasar a la frase siguiente»; «Unir con la siguiente» junta la
+  frase con la de después.
+- **Trozo sin cantar** (un solo, una parte instrumental): «⌇ Marcar trozo sin cantar» y arrastrar sobre él (también
+  arrastrando sobre la forma de onda, en los dos modos); se puede escuchar y, con «Dejar sin cantar», las sílabas que
+  caían dentro se aprietan antes o después del trozo (según a qué frase pertenecen o, si la frase lo cruza, según su
+  mitad) y queda un corte de frase en el hueco. Esc cancela.
 - Las canciones en preparación tienen **«Volver a encajar»**: rehace las notas desde su audio y su letra con el método
   actual (lo editado queda en Versiones).
 
