@@ -2,7 +2,8 @@
 
 ## Requisitos
 
-- **Node.js 22+** (solo usa la librería `ws`).
+- **Node.js 22+** (librerías `ws` y `@simplewebauthn/server` para el Touch ID del admin).
+- Para el admin: **python3** y **ffmpeg** (Megamix y volumen de las canciones).
 - Un **dominio con HTTPS** para jugar con móviles (los navegadores solo dejan usar el micro en páginas seguras).
 
 ## En local (para desarrollar)
@@ -22,7 +23,8 @@ Variables de entorno:
 | `WEB_DIR` | `../web` | Carpeta de la web. |
 | `SONGS_DIR` | `$WEB_DIR/songs` | Carpeta de canciones. |
 | `SERVE_STATIC` | `1` | Con `0`, el servidor solo atiende `/api` y `/ws` (si los estáticos los sirve nginx). |
-| `DATA_DIR` | `server/data` | Dónde se guardan los récords (`records.json`). |
+| `DATA_DIR` | `server/data` | Récords (`records.json`), estadísticas, actividad, llaves del admin y canciones retiradas. |
+| `ADMIN_HOST` | — | Host del portal de administración. Sin ella, cualquier host que empiece por `admin.` (en local, `admin.localhost:8877`). |
 
 En `localhost` el micro funciona porque los navegadores lo tratan como seguro, así que puedes probar la web del micro
 en el mismo ordenador (`http://localhost:8877/m/`).

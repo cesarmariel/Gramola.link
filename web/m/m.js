@@ -118,6 +118,14 @@ function onMessage(m) {
     else setWaitTexts(lastState);
     return;
   }
+  // Aviso desde la administración: una franja arriba unos segundos
+  if (m.type === 'admin' && m.action === 'toast' && m.text) {
+    let el = document.getElementById('g-aviso');
+    if (!el) { el = document.createElement('div'); el.id = 'g-aviso'; el.className = 'aviso'; document.body.appendChild(el); }
+    el.textContent = String(m.text).slice(0, 140);
+    el.classList.add('on'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('on'), 6000);
+    return;
+  }
   if (m.type === 'kicked' || m.type === 'closed') {
     joined = false;
     hello = null;

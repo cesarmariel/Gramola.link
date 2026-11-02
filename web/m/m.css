@@ -126,3 +126,7 @@ hr { border: 0; border-top: 2px solid var(--ink); width: 100%; margin: 14px 0; }
 /* Móvil en horizontal mientras se canta: se contrarrota la pantalla del micro para que el dibujo siga «pegado» al móvil */
 html.rot #s-sing.on { position: fixed; top: 50%; left: 50%; width: 100vh; height: 100vw; min-height: 0; transform: translate(-50%, -50%) rotate(var(--rot)); }
 html.rot .mic img, html.rot .vu { width: min(100%, 62vw); }
+
+/* Aviso desde la administración */
+.aviso { position: fixed; left: 12px; right: 12px; top: max(12px, env(safe-area-inset-top)); z-index: 50; background: var(--ink, #201e1d); color: #fff; padding: 14px 16px; font-weight: 600; font-size: 15px; line-height: 1.35; transform: translateY(-140%); transition: transform .3s; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+.aviso.on { transform: none; }

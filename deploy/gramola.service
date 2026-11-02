@@ -18,7 +18,7 @@ RestartSec=3
 NoNewPrivileges=true
 ProtectSystem=strict
 ReadOnlyPaths=/var/www/vhosts/DOMINIO/app
-ReadWritePaths=/var/www/vhosts/DOMINIO/app/data
+ReadWritePaths=/var/www/vhosts/DOMINIO/app/data /var/www/vhosts/DOMINIO/app/web/songs
 PrivateTmp=true
 
 [Install]

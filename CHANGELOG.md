@@ -2,6 +2,11 @@
 
 Versiones con el esquema `1.AA.MMDD.HHMM` (fecha y hora del despliegue).
 
+## 1.26.1102.1059
+- **Administración** en el subdominio `admin.`, con entrada solo por Touch ID (passkeys): salas y jugadores en directo (mensaje, echar, cerrar, recargar la tele, aviso a todas), canciones (búsqueda, filtros, ficha con audio, carátulas de iTunes y Deezer, imagen propia, Megamix automático o a mano, medir e igualar el volumen, cabecera del .txt, ficheros, canción nueva, renombrar, retirar y restaurar), récords (renombrar, fusionar, borrar, vaciar con copia), actividad, estadísticas por día, telemetría, estado del servidor, copia de los datos y reinicio.
+- La tele muestra los avisos de la administración y obedece la orden de recargar; los móviles muestran los avisos en una franja.
+- La tele informa al servidor del modo y la canción que suena.
+
 ## 1.26.1102.1031
 - Mando en la tele: en LG la cruceta del mando llegaba dos veces (como tecla y por el mando) y se avanzaba el doble; ahora se cuenta una sola vez.
 

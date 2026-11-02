@@ -77,6 +77,11 @@ window.GR = (() => {
       if (k && c) c.act(k);
     } else if (m.type === 'full-attempt') { if (c) c.setState({ err: 'full' }); }
     else if (m.type === 'replaced') { if (c) c.toast('Esta sala se ha abierto en otra pantalla'); }
+    // Órdenes desde la administración: un aviso en pantalla o recargar la app
+    else if (m.type === 'admin') {
+      if (m.action === 'reload') setTimeout(() => location.reload(), 300);
+      else if (m.action === 'toast' && c && m.text) c.toast(String(m.text).slice(0, 140));
+    }
   }
 
   // Jugadores reales → PLAYERS del diseño (en orden de llegada)
@@ -1623,6 +1628,10 @@ window.GR = (() => {
     const screen = s.screen === 'count' ? 'countdown' : s.screen === 'sing' && s.mode !== 'jukebox' && !s.paused ? 'sing' : s.screen === 'calib' ? 'calibrate' : s.screen === 'setup' ? 'prepare' : s.screen;
     const st = { type: 'state', screen, singers: (s.singers || []).map(x => x.id).filter(x => x != null) };
     if (s.mode === 'party' && s.party && s.singers && s.singers[0]) st.turn = s.singers[0].name;
+    // Para la administración: qué se canta y en qué modo
+    if (s.mode) st.mode = s.mode;
+    const cs = ['prepare', 'countdown', 'sing', 'results', 'pause'].includes(screen) || s.screen === 'sing' ? SONGS[s.songSel] : null;
+    if (cs && cs.title) st.song = { title: cs.title, artist: cs.artist || '' };
     const key = JSON.stringify(st);
     if (key !== lastState && G.net) { lastState = key; G.net.send(st); }
   };

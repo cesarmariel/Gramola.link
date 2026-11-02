@@ -11,7 +11,7 @@
 La tele es el escenario (**funciona en el navegador**) y cada móvil es un micrófono:
 escaneas el QR, eliges tu color y cantas. Gramola escucha el tono de cada voz y puntúa lo afinado que vas.
 
-![Versión](https://img.shields.io/badge/versi%C3%B3n-1.26.1102.1031-ec3013)
+![Versión](https://img.shields.io/badge/versi%C3%B3n-1.26.1102.1059-ec3013)
 ![Navegador](https://img.shields.io/badge/navegador-Edge%20%C2%B7%20Chrome%20%C2%B7%20Safari-1f6feb)
 ![PWA](https://img.shields.io/badge/micro-web%20%2B%20PWA-ec3013)
 ![Node.js 22+](https://img.shields.io/badge/Node.js-22%2B-5fa04e?logo=nodedotjs&logoColor=white)
@@ -140,6 +140,13 @@ del bloque de frases repetido más largo. Detalles en **[docs/CANCIONES.md](docs
 
 La música de los menús (`web/audio/menu.mp3`) es original, creada para Gramola. Los aplausos de los resultados (`web/audio/aplausos.mp3`) son
 un fragmento de *Sound Effects – Applause after a concert*, grabación de dominio público (CC0) de Wikimedia Commons.
+
+## 🛠️ Administración
+
+Portal propio en el subdominio `admin.`, con entrada **solo por Touch ID** (passkeys): salas y jugadores en directo
+(mensajes, echar, cerrar, recargar la tele), canciones (carátulas de iTunes y Deezer, Megamix, volumen, cabecera,
+ficheros, subir canciones nuevas, retirar), récords, actividad, estadísticas por día y estado del servidor.
+Detalles en **[docs/ADMIN.md](docs/ADMIN.md)**.
 
 Novedades de cada versión en **[CHANGELOG.md](CHANGELOG.md)**.
 

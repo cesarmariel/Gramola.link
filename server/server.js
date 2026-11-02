@@ -45,8 +45,8 @@ function megamixOf(dir, base) {
   } catch { return null; }
 }
 
-function scanSongs() {
-  if (Date.now() - songsCache.at < 5000) return songsCache.list;
+function scanSongs(force) {
+  if (!force && Date.now() - songsCache.at < 5000) return songsCache.list;
   const out = [];
   let dirs = [];
   try { dirs = fs.readdirSync(SONGS_DIR, { withFileTypes: true }).filter(d => d.isDirectory()); } catch { dirs = []; }
@@ -185,8 +185,10 @@ function freeSlot(room) {
 }
 
 function createRoom(hostWs) {
-  const room = { code: newCode(), hostToken: crypto.randomUUID(), host: hostWs, players: new Map(), nextId: 1, state: null, emptySince: null };
+  const room = { code: newCode(), hostToken: crypto.randomUUID(), host: hostWs, players: new Map(), nextId: 1, state: null, emptySince: null, createdAt: Date.now(), hostInfo: hostWs && hostWs.info };
   rooms.set(room.code, room);
+  admin.count('rooms');
+  admin.ev('room', `Sala ${room.code} abierta`, { room: room.code, ...(hostWs && hostWs.info ? { country: hostWs.info.country } : {}) });
   return room;
 }
 
@@ -194,6 +196,7 @@ function closeRoom(room) {
   toPlayers(room, { type: 'closed' });
   for (const p of room.players.values()) p.ws && p.ws.close();
   rooms.delete(room.code);
+  admin.ev('room', `Sala ${room.code} cerrada (${room.players.size} jugadores, ${Math.round((Date.now() - room.createdAt) / 60000)} min)`, { room: room.code });
 }
 
 setInterval(() => {
@@ -240,9 +243,17 @@ function hasTvPass(req) {
 const MICRO_HOST = /^micro\./i;
 const MICRO_FILES = { '/': '/m/index.html', '/manifest.webmanifest': '/m/manifest.webmanifest', '/sw.js': '/m/sw.js', '/m.css': '/m/m.css', '/m.js': '/m/m.js', '/despierto.mp4': '/m/despierto.mp4' };
 
+// ======================================================================= administración (subdominio admin.)
+const admin = require('./admin')({
+  DATA_DIR, SONGS_DIR, WEB_DIR, rooms, COLORS,
+  scanSongs, songsChanged: () => { songsCache.at = 0; }, records: () => records, saveRecords, telemetry: () => telemetry,
+  sendTo: send, closeRoom: r => closeRoom(r), announce: r => announce(r), wsCount: () => wss.clients.size,
+});
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   const host = String(req.headers.host || '');
+  if (await admin.handle(req, res, url)) return;
   // Subdominio micro.: la app del micro en la raíz
   if (MICRO_HOST.test(host) && MICRO_FILES[url.pathname] && (req.method === 'GET' || req.method === 'HEAD')) {
     return serveStatic(req, res, MICRO_FILES[url.pathname]);
@@ -262,10 +273,11 @@ const server = http.createServer(async (req, res) => {
     try { body = JSON.parse(await readBody(req, 1024)); } catch { return json(res, 400, { error: 'json' }); }
     const room = rooms.get(String(body.code || '').toUpperCase());
     if (!room || room.hostToken !== body.token) return json(res, 403, { error: 'sala' });
+    admin.count('tvs');
     res.writeHead(200, { 'content-type': 'application/json', 'set-cookie': `gtv=${encodeURIComponent(room.hostToken)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=86400` });
     return res.end('{"ok":true}');
   }
-  if ((url.pathname === '/api/songs' || url.pathname.startsWith('/songs/')) && !hasTvPass(req)) {
+  if ((url.pathname === '/api/songs' || url.pathname.startsWith('/songs/')) && !hasTvPass(req) && !admin.isAuthed(req)) {
     res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' });
     return res.end('Solo para la tele de una sala abierta');
   }
@@ -290,6 +302,11 @@ const server = http.createServer(async (req, res) => {
     const room = rooms.get(String(body.code || '').toUpperCase());
     if (!room || room.hostToken !== body.token) return json(res, 403, { error: 'sala' });
     const r = addRecord(body);
+    if (r) {
+      admin.count('plays');
+      const who = (Array.isArray(body.players) ? body.players : []).filter(p => !p.bot).map(p => `${clean(p.name, 16)} ${Math.round(+p.score || 0)}`).join(', ');
+      admin.ev('play', `Sala ${room.code}: «${clean(body.title, 80)}»${who ? ' — ' + who : ''}${r.isNew ? ' · ¡récord!' : ''}`, { room: room.code, song: clean(body.song, 200) });
+    }
     return r ? json(res, 200, r) : json(res, 400, { error: 'datos' });
   }
   if (SERVE_STATIC && (req.method === 'GET' || req.method === 'HEAD')) return serveStatic(req, res, url.pathname);
@@ -335,6 +352,7 @@ function serveStatic(req, res, pathname) {
       const end = m[1] && m[2] ? Math.min(+m[2], st.size - 1) : st.size - 1;
       if (start > end || start >= st.size || start < 0) { res.writeHead(416, { 'content-range': `bytes */${st.size}` }); return res.end(); }
       res.writeHead(206, { ...headers, 'content-range': `bytes ${start}-${end}/${st.size}`, 'content-length': end - start + 1 });
+      if (isSong && req.method === 'GET') admin.count('songBytes', end - start + 1);
       return req.method === 'HEAD' ? res.end() : fs.createReadStream(file, { start, end }).pipe(res);
     }
     // Páginas: la dirección pública (para las vistas previas en redes) sale de la petición, no va escrita en el código
@@ -345,6 +363,7 @@ function serveStatic(req, res, pathname) {
       return res.end(req.method === 'HEAD' ? undefined : body);
     }
     res.writeHead(200, { ...headers, 'content-length': st.size });
+    if (isSong && req.method === 'GET') admin.count('songBytes', st.size);
     return req.method === 'HEAD' ? res.end() : fs.createReadStream(file).pipe(res);
   }
 }
@@ -352,8 +371,10 @@ function serveStatic(req, res, pathname) {
 // ======================================================================= WebSocket
 const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 64 * 1024 });   // (la foto del jugador ~10 KB)
 
-wss.on('connection', ws => {
+wss.on('connection', (ws, req) => {
   ws.isAlive = true;
+  // Para el admin: de dónde se conecta (país según Cloudflare) y con qué aparato
+  ws.info = { country: String(req.headers['cf-ipcountry'] || ''), ua: String(req.headers['user-agent'] || '').slice(0, 200), at: Date.now() };
   ws.on('pong', () => { ws.isAlive = true; });
   let role = null; // 'host' | 'player'
   let room = null;
@@ -395,6 +416,7 @@ wss.on('connection', ws => {
           room = createRoom(ws);
         }
         room.emptySince = null;
+        room.hostInfo = ws.info;
         role = 'host';
         send(ws, { type: 'room', code: room.code, token: room.hostToken, recovered: room === prev, players: playerList(room) });
         for (const p of room.players.values()) if (p.photo) send(ws, { type: 'photo', p: p.id, data: p.photo });
@@ -429,8 +451,10 @@ wss.on('connection', ws => {
           if (player.ws && player.ws !== ws) player.ws.close();
           Object.assign(player, { ws, name, slot });
         } else {
-          player = { id: room.nextId++, token: crypto.randomUUID(), name, slot, ws };
+          player = { id: room.nextId++, token: crypto.randomUUID(), name, slot, ws, joinedAt: Date.now(), info: ws.info };
           room.players.set(player.id, player);
+          admin.count('joins');
+          admin.ev('player', `${name} entra en la sala ${room.code}`, { room: room.code });
         }
         role = 'player';
         send(ws, { type: 'joined', id: player.id, slot: player.slot, token: player.token, name: player.name, color: COLORS[player.slot - 1], code: room.code, hostOnline: !!room.host });
@@ -447,6 +471,8 @@ wss.on('connection', ws => {
         const n = typeof m.n === 'number' && isFinite(m.n) ? Math.round(m.n * 100) / 100 : null;
         const v = typeof m.v === 'number' ? Math.round(Math.max(0, Math.min(1, m.v)) * 1000) / 1000 : 0;
         const lat = typeof m.lat === 'number' ? Math.max(0, Math.min(2000, Math.round(m.lat))) : 0;
+        player.lat = lat; player.lastV = v; player.lastN = n;
+        if (n !== null && v > 0.02) player.pitchAt = Date.now();
         return toHost(room, { type: 'pitch', p: player.id, n, v, lat });
       }
       if (m.type === 'input') return toHost(room, { type: 'input', p: player.id, key: clean(m.key, 8) });
@@ -457,6 +483,7 @@ wss.on('connection', ws => {
         return toHost(room, { type: 'photo', p: player.id, data });
       }
       if (m.type === 'leave') {
+        admin.ev('player', `${player.name} sale de la sala ${room.code}`, { room: room.code });
         room.players.delete(player.id);
         announce(room);
         return ws.close();
@@ -467,6 +494,7 @@ wss.on('connection', ws => {
     if (role === 'host') {
       if (m.type === 'state') {
         room.state = { ...m, type: 'state' };
+        room.stateAt = Date.now();
         return toPlayers(room, room.state);
       }
       if (m.type === 'kick') {

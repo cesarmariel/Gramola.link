@@ -18,7 +18,8 @@ Una conexión WebSocket en `/ws` por dispositivo; mensajes JSON con `type`.
 | `{type:"pitch", p, n, v, lat}` | servidor → tele | Voz del jugador `p`: nota MIDI decimal o `null`, volumen 0–1, media latencia del móvil (ms). |
 | `{type:"input", p, key}` | servidor → tele | Botón del móvil: `up/down/left/right/ok/back/y`. |
 | `{type:"full-attempt", name}` | servidor → tele | Alguien intentó entrar con la sala llena. |
-| `{type:"state", screen, singers, turn?}` | tele → servidor → móviles | Pantalla actual y quién canta (los móviles muestran el micro solo a quien le toca). |
+| `{type:"state", screen, singers, turn?, mode?, song?}` | tele → servidor → móviles | Pantalla actual y quién canta (los móviles muestran el micro solo a quien le toca). `mode` y `song:{title,artist}` son para la administración. |
+| `{type:"admin", action, text?}` | servidor → tele | Desde la administración: `toast` (aviso en pantalla) o `reload` (recargar la app). |
 | `{type:"bot"}` | tele → servidor | «Simular jugador»: ocupa un color libre y canta desde la tele. |
 | `{type:"kick", p}` · `{type:"new-code"}` | tele → servidor | Expulsar jugador · cerrar la sala y abrir otra. |
 | `{type:"photo", p, data}` | servidor → tele | Foto del jugador `p` (JPEG 200×200 en `data:`, o vacío para quitarla). Al reconectar la tele se reenvían todas. |
@@ -34,6 +35,7 @@ Una conexión WebSocket en `/ws` por dispositivo; mensajes JSON con `type`.
 | `{type:"pitch", n, v, lat}` · `{type:"input", key}` · `{type:"leave"}` | móvil → servidor | Voz (25/s), mando, salir. |
 | `{type:"photo", data}` | móvil → servidor | Foto del jugador (cámara frontal, ≤48 KB). Solo se guarda en memoria mientras dura la sala. |
 | `{type:"roster", players}` · `{type:"host", online}` · `{type:"kicked"}` · `{type:"closed"}` | servidor → móvil | Lista de la sala, tele conectada o no, expulsado, sala cerrada. |
+| `{type:"admin", action:"toast", text}` | servidor → móvil | Aviso desde la administración (franja arriba unos segundos). |
 
 ## Límites
 
@@ -48,3 +50,4 @@ la sala dura 15 min sin tele; ping de WebSocket cada 25 s.
 | `GET /api/records` | `{songs:{id:{score,name,date,title,artist}}, singers:{nombre:{songs,best,streak}}, plays:{id:n}}`. |
 | `POST /api/records` | `{code, token, song, title, artist, players:[{name,score,streak,bot}]}`. Solo con el token de una sala abierta. |
 | `GET /api/health` | Estado. |
+| `/api/admin/*` | Solo en el subdominio `admin.` y con sesión de Touch ID. Ver [ADMIN.md](ADMIN.md). |
