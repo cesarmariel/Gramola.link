@@ -6,6 +6,9 @@ TITLE       := Gramola
 VERSION     := 01.00
 TITLE_ID    := GRAM00001
 CONTENT_ID  := IV0000-GRAM00001_00-GRAMOLAKARAOKE00
+# La del repo (web/server), la que se ve en pantalla como «Versión …»; VERSION de arriba es solo el número de
+# paquete de la PS4 (lo exige el formato del PKG: dos cifras), no tiene por qué coincidir.
+GRAMOLA_VERSION := $(shell cat ../VERSION 2>/dev/null || echo "sin version")
 
 TOOLCHAIN   ?= $(OO_PS4_TOOLCHAIN)
 LIBS        := -lc -lkernel -lc++ -lpthread -lSceUserService -lSceSysmodule -lSceSystemService -lScePigletv2VSH \
@@ -28,6 +31,7 @@ OO          := $(TOOLCHAIN)/bin/$(CDIR)
 SRC         := src/main.cpp src/gfx.cpp src/audio.cpp src/pitch.cpp src/song.cpp src/plat_ps4.cpp
 OBJ         := $(patsubst src/%.cpp,build/%.o,$(SRC))
 CXXFLAGS    := --target=x86_64-pc-freebsd12-elf -fPIC -funwind-tables -O2 -std=gnu++17 -D_GNU_SOURCE -DGRAMOLA_PS4 \
+               -DGRAMOLA_VERSION_STR='"$(GRAMOLA_VERSION)"' \
                -isysroot $(TOOLCHAIN) -isystem $(TOOLCHAIN)/include -isystem $(TOOLCHAIN)/include/c++/v1
 LDFLAGS     := -m elf_x86_64 -pie --script $(TOOLCHAIN)/link.x --eh-frame-hdr -L$(TOOLCHAIN)/lib $(LIBS) $(TOOLCHAIN)/lib/crt1.o
 AUTHINFO    := 000000000000000000000000001C004000FF000000000080000000000000000000000000000000000000008000400040000000000000008000000000000000080040FFFF000000F000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
