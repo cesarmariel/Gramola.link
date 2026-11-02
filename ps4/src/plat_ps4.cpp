@@ -54,15 +54,30 @@ static std::pair<unsigned char *, uint64_t> shader(const char *name) {
 bool init() {
   mkdir("/data/gramola", 0777);
   logf = fopen("/data/gramola/registro.txt", "w");
-  sceSysmoduleLoadModuleInternal(ORBIS_SYSMODULE_INTERNAL_SYSTEM_SERVICE);
+  log("arranque");
+  // Las librerías del sistema no se cargan solas aunque el ELF las declare: hay que pedirlas una a una
+  // (si no, la primera llamada acaba en PRX_NOT_RESOLVED_FUNCTION).
+  struct { const char *n; OrbisSysModuleInternal id; } mods[] = {
+    {"SystemService", ORBIS_SYSMODULE_INTERNAL_SYSTEM_SERVICE}, {"UserService", ORBIS_SYSMODULE_INTERNAL_USER_SERVICE},
+    {"Pad", ORBIS_SYSMODULE_INTERNAL_PAD}, {"AudioOut", ORBIS_SYSMODULE_INTERNAL_AUDIOOUT}, {"AudioIn", ORBIS_SYSMODULE_INTERNAL_AUDIOIN}};
+  int r = 0;
+  for (auto &m : mods) { int e = (int)sceSysmoduleLoadModuleInternal(m.id); log("modulo %s = %x", m.n, e); }
   OrbisUserServiceInitializeParams up{}; up.priority = 700;
-  sceUserServiceInitialize(&up);
-  sceUserServiceGetInitialUser(&user);
+  r = sceUserServiceInitialize(&up);
+  log("UserService init = %x", r);
+  r = sceUserServiceGetInitialUser(&user);
+  log("usuario = %x (r=%x)", user, r);
 
-  std::string pre = std::string("/") + sceKernelGetFsSandboxRandomWord() + "/common/lib/";
+  const char *sbw = sceKernelGetFsSandboxRandomWord();
+  log("sandbox = %s", sbw ? sbw : "(nulo)");
+  std::string pre = std::string("/") + (sbw ? sbw : "") + "/common/lib/";
   int ms = 0;
-  if ((int)sceKernelLoadStartModule((pre + "libScePigletv2VSH.sprx").c_str(), 0, nullptr, 0, nullptr, &ms) < 0) { log("sin piglet"); return false; }
-  if ((int)sceKernelLoadStartModule((pre + "libScePrecompiledShaders.sprx").c_str(), 0, nullptr, 0, nullptr, &ms) < 0) { log("sin shaders"); return false; }
+  r = (int)sceKernelLoadStartModule((pre + "libScePigletv2VSH.sprx").c_str(), 0, nullptr, 0, nullptr, &ms);
+  log("piglet modulo = %x (start %x)", r, ms);
+  if (r < 0) return false;
+  r = (int)sceKernelLoadStartModule((pre + "libScePrecompiledShaders.sprx").c_str(), 0, nullptr, 0, nullptr, &ms);
+  log("shaders modulo = %x (start %x)", r, ms);
+  if (r < 0) return false;
 
   OrbisPglConfig cfg{};
   cfg.size = sizeof cfg;
@@ -75,12 +90,16 @@ bool init() {
   cfg.lcueResourceBufferSize = 1 * 1024 * 1024;
   cfg.dbgPosCmd_0x40 = W; cfg.dbgPosCmd_0x44 = H; cfg.dbgPosCmd_0x48 = 0; cfg.dbgPosCmd_0x4C = 0;
   cfg.unk_0x5C = 2;
-  if (!scePigletSetConfigurationVSH(&cfg)) { log("piglet config"); return false; }
+  log("piglet config...");
+  if (!scePigletSetConfigurationVSH(&cfg)) { log("piglet config fallo"); return false; }
+  log("piglet config ok");
 
   dpy = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+  log("egl display %p", (void *)dpy);
   EGLint maj, min, n = 0;
-  if (!eglInitialize(dpy, &maj, &min) || !eglBindAPI(EGL_OPENGL_ES_API)) { log("egl init"); return false; }
-  eglSwapInterval(dpy, 1);   // sincronizado con la pantalla
+  if (!eglInitialize(dpy, &maj, &min) || !eglBindAPI(EGL_OPENGL_ES_API)) { log("egl init fallo %x", eglGetError()); return false; }
+  log("egl %d.%d", maj, min);
+  eglSwapInterval(dpy, 0);   // como el ejemplo de OpenOrbis: con 1 eglSwapBuffers se queda bloqueado
   const EGLint at[] = {EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8, EGL_DEPTH_SIZE, 0, EGL_STENCIL_SIZE, 0,
                        EGL_SAMPLE_BUFFERS, 0, EGL_SAMPLES, 0, EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT, EGL_SURFACE_TYPE, EGL_WINDOW_BIT, EGL_NONE};
   EGLConfig ec;
@@ -92,6 +111,7 @@ bool init() {
   ctx = eglCreateContext(dpy, ec, EGL_NO_CONTEXT, ca);
   if (surf == EGL_NO_SURFACE || ctx == EGL_NO_CONTEXT || !eglMakeCurrent(dpy, surf, surf, ctx)) { log("egl contexto"); return false; }
 
+  log("contexto gl ok");
   auto v = shader("texmap/v_2.vert"), f = shader("texmap/f_2.frag");
   if (!v.first || !f.first) { log("shaders texmap no encontrados"); return false; }
   GLuint vs = glCreateShader(GL_VERTEX_SHADER), fs = glCreateShader(GL_FRAGMENT_SHADER);
@@ -113,8 +133,10 @@ bool init() {
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   glViewport(0, 0, W, H);
 
-  scePadInit();
+  log("shaders ok, programa %u", prog);
+  r = scePadInit();
   pad = scePadOpen(user, 0, 0, nullptr);
+  log("pad init %x, pad %d", r, pad);
   sceSystemServiceHideSplashScreen();
   log("piglet listo: %s", (const char *)glGetString(GL_RENDERER));
   return true;
@@ -129,7 +151,20 @@ bool frame_begin(uint32_t c) {
   return true;
 }
 
-void frame_end() { eglSwapBuffers(dpy, surf); }
+static long frames = 0;
+static double last_swap = 0;
+void frame_end() {
+  if (frames < 3) log("frame %ld: antes de eglSwapBuffers", frames);
+  EGLBoolean ok = eglSwapBuffers(dpy, surf);
+  if (frames < 3) log("frame %ld: eglSwapBuffers = %d (err %x)", frames, (int)ok, eglGetError());
+  else if (frames % 300 == 0) log("frame %ld t=%.3f", frames, now());
+  frames++;
+  // Sin vsync: ~60 fps a mano para no quemar la CPU
+  double t = now();
+  double resto = (1.0 / 60) - (t - last_swap);
+  if (resto > 0.0005 && resto < 0.02) sceKernelUsleep((unsigned)(resto * 1e6));
+  last_swap = now();
+}
 
 int tex_create(int w, int h, const uint8_t *rgba, bool smooth) {
   GLuint t = 0;
@@ -164,7 +199,11 @@ void draw(int id, int tw, int th, float sx, float sy, float sw, float sh, float 
 uint32_t buttons() {
   if (pad < 0) return 0;
   OrbisPadData d{};
-  if (scePadReadState(pad, &d) != 0) return 0;
+  int r = scePadReadState(pad, &d);
+  static long n = 0; static int logged_press = 0;
+  if (n++ % 600 == 0 || r != 0) log("pad: read=%x conectado=%d botones=%08x stick=%d,%d", r, d.connected, d.buttons, d.leftStick.x, d.leftStick.y);
+  if (r != 0) return 0;
+  if (d.buttons && logged_press < 10) { logged_press++; log("pad: pulsado %08x", d.buttons); }
   uint32_t b = d.buttons, o = 0;
   if (b & ORBIS_PAD_BUTTON_UP) o |= B_UP;
   if (b & ORBIS_PAD_BUTTON_DOWN) o |= B_DOWN;
@@ -197,8 +236,10 @@ static void *aout_loop(void *) {
 void audio_start(void (*fill)(int16_t *, int)) {
   fill_fn = fill;
   sceAudioOutInit();
-  aout = sceAudioOutOpen(user, ORBIS_AUDIO_OUT_PORT_TYPE_MAIN, 0, 256, RATE, ORBIS_AUDIO_OUT_PARAM_FORMAT_S16_STEREO);
+  aout = sceAudioOutOpen(ORBIS_USER_SERVICE_USER_ID_SYSTEM, ORBIS_AUDIO_OUT_PORT_TYPE_MAIN, 0, 256, RATE, ORBIS_AUDIO_OUT_PARAM_FORMAT_S16_STEREO);
+  if (aout < 0) { log("audio (usuario sistema): %x, probando con el usuario real", aout); aout = sceAudioOutOpen(user, ORBIS_AUDIO_OUT_PORT_TYPE_MAIN, 0, 256, RATE, ORBIS_AUDIO_OUT_PARAM_FORMAT_S16_STEREO); }
   if (aout < 0) { log("sin salida de audio: %x", aout); return; }
+  log("salida de audio abierta: %d", aout);
   pthread_t t; pthread_create(&t, nullptr, aout_loop, nullptr);
 }
 
@@ -249,7 +290,8 @@ int mic_read(float *out, int max) {
 
 void mic_close() {}
 
-double now() { timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return t.tv_sec + t.tv_nsec / 1e9; }
+// clock_gettime de la libc de OpenOrbis va ~250 veces lento en la consola: el reloj fiable es el del kernel (µs desde el arranque del proceso)
+double now() { return sceKernelGetProcessTime() / 1e6; }
 std::string assets() { return "/app0/assets/"; }
 std::string songs_dir() { return "/data/gramola/canciones"; }
 

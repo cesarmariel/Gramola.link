@@ -33,7 +33,7 @@ static int sel = 0;
 static float scroll = 0;
 static double sel_t = 0;      // cuándo se eligió la canción actual (para el avance y el scroll)
 static int preview_for = -1;  // qué canción está sonando de avance
-static Img logo_white, logo_ink, nuvola_ink, nuvola_white;
+static Img logo_white, logo_ink, nuvola_ink, nuvola_white, nuvola_original, disco_rojo;
 static std::shared_ptr<audio::Pcm> menu_music, applause;
 static const uint32_t PLAYER = 0xff4fa3;   // color del jugador 1 (rosa del diseño)
 static double now_t = 0;
@@ -49,6 +49,7 @@ static double held_since[32];
 static void read_input() {
   uint32_t b = plat::buttons();
   pressed = b & ~prev_b;
+  if (pressed) plat::log("[%.3f] pulsado %x (antes %x) pantalla %s", now_t, pressed, prev_b, SNAME[screen]);
   for (int i = 0; i < 4; i++) {   // flechas: se repiten al mantener
     uint32_t m = 1u << i;
     if (pressed & m) held_since[i] = now_t + 0.38;
@@ -132,15 +133,68 @@ static void sing_header(const Song &S) {
   text(REGULAR, 60, sc, bx + 56, 88, INK);
 }
 
-// ------------------------------------------------------------------ ARRANQUE (logo nuvola, luego tele roja)
+// ------------------------------------------------------------------ ARRANQUE (TV-00 Nuvola + TV-01 Arranque), con los tiempos de la tele
+// 0,12 s logo (1 s de fundido, escala 0,94→1 en 4 s) · 1,7 s círculo rojo (1,1 s) · 3,3 s se va el logo (0,7 s) ·
+// 4,0 s aviso (0,5 s) · 10,0 s se va el aviso · 10,6 s pantalla roja (0,8 s) con «Cargando canciones…» 2,6 s · bienvenida
+static float ease_io(float t) { t = std::max(0.f, std::min(1.f, t)); return t < 0.5f ? 4 * t * t * t : 1 - powf(-2 * t + 2, 3) / 2; }   // ≈ cubic-bezier(.7,0,.2,1)
+static float ease_out(float t) { t = std::max(0.f, std::min(1.f, t)); return 1 - powf(1 - t, 3); }                                   // ≈ cubic-bezier(.2,.8,.2,1)
+static void disco(float cx, float cy, float r, float a) { if (disco_rojo) image(disco_rojo, cx - r, cy - r, 2 * r, 2 * r, a); }
+// Texto blanco centrado partido en líneas que quepan en «maxw»
+static float parrafo(Font f, float px, const std::string &txt, float cx, float y, float maxw, float lh, uint32_t rgb, float a) {
+  std::string linea, palabra; std::vector<std::string> lineas;
+  for (size_t i = 0; i <= txt.size(); i++) {
+    char c = i < txt.size() ? txt[i] : ' ';
+    if (c == ' ') {
+      std::string prueba = linea.empty() ? palabra : linea + " " + palabra;
+      if (text_w(f, px, prueba) > maxw && !linea.empty()) { lineas.push_back(linea); linea = palabra; } else linea = prueba;
+      palabra.clear();
+    } else palabra += c;
+  }
+  if (!linea.empty()) lineas.push_back(linea);
+  for (auto &l : lineas) { text_c(f, px, l, cx, y, rgb, a); y += lh; }
+  return y;
+}
 static void draw_boot() {
   double t = now_t - screen_t0;
-  float a = (float)std::min(1.0, std::min(t / 0.5, (1.9 - t) / 0.5));
-  rect(0, 0, plat::W, plat::H, 0x0e0f0f);
-  if (nuvola_white) { float w = 220, h = w * nuvola_white.h / nuvola_white.w; image(nuvola_white, (plat::W - w) / 2, (plat::H - h) / 2, w, h, a); }
-  else text_c(BOLD, 90, "nuvola", plat::W / 2, plat::H / 2 - 60, WHITE, a);
-  // Un botón salta directamente a la bienvenida (y así ningún toque se pierde en el instante del cambio de pantalla)
-  if (t > 1.9 || hit(plat::B_CROSS) || hit(plat::B_OPTIONS)) go(S_WELCOME);
+  if (t < 10.6) {
+    rect(0, 0, plat::W, plat::H, 0x0e0f0f);
+    // círculo rojo: circle(75 %) = radio 0,75 · diagonal/√2 ≈ 1168 px
+    if (t > 1.7) disco(plat::W / 2.f, plat::H / 2.f, 1168 * ease_io((float)((t - 1.7) / 1.1)), 1);
+    // logo bitono de nuvola, 190 px de alto, centrado
+    float a = t < 0.12 ? 0 : t < 3.3 ? ease_out((float)((t - 0.12) / 1.0)) : 1 - ease_out((float)((t - 3.3) / 0.7));
+    float k = 0.94f + 0.06f * ease_out((float)((t - 0.12) / 4.0));
+    if (nuvola_original && a > 0) { float h = 190 * k, w = h * nuvola_original.w / nuvola_original.h; image(nuvola_original, (plat::W - w) / 2, (plat::H - h) / 2, w, h, a); }
+    // aviso
+    if (t > 4.0) {
+      float am = t < 10.0 ? ease_out((float)((t - 4.0) / 0.5)) : 1 - ease_out((float)((t - 10.0) / 0.5));
+      float dy = 18 * (1 - ease_out((float)((t - 4.0) / 0.7)));
+      if (am > 0) {
+        // bloque centrado verticalmente: 2 líneas de 66 px + 32 + 52 + 32 + 3 líneas de 42 px ≈ 374 px
+        float y = (plat::H - 374) / 2 + dy;
+        text_c(BOLD, 60, "Gramola es un proyecto gratuito", plat::W / 2.f, y, WHITE, am); y += 66;
+        text_c(BOLD, 60, "y sin ánimo de lucro.", plat::W / 2.f, y, WHITE, am); y += 66 + 32;
+        text_c(REGULAR, 40, "Nunca se solicitará ningún pago por su uso.", plat::W / 2.f, y, WHITE, am); y += 52 + 32;
+        parrafo(REGULAR, 30, "Gramola no tiene relación alguna con los artistas, autores o compañías discográficas de las obras que incluye, cuyos derechos pertenecen a sus respectivos titulares.", plat::W / 2.f, y, 1250, 42, WHITE, am * 0.92f);
+      }
+    }
+    return;
+  }
+  // pantalla roja de carga (TV-01 Arranque); el 0,7 s de espera de la tele + fundido de 0,8 s
+  double tb = t - 10.6 - 0.7;
+  rect(0, 0, plat::W, plat::H, RED);
+  if (tb < 0) return;
+  float a = ease_out((float)(tb / 0.8));
+  text(BOLD, 28, "KARAOKE EN CASA", 96, 54, INK, a);
+  text_r(BOLD, 28, "PS4", plat::W - 96, 54, INK, a);
+  if (logo_white) { float w = 1430, h = w * logo_white.h / logo_white.w; image(logo_white, 96, 560 - h / 2 + 40, w, h, a); }
+  double k = std::min(1.0, tb / 2.6);
+  if (!menu_music) k = std::min(k, 0.95);
+  char pc[16]; snprintf(pc, sizeof pc, "%d %%", (int)(k * 100));
+  text(BOLD, 32, "Cargando canciones…", 96, 958, INK, a);
+  text_r(BOLD, 32, pc, plat::W - 96, 958, INK, a);
+  rect(96, 1018, plat::W - 192, 8, INK, 0.25f * a);
+  rect(96, 1018, (float)((plat::W - 192) * k), 8, INK, a);
+  if (k >= 1) go(S_WELCOME);
 }
 
 // ------------------------------------------------------------------ BIENVENIDA (TV-01b)
@@ -160,7 +214,7 @@ static void draw_welcome() {
   text_r(SEMIBOLD, 28, std::string("Versión ") + GAME_VERSION, plat::W - 96, 982, GREY2);
   if (songs.empty()) {
     text(SEMIBOLD, 30, "No hay canciones instaladas. Cópialas por FTP en " + plat::songs_dir(), 96, 982, RED);
-  } else if (t > 0.3 && hit(plat::B_CROSS)) { go(S_MENU); }
+  } else if (hit(plat::B_CROSS)) { plat::log("bienvenida: X con t=%.3f", t); go(S_MENU); }
 }
 
 // ------------------------------------------------------------------ MENÚ (TV-03): 7 modos, solo «Cantar» funciona
@@ -594,6 +648,16 @@ int main() {
   logo_ink = load(plat::assets() + "images/logo-tinta.png");
   nuvola_ink = load(plat::assets() + "images/nuvola-tinta.png");
   nuvola_white = load(plat::assets() + "images/nuvola-blanco.png");
+  nuvola_original = load(plat::assets() + "images/nuvola-original.png");
+  {   // disco rojo con borde suavizado, para el círculo del arranque (el sombreador de la PS4 no tiñe: va en su color)
+    const int N = 1024; std::vector<uint8_t> px(N * N * 4);
+    for (int y = 0; y < N; y++) for (int x = 0; x < N; x++) {
+      float d = sqrtf((x + 0.5f - N / 2.f) * (x + 0.5f - N / 2.f) + (y + 0.5f - N / 2.f) * (y + 0.5f - N / 2.f));
+      float al = std::max(0.f, std::min(1.f, N / 2.f - d));
+      uint8_t *q = &px[(y * N + x) * 4]; q[0] = 0xec; q[1] = 0x30; q[2] = 0x13; q[3] = (uint8_t)(al * 255);
+    }
+    disco_rojo = from_rgba(N, N, px.data());
+  }
   songs = scan_songs(plat::songs_dir());
   plat::log("%d canciones en %s", (int)songs.size(), plat::songs_dir().c_str());
   covers.resize(songs.size()); cover_tried.assign(songs.size(), 0);

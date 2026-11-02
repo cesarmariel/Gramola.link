@@ -11,8 +11,8 @@ CONTENT_ID  := IV0000-GRAM00001_00-GRAMOLAKARAOKE00
 GRAMOLA_VERSION := $(shell cat ../VERSION 2>/dev/null || echo "sin version")
 
 TOOLCHAIN   ?= $(OO_PS4_TOOLCHAIN)
-LIBS        := -lc -lkernel -lc++ -lpthread -lSceUserService -lSceSysmodule -lSceSystemService -lScePigletv2VSH \
-               -lScePrecompiledShaders -lScePad -lSceAudioOut -lSceAudioIn
+LIBS        := -lc -lkernel -lc++ -lpthread -lSceShellCoreUtil -lSceUserService -lSceSysmodule -lSceSystemService -lScePigletv2VSH \
+               -lScePrecompiledShaders -lSceRtc -lScePad -lSceAudioOut -lSceAudioIn
 
 UNAME_S     := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
