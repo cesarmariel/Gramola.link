@@ -32,7 +32,9 @@ def audio_de(carpeta):
         return None
     h = megamix.leer_txt(os.path.join(carpeta, min(ts, key=len)))
     a = h.get('MP3') or h.get('AUDIO')
-    return os.path.join(carpeta, a) if a and os.path.exists(os.path.join(carpeta, a)) else None
+    if not a or '/' in a or '\\' in a or a in ('.', '..'):   # un nombre de fichero de la carpeta, nunca una ruta
+        return None
+    return os.path.join(carpeta, a) if os.path.exists(os.path.join(carpeta, a)) else None
 
 
 def medir(path, extra=''):
@@ -57,11 +59,15 @@ def una(carpeta):
     af = (f"loudnorm=I={OBJ}:TP=-1:LRA=11:measured_I={m['input_i']}:measured_TP={m['input_tp']}:"
           f"measured_LRA={m['input_lra']}:measured_thresh={m['input_thresh']}:offset={m['target_offset']}:linear=true")
     tmp = a + '.norm.mp3'
-    r = subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', a, '-vn', '-af', af, '-ar', '44100',
-                        '-c:a', 'libmp3lame', '-b:a', '192k', tmp], capture_output=True)
-    if r.returncode != 0 or os.path.getsize(tmp) < 100000:
-        return nombre, 'ffmpeg falló'
-    os.replace(tmp, a)
+    try:
+        r = subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', a, '-vn', '-af', af, '-ar', '44100',
+                            '-c:a', 'libmp3lame', '-b:a', '192k', tmp], capture_output=True)
+        if r.returncode != 0 or not os.path.exists(tmp) or os.path.getsize(tmp) < 100000:
+            return nombre, 'ffmpeg falló'
+        os.replace(tmp, a)
+    finally:
+        if os.path.exists(tmp):   # (si algo ha fallado, el temporal no se queda en la carpeta de la canción)
+            os.remove(tmp)
     json.dump({'antes_lufs': i, 'objetivo_lufs': OBJ}, open(os.path.join(carpeta, 'volumen.json'), 'w'))
     mm = megamix.preparar(carpeta, forzar=True, auto=True) if os.path.exists(os.path.join(carpeta, 'megamix.json')) else '-'
     return nombre, f'{i:.1f} → {OBJ:.0f} LUFS' + (' · megamix rehecho' if mm.startswith('ok') else '')

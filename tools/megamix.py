@@ -125,18 +125,26 @@ def preparar(carpeta, forzar=False, auto=False):
     if not t:
         return 'sin estribillo marcado'
     audio = head.get('MP3') or head.get('AUDIO')
-    if not audio or not os.path.exists(os.path.join(carpeta, audio)):
+    if not audio or '/' in audio or '\\' in audio or audio in ('.', '..') or not os.path.exists(os.path.join(carpeta, audio)):
         return 'sin audio'
     out = os.path.join(carpeta, 'megamix.mp3')
     off, a, b = t
     if forzar or not os.path.exists(out):
-        # -ss/-to después de -i: corte exacto (decodifica desde el principio)
+        # -ss/-to después de -i: corte exacto (decodifica desde el principio). A un temporal y se renombra al acabar:
+        # si se corta a medias no queda un megamix.mp3 truncado que luego se dé por bueno
+        tmp = out + '.tmp'
         r = subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', os.path.join(carpeta, audio),
                             '-ss', f'{off / 1000:.3f}', '-to', f'{(b + DESPUES) / 1000:.3f}',
-                            '-vn', '-ac', '2', '-c:a', 'libmp3lame', '-b:a', '192k', out], capture_output=True)
-        if r.returncode != 0:
+                            '-vn', '-ac', '2', '-c:a', 'libmp3lame', '-b:a', '192k', '-f', 'mp3', tmp], capture_output=True)
+        if r.returncode != 0 or not os.path.exists(tmp):
+            if os.path.exists(tmp):
+                os.remove(tmp)
             return 'ffmpeg falló'
-    json.dump({'file': 'megamix.mp3', 'offset': off, 'start': a, 'end': b, 'origen': origen}, open(os.path.join(carpeta, 'megamix.json'), 'w'))
+        os.replace(tmp, out)
+    jtmp = os.path.join(carpeta, 'megamix.json.tmp')
+    with open(jtmp, 'w') as f:
+        json.dump({'file': 'megamix.mp3', 'offset': off, 'start': a, 'end': b, 'origen': origen}, f)
+    os.replace(jtmp, os.path.join(carpeta, 'megamix.json'))
     return f'ok · estribillo {origen} {(b - a) / 1000:.0f} s'
 
 

@@ -82,10 +82,13 @@ export class PitchTracker {
   }
 
   async start() {
-    const stream = await phoneMic();
+    // El AudioContext se crea ANTES de pedir el micro: así nace con el gesto del usuario (en iPhone, si el aviso de
+    // permiso tarda, el gesto caduca y un contexto creado después se queda «suspended» sin remedio)
     const Ctx = window.AudioContext || window.webkitAudioContext;
     this.ctx = new Ctx();
-    await this.ctx.resume();
+    this.ctx.resume().catch(() => {});
+    const stream = await phoneMic();
+    await this.ctx.resume().catch(() => {});
     this.analyser = this.ctx.createAnalyser();
     this.analyser.fftSize = 2048;
     this.buf = new Float32Array(this.analyser.fftSize);
@@ -102,6 +105,16 @@ export class PitchTracker {
     this.stream = stream;
     this.src = this.ctx.createMediaStreamSource(stream);
     this.src.connect(this.analyser);
+    // Si el sistema corta la pista (llamada, otra app coge el micro, permiso retirado), se vuelve a pedir el micro
+    const tr = stream.getAudioTracks()[0];
+    if (tr) tr.addEventListener('ended', () => { if (this.stream === stream) this.reacquire(); });
+  }
+
+  async reacquire() {
+    if (this.busy || !this.timer) return;
+    this.busy = true;
+    try { this.use(await phoneMic()); } catch {}
+    this.busy = false;
   }
 
   async recheck() {
@@ -121,13 +134,11 @@ export class PitchTracker {
   }
 
   tick() {
-    if (this.ctx.state !== 'running') this.ctx.resume();
+    if (this.ctx.state !== 'running') this.ctx.resume().catch(() => {});
     this.analyser.getFloatTimeDomainData(this.buf);
     let sum = 0;
     for (let i = 0; i < this.buf.length; i++) sum += this.buf[i] * this.buf[i];
     const rms = Math.sqrt(sum / this.buf.length);
-    // Suelo de ruido adaptativo: sube despacio, baja rápido
-    this.noiseFloor = rms < this.noiseFloor ? rms * 0.5 + this.noiseFloor * 0.5 : this.noiseFloor * 0.995 + rms * 0.005;
     this.peak = Math.max(rms, (this.peak || 0.01) * 0.995);
     const vol = Math.min(1, rms / Math.max(0.004, this.peak * 0.8));
     let midi = null, r = null;
@@ -136,6 +147,10 @@ export class PitchTracker {
       r = yin(this.buf, this.ctx.sampleRate);
       if (r && r.clarity > 0.55) midi = hzToMidi(r.hz);
     }
+    // Suelo de ruido adaptativo: baja rápido y sube despacio, pero NO mientras hay una nota clara (si no, una nota
+    // larga a volumen constante acababa «siendo ruido» a los 7 s y se cortaba)
+    const voz = r && r.clarity > 0.55;
+    this.noiseFloor = rms < this.noiseFloor ? rms * 0.5 + this.noiseFloor * 0.5 : voz ? this.noiseFloor : this.noiseFloor * 0.995 + rms * 0.005;
     // Mediana de 3 para quitar saltos de octava sueltos
     this.history.push(midi);
     if (this.history.length > 3) this.history.shift();

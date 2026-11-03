@@ -18,10 +18,12 @@ Una conexión WebSocket en `/ws` por dispositivo; mensajes JSON con `type`.
 | `{type:"pitch", p, n, v, lat}` | servidor → tele | Voz del jugador `p`: nota MIDI decimal o `null`, volumen 0–1, media latencia del móvil (ms). |
 | `{type:"input", p, key}` | servidor → tele | Botón del móvil: `up/down/left/right/ok/back/y`. |
 | `{type:"full-attempt", name}` | servidor → tele | Alguien intentó entrar con la sala llena. |
-| `{type:"state", screen, singers, turn?, mode?, song?}` | tele → servidor → móviles | Pantalla actual y quién canta (los móviles muestran el micro solo a quien le toca). `mode` y `song:{title,artist}` son para la administración. |
+| `{type:"state", screen, singers, turn?, mode?, song?}` | tele → servidor → móviles | Pantalla actual (`lobby`, `menu`, `songs`, `prepare`, `countdown`, `sing`, `pause`, `results`, `calibrate`…) y quién canta (los móviles muestran el micro solo a quien le toca y solo mandan voz en `sing`/`countdown`/`calibrate`). `mode` y `song:{title,artist}` son para la administración. |
 | `{type:"admin", action, text?}` | servidor → tele | Desde la administración: `toast` (aviso en pantalla) o `reload` (recargar la app). |
 | `{type:"bot"}` | tele → servidor | «Simular jugador»: ocupa un color libre y canta desde la tele. |
 | `{type:"kick", p}` · `{type:"new-code"}` | tele → servidor | Expulsar jugador · cerrar la sala y abrir otra. |
+| `{type:"sing", song, duo, delay, singers:[{id, part, tol}]}` | tele → servidor | Empieza una canción: carpeta de la canción, si es modo Dúo, ajuste del micro (ms) y, por cantante, su id, su parte (0/1) y su margen en semitonos. El servidor lee la misma partitura y lleva su propia puntuación con la voz que reenvía ([PUNTUACION.md](PUNTUACION.md)). |
+| `{type:"clock", pos, playing, lat}` | tele → servidor | Cada segundo (y al pausar o seguir): segundo de la canción que suena, si está en marcha y media latencia de la tele (ms). |
 | `{type:"photo", p, data}` | servidor → tele | Foto del jugador `p` (JPEG 200×200 en `data:`, o vacío para quitarla). Al reconectar la tele se reenvían todas. |
 
 ## Móvil
@@ -54,7 +56,7 @@ Las rutas se descodifican y normalizan una sola vez antes de mirar permisos: `/%
 |---|---|
 | `GET /api/songs` | Canciones: id, título, artista, año, idioma, género, duración, dificultad 1–3, dúo, rutas. |
 | `GET /api/records` | `{songs:{id:{score,name,date,title,artist}}, singers:{nombre:{songs,best,streak}}, plays:{id:n}}`. |
-| `POST /api/records` | `{code, token, song, title, artist, players:[{name,score,streak,bot}]}`. Solo con el token de una sala abierta, `players` objetos y `song` una canción de la biblioteca. |
+| `POST /api/records` | `{code, token, song, players:[{id,score,streak}]}`. Solo con el token de una sala abierta, `song` una canción de la biblioteca que se haya cantado entera en esa sala (mensajes `sing` y `clock`) y `id` de jugadores de la sala (los bots no cuentan). El nombre, el título y el artista los pone el servidor, y los puntos no pueden pasar de lo que él ha visto acertar (ver [PUNTUACION.md](PUNTUACION.md)). Responde `{isNew, previous, record, players:[{name,score,streak}]}` con lo guardado; una segunda llamada para la misma canción da 409. |
 | `GET /api/health` | Estado. |
 | `POST /api/telemetry` | Rendimiento de la tele (fps, memoria…), en memoria (últimas 300). Solo con pase de tele; `GET` solo con sesión de admin. |
 | `/api/admin/*` | Solo en el subdominio `admin.` y con sesión de Touch ID. Ver [ADMIN.md](ADMIN.md). |

@@ -156,15 +156,25 @@
     $('view').innerHTML = '';
     window.scrollTo(0, 0);
     // Si se cambia de apartado mientras el anterior aún carga, su error (ya no tiene dónde pintar) se ignora
-    fn(rest.map(decodeURIComponent)).catch(e => { if (gen === viewGen) fail(e); });
+    let args;
+    try { args = rest.map(decodeURIComponent); } catch { location.hash = 'resumen'; return; }   // («#canciones/100%» no deja la pantalla en blanco)
+    fn(args).catch(e => {
+      if (gen !== viewGen) return;
+      fail(e);
+      // Que nunca quede la vista vacía: un botón para volver y el motivo
+      $('view').innerHTML = `<button class="btn ghost sm back" data-go="${['editor', 'canciones', 'preparando'].includes(v) ? 'canciones' : 'resumen'}">← Volver</button><div class="empty">${esc(e.message || 'Error')}</div>`;
+    });
   }
   addEventListener('hashchange', route);
   document.addEventListener('click', e => { const g = e.target.closest('[data-go]'); if (g) location.hash = g.dataset.go; });
+  let tSide = 0, tVigilar = 0;
+  const avisados = new Set();   // trabajos ya avisados (vive entre entradas: al volver a entrar no se repiten los avisos)
   async function start() {
     const st = await api('/auth/status' + (setup ? '?setup=' + enc(setup) : ''));
     if (!st.authenticated || st.setupValid) return showLogin(st);
     $('login').hidden = true; $('app').hidden = false;
     route();
+    clearInterval(tSide); clearInterval(tVigilar);   // (al volver a entrar tras caducar la sesión no se duplican los sondeos)
     // Contadores del menú, siempre al día
     const side = async () => {
       try {
@@ -172,9 +182,9 @@
         const b = $('nav-live'); b.textContent = l.counts.rooms || ''; b.className = l.counts.rooms ? 'live' : '';
       } catch {}
     };
-    side(); setInterval(side, 10000);
+    side(); tSide = setInterval(side, 10000);
     // Aviso al terminar un trabajo de creación (en cualquier apartado): «Abrir en el editor»
-    const desde = Date.now(), avisados = new Set();
+    const desde = Date.now();
     const vigilar = async () => {
       try {
         const d = await api('/jobs');
@@ -186,7 +196,7 @@
         }
       } catch {}
     };
-    setInterval(vigilar, 8000);
+    tVigilar = setInterval(vigilar, 8000);
     api('/server').then(s => ($('ver').textContent = 'v' + s.version)).catch(() => {});
   }
 
@@ -244,7 +254,8 @@
       <div class="rooms" id="d-rooms"></div>`;
     $('d-send').onclick = async () => {
       const text = $('d-msg').value.trim(); if (!text) return;
-      try { const r = await api('/broadcast', { method: 'POST', json: { text, phones: $('d-ph').checked } }); toast(`Enviado a ${r.tvs} teles`); $('d-msg').value = ''; } catch (e) { fail(e); }
+      $('d-msg').value = '';   // (antes de esperar: un doble clic no lo manda dos veces)
+      try { const r = await api('/broadcast', { method: 'POST', json: { text, phones: $('d-ph').checked } }); toast(`Enviado a ${r.tvs} teles`); } catch (e) { $('d-msg').value = text; fail(e); }
     };
     $('d-rooms').onclick = async e => {
       const b = e.target.closest('button[data-a]'); if (!b) return;
@@ -451,7 +462,7 @@
     if ($('s-rest')) $('s-rest').onclick = () => act(api(`/songs/${enc(id)}/cover`, { method: 'POST', json: { restore: true } }), 'Portada anterior recuperada');
     if ($('s-p0')) $('s-p0').onclick = async () => { if (await ask('¿Poner a 0 las veces cantada?', esc(s.title))) act(api('/records/plays/' + enc(id), { method: 'DELETE' })); };
     if ($('s-r0')) $('s-r0').onclick = async () => { if (await ask('¿Borrar el récord de esta canción?', esc(s.title))) act(api('/records/song/' + enc(id), { method: 'DELETE' })); };
-    if ($('s-pub')) $('s-pub').onclick = async () => { const nid = await publicar(id); if (nid) { toast('Publicada: ya sale en la tele'); location.hash = 'canciones/' + enc(nid); } };
+    if ($('s-pub')) $('s-pub').onclick = async () => { const b = $('s-pub'); if (b.disabled) return; b.disabled = true; try { const nid = await publicar(id); if (nid) { toast('Publicada: ya sale en la tele'); if (nid === id) reload(); else location.hash = 'canciones/' + enc(nid); } } finally { b.disabled = false; } };
     $('s-voz').onclick = async () => { try { await api('/jobs', { method: 'POST', json: { kind: 'analizar', song: id } }); toast('En la cola de creación'); location.hash = 'creacion'; } catch (e) { fail(e); } };
     $('s-nov').onclick = () => act(api('/novedades', { method: 'POST', json: { ids: [id], on: !s.isNew } }), s.isNew ? 'Quitada de Novedades' : 'Marcada como novedad');
     $('s-ren').onclick = async () => { const to = await prompt2('Renombrar carpeta', 'Nombre nuevo de la carpeta', id); if (to && to !== id) try { const r = await api(`/songs/${enc(id)}/rename`, { method: 'POST', json: { to } }); toast('Renombrada'); location.hash = 'canciones/' + enc(r.id); } catch (e) { fail(e); } };
@@ -460,12 +471,13 @@
     const now = () => { const a = $('s-audio'); return a ? mmss(a.currentTime) : ''; };
     $('mm-ah').onclick = () => ($('mm-a').value = now());
     $('mm-bh').onclick = () => ($('mm-b').value = now());
-    const mmRun = async (json, msg) => { try { toast('Cortando el tramo…'); const r = await api(`/songs/${enc(id)}/megamix`, { method: 'POST', json }); toast(msg || r.result); reload(); } catch (e) { fail(e); } };
+    let mmBusy = false;   // (un doble clic no lanza dos ffmpeg sobre el mismo megamix.mp3)
+    const mmRun = async (json, msg) => { if (mmBusy) return; mmBusy = true; try { toast('Cortando el tramo…'); const r = await api(`/songs/${enc(id)}/megamix`, { method: 'POST', json }); toast(msg || r.result); reload(); } catch (e) { fail(e); } finally { mmBusy = false; } };
     $('mm-set').onclick = () => { const a = parseT($('mm-a').value), b = parseT($('mm-b').value); if (!(a >= 0 && b > a)) return toast('Pon inicio y fin (m:ss)', true); mmRun({ mode: 'manual', start: a, end: b }); };
     $('mm-auto').onclick = () => mmRun({ mode: 'auto' });
     if ($('mm-off')) $('mm-off').onclick = async () => { if (await ask('¿Quitar del Megamix?', esc(s.title))) mmRun({ mode: 'none' }, 'Fuera del Megamix'); };
     $('v-me').onclick = async () => { $('v-out').textContent = 'Midiendo…'; try { const r = await api(`/songs/${enc(id)}/measure`, { method: 'POST', json: {} }); $('v-out').textContent = `${(+r.input_i).toFixed(1)} LUFS · pico ${(+r.input_tp).toFixed(1)} dBTP · rango ${(+r.input_lra).toFixed(1)} LU`; } catch (e) { $('v-out').textContent = ''; fail(e); } };
-    $('v-no').onclick = async () => { $('v-out').textContent = 'Igualando (tarda un poco)…'; try { const r = await api(`/songs/${enc(id)}/normalize`, { method: 'POST', json: {} }); toast(r.result); reload(); } catch (e) { $('v-out').textContent = ''; fail(e); } };
+    $('v-no').onclick = async () => { const b = $('v-no'); if (b.disabled) return; b.disabled = true; $('v-out').textContent = 'Igualando (tarda un poco)…'; try { const r = await api(`/songs/${enc(id)}/normalize`, { method: 'POST', json: {} }); toast(r.result); reload(); } catch (e) { $('v-out').textContent = ''; b.disabled = false; fail(e); } };
     $('t-add').onclick = async () => { const k = await prompt2('Añadir dato', 'Nombre del dato (p. ej. GENRE, EDITION, VIDEO)', ''); if (k) $('s-tags').insertAdjacentHTML('beforeend', tagRow(k.toUpperCase().replace(/[^A-Z0-9]/g, ''), '')); };
     $('s-tags').onclick = e => { const b = e.target.closest('[data-rm]'); if (b) b.previousElementSibling.value = ''; };
     $('t-save').onclick = () => {
@@ -571,7 +583,7 @@
     $('rt').onclick = async e => {
       const r = e.target.closest('[data-r]'), d = e.target.closest('[data-d]');
       try {
-        if (r) { await api(`/retired/${enc(r.dataset.r)}/restore`, { method: 'POST', json: {} }); toast('Restaurada'); }
+        if (r) { if (r.disabled) return; r.disabled = true; await api(`/retired/${enc(r.dataset.r)}/restore`, { method: 'POST', json: {} }); toast('Restaurada'); }
         if (d && await ask('¿Borrar para siempre?', `«${esc(d.dataset.d)}» se borra del servidor. No se puede deshacer.`, 'Borrar')) { await api(`/retired/${enc(d.dataset.d)}`, { method: 'DELETE' }); toast('Borrada'); }
         draw();
       } catch (err) { fail(err); }
@@ -668,7 +680,8 @@ Las líneas vacías no cuentan."></textarea>
         await new Promise((res, rej) => {   // con barra de progreso
           const x = new XMLHttpRequest(); x.open('PUT', `/api/admin/jobs/${j.id}/audio`); x.setRequestHeader('x-name', f.name);
           x.upload.onprogress = e => { if (e.lengthComputable) $('k-p').style.width = (e.loaded / e.total * 100) + '%'; };
-          x.onload = () => x.status < 300 ? res() : rej(new Error((JSON.parse(x.responseText || '{}').error) || 'Error ' + x.status)); x.onerror = () => rej(new Error('Sin conexión'));
+          x.onload = () => { if (x.status < 300) return res(); let j = {}; try { j = JSON.parse(x.responseText || '{}'); } catch {} rej(new Error(j.error || 'Error ' + x.status)); };   // (un 413 o 502 en HTML no deja el modal colgado)
+          x.onerror = () => rej(new Error('Sin conexión'));
           x.send(f);
         });
         closeModal(); location.hash = 'preparando/' + j.id;
@@ -765,7 +778,10 @@ Las líneas vacías no cuentan."></textarea>
   // ------------------------------------------------------------------ Editor de canciones
   VIEWS.editor = async ([id, extra]) => {
     if (!id) { location.hash = 'canciones'; return; }
-    editor = await GramolaEditor.open($('view'), id, api, toast, { verAlAbrir: extra === 'ver' });
+    const gen = viewGen;   // si se cambia de apartado mientras carga, el editor no pisa la vista nueva
+    const ed = await GramolaEditor.open($('view'), id, api, toast, { verAlAbrir: extra === 'ver', vivo: () => gen === viewGen });
+    if (!ed) return;
+    editor = ed;
     // Las que están en preparación se editan dentro de Creación
     document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('on', a.dataset.v === (editor.draft ? 'creacion' : 'canciones')));
   };

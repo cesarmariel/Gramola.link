@@ -142,6 +142,7 @@ module.exports = function admin(ctx) {
       req.on('data', c => { size += c.length; if (size > max) { reject(httpErr(413, 'Demasiado grande')); req.destroy(); return; } chunks.push(c); });
       req.on('end', () => resolve(Buffer.concat(chunks)));
       req.on('error', reject);
+      req.on('close', () => reject(httpErr(400, 'Petición cortada')));
     });
   }
   async function body(req) {
@@ -161,6 +162,15 @@ module.exports = function admin(ctx) {
     if (mustExist && !fs.existsSync(d)) throw httpErr(404, 'No existe esa canción');
     return d;
   };
+  // Nombre del audio según la cabecera (#MP3 o #AUDIO): un nombre de fichero dentro de la carpeta, nada de rutas
+  const audioOf = h => { const a = h.MP3 || h.AUDIO; return a && !/[\/\\\0]/.test(a) && a !== '..' && a !== '.' ? a : null; };
+  // Cerrojo por carpeta: no se lanzan dos ffmpeg a la vez sobre el mismo audio (igualar volumen, Megamix)
+  const ocupadas = new Set();
+  async function conCerrojo(dir, fn) {
+    if (ocupadas.has(dir)) throw httpErr(409, 'Esta canción ya se está procesando; espera a que acabe');
+    ocupadas.add(dir);
+    try { return await fn(); } finally { ocupadas.delete(dir); }
+  }
   function readText(file) {
     const buf = fs.readFileSync(file);
     const u = buf.toString('utf8');
@@ -236,10 +246,11 @@ module.exports = function admin(ctx) {
   }
   function run(cmd, args, opts = {}) {
     return new Promise(resolve => {
-      const p = spawn(cmd, args, { ...opts });
+      // En su propio grupo de procesos: al agotarse el tiempo se mata también el ffmpeg que haya lanzado python
+      const p = spawn(cmd, args, { ...opts, detached: true });
       let out = '', err = '';
       p.stdout.on('data', d => (out += d)); p.stderr.on('data', d => (err += d));
-      const to = setTimeout(() => p.kill('SIGKILL'), opts.timeout || 300000);
+      const to = setTimeout(() => { try { process.kill(-p.pid, 'SIGKILL'); } catch { p.kill('SIGKILL'); } }, opts.timeout || 300000);
       p.on('close', code => { clearTimeout(to); resolve({ code, out: out.trim(), err: err.trim().slice(-2000) }); });
       p.on('error', e => { clearTimeout(to); resolve({ code: -1, out: '', err: e.message }); });
     });
@@ -638,10 +649,10 @@ module.exports = function admin(ctx) {
       const a = rg[1] ? +rg[1] : st.size - +rg[2], e = rg[1] && rg[2] ? Math.min(+rg[2], st.size - 1) : st.size - 1;
       if (!(a >= 0 && a <= e && a < st.size)) { res.writeHead(416, { 'content-range': `bytes */${st.size}` }); return res.end(); }
       res.writeHead(206, { 'content-type': type, 'accept-ranges': 'bytes', 'content-range': `bytes ${a}-${e}/${st.size}`, 'content-length': e - a + 1, 'cache-control': 'no-store' });
-      return fs.createReadStream(f, { start: a, end: e }).pipe(res);
+      return fs.createReadStream(f, { start: a, end: e }).on('error', () => res.destroy()).pipe(res);
     }
     res.writeHead(200, { 'content-type': type, 'accept-ranges': 'bytes', 'content-length': st.size, 'cache-control': 'no-store' });
-    fs.createReadStream(f).pipe(res);
+    fs.createReadStream(f).on('error', () => res.destroy()).pipe(res);
   });
   on('POST', '/jobs/([^/]+)/retry', (req, res, m) => { const j = jobGet(m[1]); j.state = 'pendiente'; j.error = null; j.progress = 0; j.msg = ''; jobPut(j); json(res, 200, j); });
   on('DELETE', '/jobs/([^/]+)', async (req, res, m) => { jobGet(m[1]); await fsp.rm(path.join(JOBS, safeName(m[1])), { recursive: true, force: true }); json(res, 200, { ok: true }); });
@@ -874,13 +885,15 @@ module.exports = function admin(ctx) {
     } else if (b.mode === 'manual') {
       const a = Math.round(+b.start), e = Math.round(+b.end);
       if (!(a >= 0 && e - a >= 5000 && e - a <= 90000)) throw httpErr(400, 'El estribillo tiene que durar entre 5 y 90 segundos');
-      const h = headerOf(dir), audio = h.MP3 || h.AUDIO;
+      const audio = audioOf(headerOf(dir));
       if (!audio || !fs.existsSync(path.join(dir, audio))) throw httpErr(400, 'La canción no tiene audio');
       const off = Math.max(0, a - 5000);
-      r = await run('ffmpeg', ['-y', '-loglevel', 'error', '-i', path.join(dir, audio), '-ss', (off / 1000).toFixed(3), '-to', ((e + 3000) / 1000).toFixed(3), '-vn', '-ac', '2', '-c:a', 'libmp3lame', '-b:a', '192k', path.join(dir, 'megamix.mp3')]);
-      if (r.code === 0) { writeJson(path.join(dir, 'megamix.json'), { file: 'megamix.mp3', offset: off, start: a, end: e, origen: 'manual' }); r.out = 'ok · estribillo manual ' + Math.round((e - a) / 1000) + ' s'; }
+      // (se corta a un temporal y se renombra al final: nunca queda un megamix.mp3 a medias)
+      r = await conCerrojo(dir, () => run('ffmpeg', ['-y', '-loglevel', 'error', '-i', path.join(dir, audio), '-ss', (off / 1000).toFixed(3), '-to', ((e + 3000) / 1000).toFixed(3), '-vn', '-ac', '2', '-c:a', 'libmp3lame', '-b:a', '192k', '-f', 'mp3', path.join(dir, 'megamix.mp3.tmp')]));
+      if (r.code === 0) { fs.renameSync(path.join(dir, 'megamix.mp3.tmp'), path.join(dir, 'megamix.mp3')); writeJson(path.join(dir, 'megamix.json'), { file: 'megamix.mp3', offset: off, start: a, end: e, origen: 'manual' }); r.out = 'ok · estribillo manual ' + Math.round((e - a) / 1000) + ' s'; }
+      else try { fs.unlinkSync(path.join(dir, 'megamix.mp3.tmp')); } catch {}
     } else {
-      r = await py('import megamix; print(megamix.preparar(d, forzar=True, auto=True))', dir);
+      r = await conCerrojo(dir, () => py('import megamix; print(megamix.preparar(d, forzar=True, auto=True))', dir));
     }
     ctx.songsChanged();
     ev('songs', `Megamix de «${id}»: ${r.code === 0 ? r.out : 'error'}`);
@@ -889,14 +902,14 @@ module.exports = function admin(ctx) {
   });
   on('POST', '/songs/([^/]+)/normalize', async (req, res, m) => {
     const id = decodeURIComponent(m[1]), dir = songDir(id);
-    const r = await py('import normalizar; print(normalizar.una(d)[1])', dir);
+    const r = await conCerrojo(dir, () => py('import normalizar; print(normalizar.una(d)[1])', dir));
     ctx.songsChanged();
     ev('songs', `Volumen de «${id}»: ${r.code === 0 ? r.out : 'error'}`);
     if (r.code !== 0) throw httpErr(500, 'No se pudo: ' + (r.err || r.out));
     json(res, 200, { ok: true, result: r.out });
   });
   on('POST', '/songs/([^/]+)/measure', async (req, res, m) => {
-    const id = decodeURIComponent(m[1]), dir = songDir(id), h = headerOf(dir), audio = h.MP3 || h.AUDIO;
+    const id = decodeURIComponent(m[1]), dir = songDir(id), audio = audioOf(headerOf(dir));
     if (!audio) throw httpErr(400, 'Sin audio');
     const r = await run('ffmpeg', ['-hide_banner', '-nostats', '-i', path.join(dir, audio), '-vn', '-af', 'loudnorm=I=-12:TP=-1:LRA=11:print_format=json', '-f', 'null', '-']);
     const j = (r.err.match(/\{[^{}]*"input_i"[^{}]*\}/s) || [])[0];
@@ -1070,8 +1083,8 @@ module.exports = function admin(ctx) {
           if (buf.length > 2000) { fs.writeFileSync(path.join(dir, 'cover-itunes.jpg'), buf); setCover(dir, 'cover-itunes.jpg', { origen: 'itunes', disco: r.album, año: r.year, url: r.art }); }
         }
       } catch {}
-      await py('import normalizar; print(normalizar.una(d)[1])', dir).catch(() => {});
-      await py('import megamix; print(megamix.preparar(d, forzar=True, auto=True))', dir).catch(() => {});
+      await conCerrojo(dir, () => py('import normalizar; print(normalizar.una(d)[1])', dir)).catch(() => {});
+      await conCerrojo(dir, () => py('import megamix; print(megamix.preparar(d, forzar=True, auto=True))', dir)).catch(() => {});
       ctx.songsChanged();
     })();
   }
@@ -1080,28 +1093,36 @@ module.exports = function admin(ctx) {
   won('POST', '/next', async (req, res) => {
     const b = await body(req);
     worker = { seen: Date.now(), host: String(b.host || '').slice(0, 60), job: worker.job, version: String(b.version || '').slice(0, 20) };
-    // Un trabajo que lleva 20 min sin dar señales (el trabajador se reinició a medias) vuelve a la cola
-    for (const x of jobsAll()) if (x.state === 'procesando' && Date.now() - (x.updated || 0) > 20 * 60e3) { x.state = 'pendiente'; x.msg = 'Vuelve a la cola'; jobPut(x); }
+    // Un trabajo que lleva 20 min sin dar señales (el trabajador se reinició a medias) vuelve a la cola, una vez:
+    // si vuelve a pasar, se da por fallido (si no, un audio que revienta al trabajador se repetiría sin fin)
+    for (const x of jobsAll()) if (x.state === 'procesando' && Date.now() - (x.updated || 0) > 20 * 60e3) {
+      x.retries = (x.retries || 0) + 1;
+      if (x.retries > 1) { x.state = 'error'; x.error = 'El trabajador se ha caído dos veces con este trabajo (¿audio demasiado largo?)'; ev('songs', `Error en el trabajo «${x.artista} - ${x.titulo}»: ${x.error}`); }
+      else { x.state = 'pendiente'; x.msg = 'Vuelve a la cola'; }
+      jobPut(x);
+    }
     const pend = jobsAll().reverse().filter(x => x.state === 'pendiente');
     const j = pend.find(x => x.kind === 'spotify') || pend[0];   // las descargas de Spotify son rápidas: primero
     if (!j) return json(res, 200, {});
-    j.state = 'procesando'; j.started = Date.now(); j.progress = 0; j.msg = 'Empezando'; j.worker = worker.host; jobPut(j);
-    worker.job = j.id;
     const out = { ...j };
     if (j.kind === 'crear') {
-      out.letra = fs.readFileSync(jobPath(j.id, 'letra.txt'), 'utf8');
+      // (la letra se lee antes de marcarlo «procesando»: si falta, el trabajo queda en error y no en el limbo)
+      try { out.letra = fs.readFileSync(jobPath(j.id, 'letra.txt'), 'utf8'); } catch { j.state = 'error'; j.error = 'Falta la letra del trabajo'; jobPut(j); return json(res, 200, {}); }
       try { out.lrc = fs.readFileSync(jobPath(j.id, 'letra.lrc'), 'utf8'); } catch {}
     }
+    j.state = 'procesando'; j.started = Date.now(); j.progress = 0; j.msg = 'Empezando'; j.worker = worker.host; jobPut(j);
+    worker.job = j.id;
+    Object.assign(out, { state: j.state, started: j.started, progress: 0, msg: j.msg, worker: j.worker });
     json(res, 200, out);
   });
   won('GET', '/jobs/([^/]+)/input', (req, res, m) => {
     const j = jobGet(m[1]);
     let f;
     if (j.kind === 'crear') f = jobPath(j.id, 'entrada.mp3');
-    else { const dir = songDir(j.song), h = headerOf(dir); f = path.join(dir, h.MP3 || h.AUDIO || ''); }
+    else { const dir = songDir(j.song), a = audioOf(headerOf(dir)); f = a ? path.join(dir, a) : ''; }
     if (!fs.existsSync(f)) throw httpErr(404, 'Falta el audio');
     res.writeHead(200, { 'content-type': 'audio/mpeg', 'content-length': fs.statSync(f).size });
-    fs.createReadStream(f).pipe(res);
+    fs.createReadStream(f).on('error', () => res.destroy()).pipe(res);
   });
   won('POST', '/jobs/([^/]+)/progress', async (req, res, m) => {
     const j = jobGet(m[1]), b = await body(req);

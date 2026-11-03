@@ -35,7 +35,7 @@
       if (/^E\s*$/.test(L)) break;
       const p = L.match(/^P\s*(\d)/);
       if (p) { tr = { name: 'P' + p[1], notes: [], breaks: [], br2: {} }; tracks.push(tr); off = 0; continue; }
-      const n = L.match(/^([:*FRG])\s*(-?\d+)\s+(\d+)\s+(-?\d+)(?: (.*))?$/);
+      const n = L.match(/^([:*FRG])\s*(-?\d+)\s+(\d+)\s+(-?\d+)(?:[ \t](.*))?$/);   // (también con tabulador antes de la sílaba)
       if (n) { need().notes.push({ t: n[1], b: +n[2] + off, l: +n[3], p: +n[4], s: n[5] ?? '' }); continue; }
       const br = L.match(/^-\s*(-?\d+)(?:\s+(-?\d+))?/);
       if (br) {
@@ -48,11 +48,22 @@
     for (const t of tracks) { t.notes.sort((a, b) => a.b - b.b); t.breaks.sort((a, b) => a - b); }
     return { head: head.filter(h => h[0] !== 'RELATIVE'), tracks, wasRelative: relative };
   }
+  // Notas en orden, sin tiempos negativos, sin duraciones nulas y sin solaparse (lo que se arrastra, estira o cambia de
+  // BPM puede dejar una nota encima de la siguiente; el .txt que se guarda siempre es válido)
+  function sanear(t) {
+    t.notes.sort((a, b) => a.b - b.b);
+    for (let i = 0; i < t.notes.length; i++) {
+      const n = t.notes[i], nx = t.notes[i + 1];
+      n.b = Math.max(0, Math.round(n.b)); n.l = Math.max(1, Math.round(n.l));
+      if (nx) { if (nx.b <= n.b) nx.b = n.b + 1; if (n.b + n.l > nx.b) n.l = Math.max(1, nx.b - n.b); }
+    }
+  }
   function serialize(doc) {
     const out = doc.head.map(([k, v]) => `#${k}:${v}`);
     const multi = doc.tracks.length > 1;
     for (const t of doc.tracks) {
       if (multi) out.push(t.name);
+      sanear(t);
       const notes = t.notes.slice().sort((a, b) => a.b - b.b);
       const brs = t.breaks.slice().sort((a, b) => a - b);
       let bi = 0;
@@ -83,6 +94,7 @@
   async function open(view, id, api, toast, opts = {}) {
     const fail = e => toast(e.message || String(e), true);
     const data = await api('/songs/' + encodeURIComponent(id) + '/chart');
+    if (opts.vivo && !opts.vivo()) return null;   // mientras cargaba se cambió de apartado: no se pinta nada
     let doc = parse(data.text);
     const hv = k => (doc.head.find(h => h[0] === k) || [])[1];
     const setHead = (k, v) => { const h = doc.head.find(x => x[0] === k); if (h) h[1] = String(v); else doc.head.push([k, String(v)]); };
@@ -169,10 +181,12 @@
       for (let i = 0; i < n; i++) { let mxv = 0; for (let j = i * per, e = j + per; j < e; j++) { const v = Math.abs(ch[j]); if (v > mxv) mxv = v; } p[i] = mxv; }
       return { p, dur: ab.duration * 1000 };
     }
-    peaksOf(data.audio).then(r => { peaks = r.p; durMs = r.dur; draw(); }).catch(() => {});
-    if (data.vocals) peaksOf(data.vocals).then(r => { vpeaks = r.p; draw(); }).catch(() => {});
-    if (data.pitch) fetch(data.pitch).then(r => r.json()).then(j => { pitchCurve = j; draw(); }).catch(() => {});
-    audio.addEventListener('loadedmetadata', () => { if (!durMs) durMs = audio.duration * 1000; draw(); });
+    // (si el editor ya se ha cerrado cuando acaba la descarga, no se dibuja nada)
+    const vivo = () => view.contains(cv);
+    peaksOf(data.audio).then(r => { if (!vivo()) return; peaks = r.p; durMs = r.dur; draw(); }).catch(() => {});
+    if (data.vocals) peaksOf(data.vocals).then(r => { if (!vivo()) return; vpeaks = r.p; draw(); }).catch(() => {});
+    if (data.pitch) fetch(data.pitch).then(r => r.json()).then(j => { if (!vivo()) return; pitchCurve = j; draw(); }).catch(() => {});
+    audio.addEventListener('loadedmetadata', () => { if (!vivo()) return; if (!durMs) durMs = audio.duration * 1000; draw(); });
 
     // ---------------- vista
     let pxPerMs = 0.12, viewMs = 0, H = 520, W = 1000;
@@ -205,7 +219,12 @@
     // ---------------- historia
     const snap = () => JSON.stringify({ tracks: doc.tracks, gap, head: doc.head });
     function push() { hist.push(snap()); if (hist.length > 300) hist.shift(); fut = []; setDirty(true); }
-    function restore(s) { const o = JSON.parse(s); doc.tracks = o.tracks; doc.head = o.head; gap = num(hv('GAP')); sel.clear(); range(); refresh(); }
+    function restore(s) {
+      const o = JSON.parse(s); doc.tracks = o.tracks; doc.head = o.head; gap = num(hv('GAP'));
+      bpm = num(hv('BPM')) || bpm;                         // (deshacer un cambio de BPM también devuelve la rejilla)
+      ti = Math.min(ti, doc.tracks.length - 1); if ($('#ed-track')) $('#ed-track').value = String(ti);
+      sel.clear(); range(); refresh();
+    }
     function undo() { if (!hist.length) return; fut.push(snap()); restore(hist.pop()); setDirty(true); }
     function redo() { if (!fut.length) return; hist.push(snap()); restore(fut.pop()); setDirty(true); }
     function setDirty(v) { dirty = v; $('#ed-dirty').hidden = !v; }
@@ -394,19 +413,19 @@
       actx.resume();
       if (y < RULER) {
         const bi = hitBreak(x, y);
-        if (bi != null) { push(); drag = { kind: 'break', i: bi }; return; }
+        if (bi != null) { const wasDirty = dirty, fut0 = fut.slice(); push(); drag = { kind: 'break', i: bi, b0: T().breaks[bi], wasDirty, fut0 }; return; }
         seek(msOf(x)); return;
       }
       if (y > H - WAVE || marcando) { drag = { kind: 'hueco', x0: x, x1: x, onda: y > H - WAVE }; return; }
       const bi = hitBreak(x, RULER);
       const h = hit(x, y);
-      if (!h && bi != null && Math.abs(xOf(b2ms(T().breaks[bi])) - x) < 4) { push(); drag = { kind: 'break', i: bi }; return; }
+      if (!h && bi != null && Math.abs(xOf(b2ms(T().breaks[bi])) - x) < 4) { const wasDirty = dirty, fut0 = fut.slice(); push(); drag = { kind: 'break', i: bi, b0: T().breaks[bi], wasDirty, fut0 }; return; }
       if (h) {
         if (e.shiftKey) { sel.has(h.n) ? sel.delete(h.n) : sel.add(h.n); draw(); info(); return; }
         if (!sel.has(h.n)) { sel = new Set([h.n]); }
-        const wasDirty = dirty;
+        const wasDirty = dirty, fut0 = fut.slice();   // (un clic sin arrastrar no cuenta como cambio ni borra «rehacer»)
         push();
-        drag = { wasDirty, kind: h.edge ? 'resize-' + h.edge : 'move', x0: x, y0: y, orig: [...sel].map(n => ({ n, b: n.b, l: n.l, p: n.p })), moved: false };
+        drag = { wasDirty, fut0, kind: h.edge ? 'resize-' + h.edge : 'move', x0: x, y0: y, orig: [...sel].map(n => ({ n, b: n.b, l: n.l, p: n.p })), moved: false };
         info(); draw(); return;
       }
       if (!e.shiftKey) sel.clear();
@@ -456,7 +475,8 @@
         hueco = { a: Math.max(0, msOf(Math.min(d.x0, d.x1))), b: msOf(Math.max(d.x0, d.x1)) }; marcando = false;
         return barraHueco();
       }
-      if ((drag.kind === 'move' || drag.kind.startsWith('resize')) && !drag.moved) { hist.pop(); setDirty(drag.wasDirty); }
+      if ((drag.kind === 'move' || drag.kind.startsWith('resize')) && !drag.moved) { hist.pop(); setDirty(drag.wasDirty); fut = drag.fut0; }
+      if (drag.kind === 'break' && T().breaks[drag.i] === drag.b0) { hist.pop(); setDirty(drag.wasDirty); fut = drag.fut0; }
       if (drag.kind === 'break') T().breaks.sort((a, b) => a - b);
       if (drag.kind === 'move') { T().notes.sort((a, b) => a.b - b.b); range(); }
       drag = null; refresh();
@@ -491,7 +511,7 @@
       const inp = document.createElement('input');
       inp.className = 'ed-inp'; inp.value = n.s; inp.style.left = (r.left + scrollX + x) + 'px'; inp.style.top = (r.top + scrollY + y + 4) + 'px';
       document.body.appendChild(inp); inp.focus(); inp.select();
-      const done = ok => { if (ok && inp.value !== n.s) { push(); n.s = inp.value; } inp.remove(); refresh(); };
+      const done = ok => { if (!inp.isConnected) return; inp.onblur = null; if (ok && inp.value !== n.s) { push(); n.s = inp.value; } inp.remove(); refresh(); };   // (Escape no aplica el texto por el blur)
       inp.onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') done(true); if (e.key === 'Escape') done(false); };
       inp.onblur = () => done(true);
     }
@@ -648,7 +668,7 @@
       const p = phrasesOf(T())[+d.dataset.i]; sel = new Set(p.notes);
       viewMs = b2ms(p.start) - 1500; audio.currentTime = Math.max(0, (b2ms(p.start) - 1000) / 1000); refresh();
     };
-    function refresh() { $('#ed-gap').value = Math.round(gap); $('#ed-bpm').textContent = bpm; info(); phrasesPanel(); if (sencillo()) panelSencillo(); draw(); }
+    function refresh() { doc.tracks.forEach(sanear); $('#ed-gap').value = Math.round(gap); $('#ed-bpm').textContent = bpm; info(); phrasesPanel(); if (sencillo()) panelSencillo(); draw(); }
 
     // ---------------- modo sencillo: frases a la izquierda, la frase grande con sus palabras y botones
     const esOro = n => n.t === '*' || n.t === 'G';
@@ -848,7 +868,7 @@
     // GAP
     const setGap = v => { push(); gap = Math.round(v); setHead('GAP', gap); refresh(); };
     view.querySelectorAll('[data-gap]').forEach(b => (b.onclick = () => setGap(gap + +b.dataset.gap)));
-    $('#ed-gap').onchange = () => setGap(num($('#ed-gap').value));
+    $('#ed-gap').onchange = () => { const v = parseFloat(String($('#ed-gap').value).replace(',', '.')); if (!Number.isFinite(v)) return refresh(); setGap(v); };   // (texto que no es un número: se deja como estaba)
     $('#ed-zoom').oninput = () => { const c = msOf(W / 2); pxPerMs = zoomFrom(+$('#ed-zoom').value); viewMs = c - W / 2 / pxPerMs; draw(); };
     $('#ed-play').onclick = toggle;
     $('#ed-rate').onchange = () => (audio.playbackRate = +$('#ed-rate').value);
@@ -858,24 +878,28 @@
     $('#ed-undo').onclick = undo; $('#ed-redo').onclick = redo;
 
     // ---------------- guardar y versiones
-    async function save() {
+    let saving = false;
+    async function save() {   // devuelve true si se ha guardado (Publicar y Volver a encajar no siguen si falla)
+      if (saving) return false;
+      saving = true;
       try {
         await api('/songs/' + encodeURIComponent(id) + '/chart', { method: 'PUT', json: { text: serialize(doc), note: 'editor' } });
         setDirty(false); toast('Guardado');
         // El tramo del Megamix depende de los tiempos: si no es manual, se vuelve a cortar
         if (data.megamix && data.megamix.origen !== 'manual') api('/songs/' + encodeURIComponent(id) + '/megamix', { method: 'POST', json: { mode: 'auto' } }).catch(() => {});
         loadVersions();
-      } catch (e) { fail(e); }
+        return true;
+      } catch (e) { fail(e); return false; } finally { saving = false; }
     }
     $('#ed-save').onclick = save;
     if ($('#ed-reenc')) $('#ed-reenc').onclick = async () => {
       if (!confirm('¿Volver a encajar la letra? Se rehacen las notas desde el audio y la letra (unos 5 minutos). Lo actual queda en Versiones.')) return;
-      try { if (dirty) await save(); const j = await api('/songs/' + encodeURIComponent(id) + '/reencajar', { method: 'POST', json: {} }); setDirty(false); location.hash = 'preparando/' + j.id; } catch (e) { fail(e); }
+      try { if (dirty && !(await save())) return; const j = await api('/songs/' + encodeURIComponent(id) + '/reencajar', { method: 'POST', json: {} }); setDirty(false); location.hash = 'preparando/' + j.id; } catch (e) { fail(e); }
     };
     if ($('#ed-pub')) $('#ed-pub').onclick = async () => {
       if (!confirm('¿Publicarla? Saldrá en la tele, en Novedades.')) return;
       try {
-        if (dirty) await save();
+        if (dirty && !(await save())) return;
         const nid = await window.GramolaAdmin.publicar(id);
         if (!nid) return;
         data.draft = false; $('#ed-pub').remove(); $('#ed-draft').remove(); $('#ed-save').classList.add('red');
@@ -926,6 +950,7 @@
         const r = await pedir('Desplazar desde el cursor', `Mueve todas las notas y cortes desde ${fmt(audio.currentTime * 1000)} hasta el final. En milisegundos: positivo = más tarde, negativo = antes.`, '250');
         const ms = num(r); if (r == null || !ms) return;
         const d = Math.round(ms / beatMs());
+        if (!d) return toast(`Menos de un tiempo (${Math.round(beatMs())} ms): no se mueve nada`, true);
         push(); for (const n of T().notes) if (n.b >= desde) n.b += d;
         T().breaks = T().breaks.map(b => (b >= desde ? b + d : b)); refresh();
         toast(`Movido ${ms > 0 ? '+' : ''}${Math.round(ms)} ms desde ${fmt(audio.currentTime * 1000)}`);

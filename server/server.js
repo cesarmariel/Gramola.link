@@ -11,6 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
+const { Sesion } = require('./puntuacion');
 
 const PORT = Number(process.env.PORT || 8877);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -34,6 +35,16 @@ function readText(file) {
 
 const num = s => parseFloat(String(s || '0').replace(',', '.')) || 0;
 let songsCache = { at: 0, list: [] };
+// Lector UltraStar: el mismo fichero que usa la tele (web/js/ultrastar.js), para que la partitura sea idéntica
+let ultrastar = null;
+const parser = () => ultrastar || (ultrastar = import(require('url').pathToFileURL(path.join(WEB_DIR, 'js', 'ultrastar.js')).href).catch(e => { ultrastar = null; throw e; }));
+async function loadChart(songId) {
+  const dir = path.join(SONGS_DIR, songId);
+  const txt = fs.readdirSync(dir).find(f => f.toLowerCase().endsWith('.txt'));
+  if (!txt) throw new Error('sin .txt');
+  const { parseUltraStar } = await parser();
+  return parseUltraStar(readText(path.join(dir, txt)));
+}
 // Novedades: canciones marcadas desde la administración para que salgan primero en la tele ({ id: fecha })
 const NEW_FILE = path.join(DATA_DIR, 'novedades.json');
 let novedades = {}, novedadesMtime = 0;
@@ -249,6 +260,7 @@ function readBody(req, max = 32 * 1024) {
     });
     req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
     req.on('error', reject);
+    req.on('close', () => reject(new Error('cortado')));   // (si ya llegó «end», no hace nada)
   });
 }
 // Cuerpo JSON que tiene que ser un objeto (ni null, ni lista, ni texto suelto): si no, error 400
@@ -361,14 +373,31 @@ async function handleHttp(req, res) {
     if (!Array.isArray(body.players) || body.players.some(p => !p || typeof p !== 'object')) return json(res, 400, { error: 'jugadores' });
     // Solo canciones de la biblioteca: que nadie llene el salón de la fama de canciones inventadas
     const songId = clean(body.song, 200);
-    if (!scanSongs().some(s => s.id === songId)) return json(res, 400, { error: 'cancion' });
-    const r = addRecord(body);
+    const entry = scanSongs().find(s => s.id === songId);
+    if (!entry) return json(res, 400, { error: 'cancion' });
+    // Lo que se guarda no lo decide la tele: tiene que haber una canción cantada entera en esta sala (mensaje «sing» +
+    // reloj), cada jugador tiene que ser uno de la sala (no un bot, con su nombre de verdad) y los puntos no pueden
+    // pasar de lo que el servidor ha visto acertar con la voz que ha reenviado (ver server/puntuacion.js)
+    const sg = room.sing;
+    if (!sg || sg.song !== songId) return json(res, 403, { error: 'sesion' });
+    if (sg.saved) return json(res, 409, { error: 'repetida' });
+    if (!sg.complete()) return json(res, 403, { error: 'incompleta' });
+    sg.saved = true;
+    const players = [], vistos = [];
+    for (const p of body.players.slice(0, MAX_PLAYERS)) {
+      const pl = room.players.get(+p.id);
+      if (!pl || pl.bot) continue;
+      const v = sg.verify(pl.id, p.score, p.streak);
+      if (!v) continue;
+      players.push({ name: pl.name, score: v.score, streak: v.streak });
+      vistos.push(`${pl.name} ${v.score}${v.score !== Math.round(+p.score || 0) ? ` (la tele decía ${Math.round(+p.score || 0)}, visto ${v.visto.score})` : ''}`);
+    }
+    const r = addRecord({ song: songId, title: entry.title, artist: entry.artist, players });
     if (r) {
       admin.count('plays');
-      const who = body.players.filter(p => !p.bot).map(p => `${clean(p.name, 16)} ${Math.round(+p.score || 0)}`).join(', ');
-      admin.ev('play', `Sala ${room.code}: «${clean(body.title, 80)}»${who ? ' — ' + who : ''}${r.isNew ? ' · ¡récord!' : ''}`, { room: room.code, song: clean(body.song, 200) });
+      admin.ev('play', `Sala ${room.code}: «${entry.title}»${vistos.length ? ' — ' + vistos.join(', ') : ''}${r.isNew ? ' · ¡récord!' : ''}`, { room: room.code, song: songId });
     }
-    return r ? json(res, 200, r) : json(res, 400, { error: 'datos' });
+    return r ? json(res, 200, { ...r, players }) : json(res, 400, { error: 'datos' });
   }
   if (SERVE_STATIC && (req.method === 'GET' || req.method === 'HEAD')) return serveStatic(req, res, url.pathname);
   res.writeHead(404); res.end();
@@ -401,6 +430,10 @@ function serveStatic(req, res, pathname) {
     out(err, st);
   });
   function out(err, st) {
+    try { out2(err, st); } catch (e) { console.error('static:', e.message); if (!res.headersSent) res.writeHead(500); res.end(); }
+  }
+  const stream = (opts) => fs.createReadStream(file, opts).on('error', () => res.destroy()).pipe(res);   // (un fichero que desaparece a medias no tumba nada)
+  function out2(err, st) {
     if (err || !st.isFile()) { res.writeHead(404, { 'content-type': 'text/plain' }); return res.end('No encontrado'); }
     const type = MIME[path.extname(file).toLowerCase()] || 'application/octet-stream';
     const long = /\/assets\/|\/audio\//.test(rel) || isSong;
@@ -416,7 +449,7 @@ function serveStatic(req, res, pathname) {
       if (start > end || start >= st.size || start < 0) { res.writeHead(416, { 'content-range': `bytes */${st.size}` }); return res.end(); }
       res.writeHead(206, { ...headers, 'content-range': `bytes ${start}-${end}/${st.size}`, 'content-length': end - start + 1 });
       if (isSong && req.method === 'GET') admin.count('songBytes', end - start + 1);
-      return req.method === 'HEAD' ? res.end() : fs.createReadStream(file, { start, end }).pipe(res);
+      return req.method === 'HEAD' ? res.end() : stream({ start, end });
     }
     // Páginas: la dirección pública (para las vistas previas en redes) sale de la petición, no va escrita en el código
     if (type.startsWith('text/html')) {
@@ -427,7 +460,7 @@ function serveStatic(req, res, pathname) {
     }
     res.writeHead(200, { ...headers, 'content-length': st.size });
     if (isSong && req.method === 'GET') admin.count('songBytes', st.size);
-    return req.method === 'HEAD' ? res.end() : fs.createReadStream(file).pipe(res);
+    return req.method === 'HEAD' ? res.end() : stream();
   }
 }
 
@@ -442,8 +475,17 @@ wss.on('connection', (ws, req) => {
   let role = null; // 'host' | 'player'
   let room = null;
   let player = null;
+  // Ritmo: un móvil manda 25 lecturas por segundo y la tele poco más; quien pase de 300 mensajes en un segundo se va
+  let rate = { n: 0, at: 0 };
 
   ws.on('message', raw => {
+    // Un mensaje raro no puede tumbar el servidor: se registra y se sigue
+    try { onMessage(raw); } catch (e) { console.error('ws:', e.message); }
+  });
+  function onMessage(raw) {
+    const nowS = Date.now() / 1000 | 0;
+    if (rate.at !== nowS) rate = { n: 0, at: nowS };
+    if (++rate.n > 300) return ws.terminate();
     let m;
     try { m = JSON.parse(raw); } catch { return; }
     if (!m || typeof m.type !== 'string') return;
@@ -537,7 +579,9 @@ wss.on('connection', (ws, req) => {
         const lat = typeof m.lat === 'number' ? Math.max(0, Math.min(2000, Math.round(m.lat))) : 0;
         player.lat = lat; player.lastV = v; player.lastN = n;
         if (n !== null && v > 0.02) player.pitchAt = Date.now();
-        return toHost(room, { type: 'pitch', p: player.id, n, v, lat });
+        toHost(room, { type: 'pitch', p: player.id, n, v, lat });
+        if (room.sing) try { room.sing.sample(player.id, n, v, lat); } catch (e) { console.error('puntuacion:', e.message); }
+        return;
       }
       if (m.type === 'input') return toHost(room, { type: 'input', p: player.id, key: clean(m.key, 8) });
       // Foto del jugador (cámara frontal, JPEG pequeño): solo en memoria mientras dure la sala
@@ -563,6 +607,20 @@ wss.on('connection', (ws, req) => {
         room.stateAt = Date.now();
         return toPlayers(room, room.state);
       }
+      if (m.type === 'sing') {
+        // Empieza una canción: el servidor prepara su cuenta (partitura + cantantes). Si algo falla, no hay sesión y no
+        // se aceptará el récord de esta canción (mejor sin récord que con uno sin comprobar)
+        const songId = clean(m.song, 200), r = room;
+        r.sing = null;
+        if (!songId || !scanSongs().some(s => s.id === songId)) return;
+        loadChart(songId).then(song => {
+          if (r.closed || r.host !== ws) return;
+          r.sing = new Sesion(songId, song, { duo: !!m.duo, delay: m.delay, singers: Array.isArray(m.singers) ? m.singers.slice(0, MAX_PLAYERS) : [] });
+          if (m.clock) r.sing.setClock(m.clock);
+        }).catch(e => console.error('puntuacion: no se pudo leer la partitura de', songId, e.message));
+        return;
+      }
+      if (m.type === 'clock') { if (room.sing) room.sing.setClock(m); return; }
       if (m.type === 'kick') {
         const p = room.players.get(m.p);
         if (p) { send(p.ws, { type: 'kicked' }); p.ws && p.ws.close(); room.players.delete(m.p); }
@@ -585,7 +643,7 @@ wss.on('connection', (ws, req) => {
         return send(ws, { type: 'room', code: room.code, token: room.hostToken, recovered: false, players: [] });
       }
     }
-  });
+  }
 
   ws.on('close', () => {
     if (!room || room.closed) return;   // una sala ya cerrada no manda listas de jugadores a nadie
@@ -608,5 +666,12 @@ setInterval(() => {
     ws.ping();
   }
 }, 25 * 1000).unref();
+
+// Último recurso: un error que se escape de todo lo anterior se registra y el servidor sigue con sus salas (si el
+// proceso muriera, systemd lo levantaría, pero todas las salas y los que están cantando se perderían)
+process.on('unhandledRejection', e => console.error('promesa sin capturar:', e && e.stack || e));
+process.on('uncaughtException', e => console.error('error sin capturar:', e && e.stack || e));
+// (si no se puede escuchar, por ejemplo con el puerto ocupado, sí hay que salir: systemd lo reintenta)
+server.on('error', e => { console.error('no se puede escuchar:', e.message); process.exit(1); });
 
 server.listen(PORT, HOST, () => console.log(`gramola: escuchando en ${HOST}:${server.address().port}, canciones en ${SONGS_DIR}`));

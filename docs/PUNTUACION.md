@@ -11,7 +11,10 @@ Es la del diseño, alimentada con la voz real.
 ## En la tele
 
 - Cada nota se divide en **ranuras de 40 ms**. Una ranura cuenta si en ella la voz está dentro del margen:
-  - **Fácil ±2**, **Normal ±1**, **Difícil ±½** semitono (por jugador, al preparar la partida). Rap: +0,6.
+  - **Fácil ±4**, **Normal ±2**, **Difícil ±1** semitonos (por jugador, al preparar la partida; desde el 01-nov el
+    listón es la mitad de exigente que el del diseño original). Rap: +0,6.
+  - La voz cuenta aunque llegue hasta 70 ms antes o después de la nota; con dos notas pegadas, manda la nota que
+    contiene el instante de verdad (el margen de la anterior no le roba la primera ranura a la siguiente).
   - **Octava indiferente**: se compara la nota, no lo grave o agudo.
 - **Puntos**: 10.000 repartidos entre todas las ranuras de la parte del cantante; las notas **doradas** valen el doble.
 - **Racha**: notas seguidas con más del 60 % acertado. **Dorada acertada**: más del 60 %.
@@ -19,6 +22,25 @@ Es la del diseño, alimentada con la voz real.
 - **Duelo**: media por equipo y barra de tira y afloja; aviso «Se adelanta…».
 - **Retraso**: la muestra se coloca en `reloj − (ajuste del micro + latencia del móvil + latencia de la tele)`;
   el ajuste se mide en **Ajustes → Retraso del micro** cantando «pa» con 8 pitidos.
+
+## En el servidor (los récords no se los inventa nadie)
+
+La tele puntúa y dibuja en directo, sin esperar a la red. Pero el récord que se guarda lo comprueba el servidor
+(`server/puntuacion.js`), que ve pasar la misma voz que reenvía a la tele:
+
+- Al empezar la canción la tele manda `sing` (canción, modo Dúo, ajuste del micro y, por cantante, parte y margen) y
+  cada segundo `clock` (en qué segundo va la canción y si está en marcha). El servidor lee la misma partitura con el
+  mismo lector que la tele (`web/js/ultrastar.js`) y aplica la misma regla: ranuras de 40 ms, octava indiferente,
+  margen por cantante (+0,6 en rap), doradas al doble, lecturas del móvil válidas hasta 160 ms, cada muestra colocada
+  en `reloj − (ajuste + latencia del móvil + latencia de la tele)`.
+- Al acabar, la tele envía los puntos que ha mostrado. El servidor solo guarda jugadores que están en la sala (con el
+  nombre que dieron al entrar, nunca el que diga la tele), descarta a los bots y a quien no ha cantado nada, y recorta
+  los puntos a **lo visto × 1,25 + 200** (el margen cubre el vibrato, que solo puntúa la tele, y los pequeños desfases
+  de reloj) y la racha a **la vista + 3**. Si la canción no ha llegado al final o ya se guardó, no se guarda nada.
+- En el admin (Actividad) se ve cuándo la tele decía más de lo que se guardó.
+
+Con esto, un récord exige haber mandado al servidor una voz que acierte las notas durante toda la canción, no basta
+con una petición.
 
 ## Rangos
 

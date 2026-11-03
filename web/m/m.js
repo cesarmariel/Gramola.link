@@ -96,8 +96,9 @@ function onMessage(m) {
     }
     joined = false;
     hello = null;
+    stopMic();   // fuera de la sala no se queda el micro abierto (indicador del sistema y batería)
     codeInputs.forEach(c => c.classList.add('bad'));
-    $('err-join').textContent = m.code === 'no-room' ? `No hay ninguna sala ${code()}. Revisa el código de la tele.` : m.msg;
+    $('err-join').textContent = m.code === 'no-room' ? `No hay ninguna sala ${code()}. Revisa el código de la tele.` : (m.msg || 'No se ha podido entrar en la sala');
     return show('s-join');
   }
   if (m.type === 'peek') {
@@ -136,8 +137,14 @@ function onMessage(m) {
     return;
   }
   if (m.type === 'host') {
-    if (!m.online && joined) $('wait-state').textContent = 'La tele se ha desconectado…';
-    else setWaitTexts(lastState);
+    if (!m.online && joined) {
+      // Tele caída a mitad de canción: a la espera (y sin micro); al volver la tele se recupera el canto
+      if (screen === 's-sing') show('s-wait');
+      setWaitTexts(lastState); $('wait-state').textContent = 'La tele se ha desconectado…';
+    } else {
+      setWaitTexts(lastState);
+      if (joined && screen === 's-wait' && isSinging(lastState)) show('s-sing');
+    }
     return;
   }
   // Aviso desde la administración: una franja arriba unos segundos
@@ -174,6 +181,7 @@ function setWaitTexts(st) {
     lobby: 'Esperando a que todos entren', menu: 'Configura el modo de juego en la pantalla principal',
     songs: 'Elegid canción en la tele', prepare: 'Preparando la partida', results: '¡Mira los resultados en la tele!',
     sing: st && st.turn ? `Le toca a ${st.turn}` : 'Esta canción no te toca', countdown: st && st.turn ? `Le toca a ${st.turn}` : 'Esta canción no te toca',
+    pause: 'Canción en pausa',
   }[s] || 'Configura el modo de juego en la pantalla principal';
   $('wait-title').textContent = title;
   $('wait-state').textContent = s === 'sing' ? 'Escuchando…' : 'Esperando…';
@@ -280,7 +288,7 @@ function onPitch(n, v, info) {
     if (n !== null) { micStats.voiced++; micStats.clar += info.clarity; }
     if (screen === 's-tuner') drawTuner(n, v, info);
   }
-  if (joined) net.send({ type: 'pitch', n, v, lat: net.halfLatency });
+  if (joined && screen === 's-sing') net.send({ type: 'pitch', n, v, lat: net.halfLatency });   // solo cuando toca cantar (la tele no lo usa en otras pantallas)
   if (screen === 's-sing') drawVu(v, n !== null);
 }
 
@@ -405,7 +413,10 @@ async function startScanner() {
     } catch {}
   }
   if (!detect) {
-    if (!window.jsQR) await new Promise((ok, ko) => { const sc = document.createElement('script'); sc.src = '/vendor/jsQR.js'; sc.onload = ok; sc.onerror = ko; document.head.appendChild(sc); });
+    if (!window.jsQR) {
+      try { await new Promise((ok, ko) => { const sc = document.createElement('script'); sc.src = '/vendor/jsQR.js'; sc.onload = ok; sc.onerror = ko; document.head.appendChild(sc); }); }
+      catch { stopScanner(); $('err-scan').textContent = 'No se ha podido cargar el lector de códigos. Escribe el código que sale en la tele.'; return show('s-scan'); }
+    }
     const cv = document.createElement('canvas'), cx = cv.getContext('2d', { willReadFrequently: true });
     detect = async () => {
       if (!v.videoWidth) return null;
@@ -510,14 +521,7 @@ $('b-ref').onclick = () => {
 };
 $('t-info').textContent = 'Si el micro va bien, con el tono de referencia tiene que marcar La4 con la aguja en el centro.';
 
-// ---------------------------------------------------------------- datos del micro (para mejorar la detección)
-setInterval(() => {
-  if (!micStats.frames || !(screen === 's-sing' || screen === 's-tuner')) return;
-  const f = micStats.frames;
-  const note = `micro: voz detectada ${Math.round(100 * micStats.voiced / f)}% · sonido por encima del umbral ${Math.round(100 * micStats.gate / f)}% · volumen medio ${(micStats.rms / f).toFixed(4)} · nitidez media ${micStats.voiced ? (micStats.clar / micStats.voiced).toFixed(2) : '-'} · ${micStats.sr} Hz`;
-  fetch('/api/telemetry', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ screen: screen === 's-tuner' ? 'micro-prueba' : 'micro', note, ua: navigator.userAgent }) }).catch(() => {});
-  Object.assign(micStats, { frames: 0, gate: 0, voiced: 0, rms: 0, clar: 0 });
-}, 5000);
+// (la telemetría del micro se quitó: el servidor solo la admite de una tele con sala y nunca se usaba)
 
 // ---------------------------------------------------------------- foto del jugador (cámara frontal)
 // Lo que se ve dentro del cuadro es exactamente la foto: recorte cuadrado del centro, en espejo como en la pantalla.

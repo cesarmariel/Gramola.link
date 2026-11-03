@@ -55,15 +55,24 @@ window.GR = (() => {
     G.net.connect(() => ({ type: 'host', code: SS.get('g-room'), token: SS.get('g-token') }));
   }
 
+  function olvidarSala() {
+    G.room = null; G.token = null;
+    try { sessionStorage.removeItem('g-room'); sessionStorage.removeItem('g-token'); } catch {}
+  }
   function onMessage(m) {
     const c = g();
     if (m.type === 'room') {
-      const lost = G.room && G.room !== m.code && !m.recovered;
+      // «Sala perdida» solo si el código cambia sin haberlo pedido (Ajustes → Nuevo código lo pide a propósito)
+      const lost = G.room && G.room !== m.code && !m.recovered && !G.expectNew;
+      G.expectNew = false;
       G.room = m.code; G.token = m.token;
       SS.set('g-room', m.code); SS.set('g-token', m.token);
-      // Pase de tele (cookie) para poder leer las canciones; después, cargarlas
-      fetch('/api/tv-pass', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: m.code, token: m.token }) })
-        .then(r => { if (r.ok && (!G.ready || lost)) loadSongs(); }).catch(() => {});
+      // Pase de tele (cookie) para poder leer las canciones; después, cargarlas. Si la petición falla (red a medias al
+      // arrancar) se reintenta con espera creciente: si no, la tele se quedaba en «Cargando… 95 %» para siempre
+      const pase = (wait = 1000) => fetch('/api/tv-pass', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: m.code, token: m.token }) })
+        .then(r => { if (r.ok) { if (!G.ready || lost) loadSongs(); } else if (r.status !== 403) throw new Error(); })
+        .catch(() => { if (G.room === m.code) setTimeout(() => pase(Math.min(8000, wait * 2)), wait); });
+      pase();
       setPlayers(m.players, true);
       if (c) c.setState({ room: m.code });
       if (lost && c) c.setState({ err: 'lost' });
@@ -78,11 +87,17 @@ window.GR = (() => {
     }
     else if (m.type === 'input') {
       const k = { up: 'u', down: 'd', left: 'l', right: 'r', ok: 'ok', back: 'back', y: 'y', x: 'x' }[m.key];
-      if (k && c) c.act(k);
-    } else if (m.type === 'full-attempt') { if (c) c.setState({ err: 'full' }); }
-    else if (m.type === 'replaced') { if (c) c.toast('Esta sala se ha abierto en otra pantalla'); }
+      // En la sala, Y añade un simulado y X echa al último: eso solo desde el mando de la tele, no desde un móvil
+      if (k && c && !(c.state.screen === 'lobby' && (k === 'y' || k === 'x'))) c.act(k);
+    } else if (m.type === 'full-attempt') { if (c) { if (c.state.screen === 'sing') c.toast(`${String(m.name || 'Alguien').slice(0, 16)} ha intentado entrar: la sala está llena`); else c.setState({ err: 'full' }); } }
+    else if (m.type === 'replaced') {
+      // Otra pantalla ha abierto esta misma sala (pestaña duplicada): esta deja de reclamarla, si no se la robarían
+      // la una a la otra sin parar; al reconectar pedirá una sala nueva
+      olvidarSala();
+      if (c) c.toast('Esta sala se ha abierto en otra pantalla');
+    }
     // El servidor no admite más salas ahora mismo: se avisa y se vuelve a pedir una al cabo de medio minuto
-    else if (m.type === 'error' && m.code === 'busy') { if (c) c.toast(String(m.msg || 'El servidor está lleno; se vuelve a intentar enseguida').slice(0, 140)); setTimeout(() => { if (!G.room && G.net) G.net.send({ type: 'host' }); }, 30000); }
+    else if (m.type === 'error' && m.code === 'busy') { olvidarSala(); if (c) c.toast(String(m.msg || 'El servidor está lleno; se vuelve a intentar enseguida').slice(0, 140)); setTimeout(() => { if (!G.room && G.net) G.net.send({ type: 'host' }); }, 30000); }
     // Órdenes desde la administración: un aviso en pantalla o recargar la app
     else if (m.type === 'admin') {
       if (m.action === 'reload') setTimeout(() => location.reload(), 300);
@@ -125,7 +140,7 @@ window.GR = (() => {
     if (!p) return c.toast('No hay nadie en la sala');
     G.net.send({ type: 'kick', p: p.id });
   };
-  G.newCode = c => { G.net.send({ type: 'new-code' }); G.players = []; c.setState({ count: 0 }); c.toast('Sala nueva: los móviles deben volver a entrar'); };
+  G.newCode = c => { G.expectNew = true; G.net.send({ type: 'new-code' }); G.players = []; c.setState({ count: 0 }); c.toast('Sala nueva: los móviles deben volver a entrar'); };
 
   // Direcciones públicas: salen del dominio donde está la tele (no van escritas en el código).
   // El micro vive en el subdominio micro.; en pruebas locales (IP o localhost), en /m/index.html.
@@ -138,7 +153,8 @@ window.GR = (() => {
   G.qr = el => { if (el) qrEl = el; drawQR(); return true; };
   function drawQR() {
     // Se recuerda por lienzo: el diseño crea un lienzo nuevo cada vez que se entra en la sala
-    if (!qrEl || !G.room || !window.qrcode || (qrEl._qrFor === G.room && qrEl.isConnected)) return;
+    // (fuera de la sala el lienzo ya no está en la página: no se regenera el QR a cada fotograma)
+    if (!qrEl || !qrEl.isConnected || !G.room || !window.qrcode || qrEl._qrFor === G.room) return;
     qrEl._qrFor = qrFor = G.room;
     const q = window.qrcode(0, 'H');   // corrección máxima: aguanta la «o» del logo en el centro
     q.addData(G.microUrl() + '?s=' + G.room);
@@ -273,6 +289,7 @@ window.GR = (() => {
     return l || '';
   }
   function refreshRecords() {
+    G.songsRev = (G.songsRev || 0) + 1;   // (la lista de canciones del diseño se recalcula solo cuando cambia algo: biblioteca, récords o filtros)
     const R = G.records || { songs: {}, singers: {}, plays: {} };
     SONGS.forEach(s => {
       const r = R.songs[s.id];
@@ -312,8 +329,9 @@ window.GR = (() => {
     const song = S.song, K = skills.length;
     const duet = song.tracks.length > 1;
     const tracks = duo && duet ? [[song.tracks[0], [0]], [song.tracks[1], [1]]] : [[song.tracks[0], null]];
-    const all = song.tracks[0].flatMap(l => l.notes).concat(duet && duo ? song.tracks[1].flatMap(l => l.notes) : []).filter(n => n.weight);
-    const lo = Math.min(...all.map(n => n.midi)), hi = Math.max(...all.map(n => n.midi));
+    // (las notas anteriores a #START no se cantan: fuera del carril y de la cuenta, que si no salían «Fallo» en ráfaga)
+    const all = song.tracks[0].flatMap(l => l.notes).concat(duet && duo ? song.tracks[1].flatMap(l => l.notes) : []).filter(n => n.weight && !(song.start && n.end <= song.start));
+    const lo = all.length ? Math.min(...all.map(n => n.midi)) : 60, hi = all.length ? Math.max(...all.map(n => n.midi)) : 72;
     const range = Math.max(12, hi - lo);
     const notes = [], phrases = [];
     for (const [lines, fixed] of tracks) {
@@ -322,6 +340,7 @@ window.GR = (() => {
         const parts = fixed || (duo ? [li % 2] : [0, 1]);
         const p = { notes: [], start: l.start / 1000, end: l.end / 1000, parts };
         for (const u of l.notes) {
+          if (song.start && u.end <= song.start) continue;
           const type = u.type === 'golden' ? 'gold' : u.type === 'free' ? 'free' : u.type === 'rap' || u.type === 'rapgolden' ? 'rap' : 'n';
           const dur = Math.max(0.06, (u.end - u.start) / 1000);
           const n = { s: u.text.replace(/~/g, ''),   // «~» = la sílaba anterior se alarga (marca de UltraStar, no se canta)
@@ -337,7 +356,9 @@ window.GR = (() => {
     phrases.sort((a, b) => a.start - b.start);
     const unitP = [0, 1].map(q => { let tot = 0; notes.forEach(n => { if (n.sl && n.parts.includes(q)) tot += Math.max(1, Math.ceil(n.dur / SL)) * (n.type === 'gold' ? 2 : 1); }); return tot ? 10000 / tot : 0; });
     const last = notes.length ? Math.max(...notes.map(n => n.start + n.dur)) : 10;
-    const chart = { notes, phrases, duration: last + 2.5, unitP, range, lo, song, songIdx: c.state.songSel };
+    // #END (ms): la canción acaba ahí aunque el audio siga
+    const endMs = parseFloat(String((song.head && song.head.END) || '0').replace(',', '.')) || 0;
+    const chart = { notes, phrases, duration: endMs > 0 ? Math.min(last + 2.5, endMs / 1000) : last + 2.5, end: endMs > 0 ? endMs / 1000 : 0, unitP, range, lo, song, songIdx: c.state.songSel };
     startAudio(chart, S);
     return chart;
   };
@@ -744,13 +765,19 @@ window.GR = (() => {
   // Audio: un AudioContext propio (se suspende en la pausa y su reloj es el de la partida)
   function megaAudio(chart, segs) {
     stopAudio();
+    G.songEnded = false;   // (si la canción anterior llegó al final, el Megamix no puede «acabar» en su primer fotograma)
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const M = Object.assign(G.mega, { ctx, segs, t0: null, cur: -1, chart, master: ctx.createGain() });
     M.master.gain.value = vol('music'); M.master.connect(ctx.destination);
     const load = k => { const sg = segs[k]; if (!sg || sg.p) return; sg.p = fetch(sg.url).then(r => r.arrayBuffer()).then(ab => new Promise((ok, ko) => { const x = ctx.decodeAudioData(ab, ok, ko); if (x && x.catch) x.catch(ko); })).then(b => (sg.buf = b)).catch(() => (sg.failed = true)); };
     load(0); load(1);
     M.load = load;
-    segs[0].p.then(() => { if (G.mega !== M) return; ctx.resume(); M.t0 = ctx.currentTime + 0.25; megaSchedule(M, 0); });
+    segs[0].p.then(() => {
+      if (G.mega !== M) return;
+      // Sin el primer estribillo (descarga o descodificación fallida) no se arranca mudo: aviso como con una canción
+      if (segs[0].failed) { const c = g(); if (c) { c.chart = null; G.failed = 'Megamix'; c.setState({ err: 'song' }); } return; }
+      ctx.resume(); M.t0 = ctx.currentTime + 0.25; megaSchedule(M, 0);
+    });
     menuMusic(false);
   }
   function megaSchedule(M, k) {
@@ -810,12 +837,27 @@ window.GR = (() => {
     G.audio = a; G.clock = { at: 0, perf: 0, playing: false };
     G.songEnded = false;
     a.addEventListener('ended', () => (G.songEnded = true));
-    a.addEventListener('error', () => { const c = g(); if (c && c.state.screen === 'sing') { c.chart = null; c.setState({ err: 'song' }); G.failed = S.title; } });
-    a.addEventListener('loadedmetadata', () => { if (isFinite(a.duration)) chart.duration = Math.max(chart.duration, a.duration); }, { once: true });
+    // (si el audio falla mientras aún se ve la cuenta atrás o la transición, también hay que avisar: antes se ignoraba
+    // y la partida se quedaba clavada en 0:00)
+    a.addEventListener('error', () => { const c = g(); if (c && G.audio === a && c.chart === chart) { c.chart = null; c.setState({ err: 'song' }); G.failed = S.title; } });
+    a.addEventListener('loadedmetadata', () => { if (isFinite(a.duration)) chart.duration = chart.end ? Math.min(chart.end, a.duration) : Math.max(chart.duration, a.duration); }, { once: true });
     if (S.song.start) a.currentTime = S.song.start / 1000;
     songGraph(a);
     a.play().catch(() => {});
     menuMusic(false);
+    // El servidor lleva su propia cuenta de la puntuación con la voz que reenvía (docs/PUNTUACION.md): le decimos qué se
+    // canta, con qué margen cada cantante y el ajuste del micro; después, cada segundo, dónde va el reloj (G.update)
+    const c = g();
+    if (G.net && !G.preview && c) {
+      const singers = (c.state.singers || []).filter(s => s.id != null && !s.bot).map(s => ({ id: s.id, part: s.part === 1 ? 1 : 0, tol: (s.tol || 1) / G.PRECISION }));
+      G.net.send({ type: 'sing', song: S.id, duo: c.state.mode === 'duo', delay: (c.state.settings && c.state.settings.delay) || 0, singers });
+      G.clockSent = 0;
+    }
+  }
+  function sendClock(c, pos) {
+    if (!G.net || G.preview || G.mega) return;
+    G.clockSent = performance.now();
+    G.net.send({ type: 'clock', pos, playing: !(c && c.state.paused) && !!G.audio && !G.audio.paused && !G.audio._pausing, lat: Math.round(G.net.halfLatency || 0) });
   }
   // Pausa suave: la canción pasa por Web Audio y, al pausar, se desvanece poco a poco (~0,6 s) en vez de cortarse
   // en seco; luego se vuelve al punto exacto donde se pulsó pausa, para que al seguir no se salte nada.
@@ -1112,12 +1154,23 @@ window.GR = (() => {
     const ch = c.chart;
     if (!ch) return;
     megaPause(c.state.paused);
-    if (c.state.paused) { if (G.audio && !G.audio.paused) songPause(G.audio); return; }
-    if (G.audio && G.audio.paused && !G.songEnded) songResume(G.audio);
+    if (c.state.paused) { if (G.audio && !G.audio.paused) { songPause(G.audio); sendClock(c, audioNow()); } return; }
+    if (G.audio && G.audio.paused && !G.songEnded) { songResume(G.audio); G.clockSent = 0; }
     const S = c.state.singers, K = S.length, duel = c.state.mode === 'duel';
     const now = audioNow();
     c.now = now;
-    const actAt = (t, part, m = 0) => { for (const n of ch.notes) { if (t >= n.start - m && t < n.start + n.dur + m && n.parts.includes(part) && n.type !== 'free') return n; } return null; };
+    if (!G.clockSent || performance.now() - G.clockSent > 1000) sendClock(c, now);
+    // La nota activa en t: primero la que lo contiene de verdad; si no hay, la que lo alcanza con el margen (antes, con
+    // dos notas pegadas, el margen de la anterior «robaba» la primera ranura de la siguiente y el 100 % era imposible)
+    const actAt = (t, part, m = 0) => {
+      let near = null;
+      for (const n of ch.notes) {
+        if (n.type === 'free' || !n.parts.includes(part)) continue;
+        if (t >= n.start && t < n.start + n.dur) return n;
+        if (!near && m && t >= n.start - m && t < n.start + n.dur + m) near = n;
+      }
+      return near;
+    };
     for (let k = 0; k < K; k++) {
       const sg = S[k];
       const f = sg.id != null ? G.frames[sg.id] : null;
@@ -1190,7 +1243,8 @@ window.GR = (() => {
           if (n.type === 'gold' && r > 0.6) c.goldHit[k]++;
           // Vibrato bien hecho en una nota bien cantada: la mitad de lo que vale la nota, de propina
           if (n.vibFrom && n.vibFrom[k] != null && r > 0.5) {
-            const bonus = Math.round(G.VIB.BONUS * ch.unitP[S[k].part] * n.sl[k].length * (n.type === 'gold' ? 2 : 1));
+            const bonus = Math.min(Math.round(G.VIB.BONUS * ch.unitP[S[k].part] * n.sl[k].length * (n.type === 'gold' ? 2 : 1)), Math.max(0, 10000 - c.score[k]));   // (nunca por encima de 10.000)
+            if (!bonus) continue;
             c.score[k] += bonus;
             if (!c.vibs) c.vibs = [];
             c.vibs[k] = (c.vibs[k] || 0) + 1;
@@ -1229,7 +1283,7 @@ window.GR = (() => {
       const r = await fetch('/api/records', {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ code: G.room, token: G.token, song: S.id, title: S.title, artist: S.artist,
-          players: rows.map(r => ({ name: r.name, score: r.score, streak: r.streak, bot: !!(sing.find(s => s.name === r.name) || {}).bot })) }),
+          players: rows.map(r => ({ id: r.id, name: r.name, score: r.score, streak: r.streak, bot: !!(sing.find(s => s.name === r.name) || {}).bot })) }),
       });
       if (r.ok) { G.records = await (await fetch('/api/records', { cache: 'no-store' })).json(); refreshRecords(); }
     } catch {}
@@ -1662,9 +1716,10 @@ window.GR = (() => {
     if (lastScreen === 'sing' && s.screen !== 'sing') stopAudio();
     if (s.screen !== lastScreen) { if (s.screen === 'results' && s.results && s.results.record) [523, 659, 784, 1047].forEach((f, i) => beep(f, 0.18, 0.16, i * 0.09)); lastScreen = s.screen; }
     // Sin conexión con el servidor durante más de 3 s → aviso del diseño
-    if (!G.netOk && G.lostAt && performance.now() - G.lostAt > 3000 && !s.err && !['splash', 'boot', 'welcome'].includes(s.screen)) c.setState({ err: G.room ? 'lost' : 'server' });
+    // (en el arranque se da más margen, 10 s, pero también se avisa: antes se quedaba en «Cargando… 95 %» sin más)
+    if (!G.netOk && G.lostAt && performance.now() - G.lostAt > (s.screen === 'boot' ? 10000 : 3000) && !s.err && !['splash', 'welcome'].includes(s.screen)) c.setState({ err: G.room ? 'lost' : 'server' });
     // Estado para los móviles
-    const screen = s.screen === 'count' ? 'countdown' : s.screen === 'sing' && s.mode !== 'jukebox' && !s.paused ? 'sing' : s.screen === 'calib' ? 'calibrate' : s.screen === 'setup' ? 'prepare' : s.screen;
+    const screen = s.screen === 'count' ? 'countdown' : s.screen === 'sing' && s.mode !== 'jukebox' && !s.paused ? 'sing' : s.screen === 'sing' && s.paused ? 'pause' : s.screen === 'calib' ? 'calibrate' : s.screen === 'setup' ? 'prepare' : s.screen;
     const st = { type: 'state', screen, singers: (s.singers || []).map(x => x.id).filter(x => x != null) };
     if (s.mode === 'party' && s.party && s.singers && s.singers[0]) st.turn = s.singers[0].name;
     // Para la administración: qué se canta y en qué modo

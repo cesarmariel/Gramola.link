@@ -57,8 +57,11 @@ def liberar():
 # ---------------------------------------------------------------------------- audio
 def leer_audio(path, sr=SR, canales=2):
     """Audio en float32 (canales, n) con ffmpeg."""
-    out = subprocess.run(['ffmpeg', '-v', 'error', '-i', path, '-f', 'f32le', '-ac', str(canales), '-ar', str(sr), '-'],
-                         capture_output=True, check=True).stdout
+    r = subprocess.run(['ffmpeg', '-v', 'error', '-i', path, '-f', 'f32le', '-ac', str(canales), '-ar', str(sr), '-'],
+                       capture_output=True)
+    if r.returncode != 0:
+        raise RuntimeError('ffmpeg no ha podido leer el audio: ' + r.stderr.decode('utf-8', 'replace').strip()[-500:])
+    out = r.stdout
     a = np.frombuffer(out, dtype=np.float32)
     return a.reshape(-1, canales).T.copy()
 
@@ -463,6 +466,8 @@ def tramos(ts, ms, umbral=0.8, minimo=0.18):
 
 # ---------------------------------------------------------------------------- 5. UltraStar
 def ultrastar(notas, titulo, artista, idioma, anio, mp3, portada=None):
+    if not notas:
+        raise ValueError('No se ha podido encajar ninguna palabra de la letra con la voz (¿letra o idioma equivocados?)')
     gap = int(round(notas[0]['ini'] * 1000))
     beat = lambda s: int(round((s * 1000 - gap) / BEAT))
     head = [f'#TITLE:{titulo}', f'#ARTIST:{artista}', f'#LANGUAGE:{LANGS.get(idioma, ("", idioma))[1]}']

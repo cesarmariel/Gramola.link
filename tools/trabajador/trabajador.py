@@ -102,7 +102,10 @@ def atender(j):
                 r = pedir('POST', f'/jobs/{j["id"]}/progress', {'p': p, 'msg': msg})
                 if r.get('cancel'):
                     raise KeyboardInterrupt('cancelado desde el admin')
-            except urllib.error.URLError:
+            except urllib.error.HTTPError as e:
+                if e.code in (404, 410):   # el trabajo se ha borrado desde el admin: no seguir calculando para nadie
+                    raise KeyboardInterrupt('borrado desde el admin')
+            except (urllib.error.URLError, OSError):   # (también los tiempos de espera agotados)
                 pass
         out = os.path.join(tmp, 'salida')
         if j['kind'] == 'spotify':
