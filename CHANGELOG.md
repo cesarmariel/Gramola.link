@@ -2,6 +2,9 @@
 
 Versiones con el esquema `1.AA.MMDD.HHMM` (fecha y hora del despliegue).
 
+## 1.26.1103.1142
+- Bienvenida: el acceso a Créditos sale discreto a la derecha del pie, la versión va pequeña y centrada (sin la palabra «Versión») y el «Pulsa ✕ para continuar» queda solo.
+
 ## 1.26.1103.1135
 - **Créditos** (Ajustes → Créditos, y △ en la bienvenida): qué es Gramola (software libre con licencia MIT, sin ánimo de lucro, sin pagos ni publicidad, hecho con respeto a los artistas; retirada de contenidos en soporte@gramola.link), y todo lo que usa con su autor y su licencia: tipografía, librerías de la tele y el móvil, servidor, herramientas de creación de canciones, servicios consultados e infraestructura. Música del menú creada con SUNO.AI; diseño original de NUVOLACAT.
 

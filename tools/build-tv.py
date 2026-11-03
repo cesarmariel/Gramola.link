@@ -168,8 +168,9 @@ sub("else{GR.newCode(this);}}}", "else if(r.k==='credits'){GR.creditsOpen(this);
 sub("o.val=r.k==='delay'?st.delay+' ms':r.k==='kick'?(n?PLAYERS[n-1][0]:'Nadie en la sala'):s.room;o.cta=r.k==='delay'?'Calibrar':r.k==='kick'?'Expulsar':'Generar';",
     "o.val=r.k==='delay'?st.delay+' ms':r.k==='kick'?(n?PLAYERS[n-1][0]:'Nadie en la sala'):r.k==='credits'?'Proyecto libre y sin ánimo de lucro':s.room;o.cta=r.k==='delay'?'Calibrar':r.k==='kick'?'Expulsar':r.k==='credits'?'Ver':'Generar';", name='créditos: fila')
 sub("if(s.screen==='welcome'){if(a==='ok')this.go('lobby');return;}", "if(s.screen==='welcome'){if(a==='ok')this.go('lobby');else if(a==='y'||a==='x')GR.creditsOpen(this);return;}", name='créditos: △ en la bienvenida')
-sub("h('span',null,'para continuar'));}V.pressEl=this._pressEl;",
-    "h('span',null,'para continuar'),h('span',{style:{marginLeft:48,display:'flex',alignItems:'center',gap:12,fontSize:24,fontWeight:600,opacity:.65}},h('span',{style:{width:40,height:40,borderRadius:'50%',border:'2px solid '+C.ink,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,fontWeight:800}},GR.gk().y),'Créditos'));}V.pressEl=this._pressEl;", name='créditos: ayuda en la bienvenida')
+# En el pie de la bienvenida: logo a la izquierda, versión pequeña en el centro (sin la palabra «Versión») y «△ Créditos»
+# a la derecha (discreto, fuera del «Pulsa ✕ para continuar»)
+sub(r'(\{\{ pressEl \}\}</div>\n  <div style=")display:flex;justify-content:space-between;', r'\1display:grid;grid-template-columns:1fr auto 1fr;', regex=True, name='bienvenida: pie en tres columnas')
 sub("const recN=parseInt((song.rec.split(' ')[0]||'0').replace('.',''))||0;", "const recN=GR.mega?Infinity:(parseInt((song.rec.split(' ')[0]||'0').replace('.',''))||0);", name='Megamix: sin récord')
 sub("resAct(i){this.conf=[];", "resAct(i){this.conf=[];if(GR.megaRes(this,i))return;", name='Megamix: resultados')
 
@@ -267,7 +268,10 @@ sub('\n    <div style="font-size:40px;font-weight:300;letter-spacing:-0.01em">Ka
 
 # --- versión (esquema 1.AA.MMDD.HHMM, fichero VERSION en la raíz del repo)
 VERSION = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'VERSION')).read().strip()
-sub('<span style="color:var(--color-neutral-700)">Versión 1.0.0</span>', f'<span style="color:var(--color-neutral-700)">Versión {VERSION}</span>', name='versión')
+sub('<span style="color:var(--color-neutral-700)">Versión 1.0.0</span>',
+    f'<span style="color:var(--color-neutral-700);font-size:22px;font-weight:500;justify-self:center">{VERSION}</span>'
+    '<span style="justify-self:end;display:flex;align-items:center;gap:12px;font-size:24px;font-weight:600;color:var(--color-neutral-700)">'
+    '<span style="width:40px;height:40px;border-radius:50%;border:2px solid var(--color-text);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:var(--color-text)">{{ gk.y }}</span>Créditos</span>', name='versión')
 # …y la misma versión en la insignia del README (así el repo muestra siempre la versión desplegada)
 _readme = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'README.md')
 if os.path.exists(_readme):

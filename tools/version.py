@@ -37,7 +37,7 @@ def comprobar():
     v = leer('VERSION').strip()
     donde = {
         'README.md': 'badge/versi%C3%B3n-' + v + '-',
-        'web/app/index.html': 'Versión ' + v,
+        'web/app/index.html': '>' + v + '</span>',
         'web/m/index.html': '/m/m.js?v=' + v,
         'web/m/sw.js': f"gramola-micro-{v}",
     }
