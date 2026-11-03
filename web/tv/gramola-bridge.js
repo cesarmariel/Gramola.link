@@ -578,6 +578,9 @@ window.GR = (() => {
   // activo es la punta)
   const CURSOR_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="1.5 1 24 24"><path d="M4 3l16 7.5-6.6 2.1L10.6 21z" fill="#ec3013" stroke="#201e1d" stroke-width="1.4" stroke-linejoin="round" paint-order="stroke"/></svg>';
   const CURSOR = `url('data:image/svg+xml;utf8,${encodeURIComponent(CURSOR_SVG)}') 8 6, auto`;
+  // Los elementos clicables del diseño llevan «cursor:pointer» (la mano): todo hereda el puntero del cuerpo, así se ve
+  // siempre la flecha propia (y nada cuando está escondida)
+  { const st = document.createElement('style'); st.textContent = 'body * { cursor: inherit !important; }'; document.head.appendChild(st); }
   let mouseT = 0;
   addEventListener('mousemove', () => {
     // Durante el arranque (logo, aviso y carga) no se enseña: a partir de la bienvenida

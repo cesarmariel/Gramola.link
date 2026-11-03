@@ -2,6 +2,9 @@
 
 Versiones con el esquema `1.AA.MMDD.HHMM` (fecha y hora del despliegue).
 
+## 1.26.1103.1155
+- Sobre los elementos clicables ya no sale la mano: todo hereda el puntero propio (y nada cuando está escondido).
+
 ## 1.26.1103.1154
 - El puntero no aparece durante el arranque (logo, aviso y carga); solo a partir de la bienvenida.
 
