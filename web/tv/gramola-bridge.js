@@ -757,9 +757,12 @@ window.GR = (() => {
       <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid ${ink};padding-bottom:20px"><span style="font-size:28px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:${red}">Créditos</span><span style="font-size:28px;font-weight:600;color:#4a4646">Gramola ${esc(((document.querySelector('script[src*="gramola-bridge.js"]') || {}).src || '').split('?v=')[1] || '')}</span></div>
       <div style="position:relative;flex:1;overflow:hidden"><div id="g-cred" style="position:absolute;left:0;right:0;top:0;display:flex;flex-direction:column;gap:40px;padding-bottom:40px;transition:transform 180ms ease-out">${secs}</div>
         <div style="position:absolute;left:0;right:0;bottom:0;height:60px;background:linear-gradient(to bottom,rgba(243,242,242,0),#f3f2f2)"></div></div>
-      <div style="display:flex;justify-content:flex-end;gap:40px">${key('↕', 'Desplazar')}${key(G.gkHtml('back'), 'Volver')}</div></div>`;
+      <div style="display:flex;justify-content:flex-end;gap:40px">${key('↕', 'Desplazar')}<span id="g-cred-volver">${key(G.gkHtml('back'), 'Volver')}</span></div></div>`;
     u.cont = u.box.querySelector('#g-cred');
     u.y = 0; creditsScroll(0);
+    // Ratón: clic en «Volver» cierra; la rueda desplaza el texto
+    u.box.querySelector('#g-cred-volver').onclick = e => { e.stopPropagation(); creditsClose(); whoosh(); };
+    u.box.onwheel = e => { e.preventDefault(); creditsScroll(e.deltaY); };
   }
   function creditsScroll(d) {
     const u = credUI; if (!u || !u.cont) return;

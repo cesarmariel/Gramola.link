@@ -2,6 +2,9 @@
 
 Versiones con el esquema `1.AA.MMDD.HHMM` (fecha y hora del despliegue).
 
+## 1.26.1103.1239
+- Créditos: «Volver» responde al clic y la rueda del ratón desplaza el texto.
+
 ## 1.26.1103.1233
 - El clic en «Créditos» del pie de la bienvenida no abría el panel: el mismo clic subía a la pantalla y lo cerraba como si fuera «OK».
 - Rejilla de canciones con ratón: al elegir una ficha pasando por encima, la rejilla ya no se desplaza mientras la ficha se vea entera (antes se movía, la ficha de debajo del puntero cambiaba y se elegía otra, y así sin parar). Con el mando sigue desplazándose como siempre.
