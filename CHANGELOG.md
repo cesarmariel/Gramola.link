@@ -2,6 +2,9 @@
 
 Versiones con el esquema `1.AA.MMDD.HHMM` (fecha y hora del despliegue).
 
+## 1.26.1103.1150
+- En escritorio, el puntero del ratón aparece al moverlo y se esconde a los 2,5 s quieto (antes estaba siempre oculto, pensado solo para la tele).
+
 ## 1.26.1103.1147
 - **Ayudas de botones según haya mando o no**: con un mando conectado (PlayStation o Xbox, detectado al pulsar un botón) se muestran sus símbolos (✕ ○ □ △ o A B X Y); sin mando, los del mando a distancia de la tele: OK, ← y los botones de colores (rojo, verde, amarillo, azul) como puntos de color. Al desconectar el mando vuelven las ayudas de la tele. Antes se mostraban siempre los de PlayStation.
 
