@@ -37,10 +37,15 @@ module.exports = function admin(ctx) {
 
   const readJson = (f, d) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return d; } };
   const writeJson = (f, data) => { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f + '.tmp', JSON.stringify(data)); fs.renameSync(f + '.tmp', f); };
+  const writeAtomic = ctx.writeAtomic || ((f, data) => { fs.writeFileSync(f + '.tmp', data); fs.renameSync(f + '.tmp', f); });
+  const copyAtomic = (a, b) => { fs.copyFileSync(a, b + '.tmp'); fs.renameSync(b + '.tmp', b); };
+  // (los ficheros de datos importantes: si están rotos se apartan con fecha en vez de pisarlos en silencio)
+  const leerJson = ctx.leerJson || readJson;
 
   // ===================================================================== estadísticas y actividad
-  const stats = readJson(STATS_FILE, { days: {}, totals: {} });
-  let events = readJson(EVENTS_FILE, []);
+  const stats = leerJson(STATS_FILE, { days: {}, totals: {} });
+  let events = leerJson(EVENTS_FILE, []);
+  if (!Array.isArray(events)) events = [];
   let dirty = false;
   const today = () => new Date().toISOString().slice(0, 10);
   function day() {
@@ -60,17 +65,17 @@ module.exports = function admin(ctx) {
     if (rooms.size > d.peakRooms) { d.peakRooms = rooms.size; dirty = true; }
     if (players > d.peakPlayers) { d.peakPlayers = players; dirty = true; }
   }
-  setInterval(() => {
-    peaks();
-    if (!dirty) return;
+  function flush() {
     dirty = false;
     const keys = Object.keys(stats.days).sort();
     for (const k of keys.slice(0, Math.max(0, keys.length - 400))) delete stats.days[k];
     try { writeJson(STATS_FILE, stats); writeJson(EVENTS_FILE, events); } catch (e) { console.error('admin: no se pudieron guardar las estadísticas', e.message); }
-  }, 15000).unref();
+  }
+  setInterval(() => { peaks(); if (dirty) flush(); }, 15000).unref();
 
   // ===================================================================== autenticación (WebAuthn)
-  const auth = readJson(AUTH_FILE, { keys: [], sessions: [] });
+  const auth = leerJson(AUTH_FILE, { keys: [], sessions: [] });
+  if (!Array.isArray(auth.keys)) auth.keys = []; if (!Array.isArray(auth.sessions)) auth.sessions = [];
   const saveAuth = () => writeJson(AUTH_FILE, auth);
   const rand = (n = 32) => crypto.randomBytes(n).toString('base64url');
   const hash = s => crypto.createHash('sha256').update(s).digest('hex');
@@ -205,7 +210,7 @@ module.exports = function admin(ctx) {
           lines.splice(firstBody, 0, `#${k}:${v}`); firstBody++;
         }
       }
-      fs.writeFileSync(p, lines.join('\r\n'), 'utf8');
+      writeAtomic(p, lines.join('\r\n'));   // (el .txt que lee la tele nunca queda a medias)
     }
     ctx.songsChanged();
   }
@@ -494,12 +499,14 @@ module.exports = function admin(ctx) {
   on('GET', '/server', (req, res) => { sizeCache.at = 0; json(res, 200, serverInfo()); });
   on('POST', '/server/restart', (req, res) => {
     ev('admin', 'Reinicio del servidor desde el admin');
-    try { writeJson(STATS_FILE, stats); writeJson(EVENTS_FILE, events); } catch {}
+    flush();
+    try { ctx.saveRooms && ctx.saveRooms(); } catch {}
     json(res, 200, { ok: true });
-    setTimeout(() => process.exit(0), 400);   // systemd lo vuelve a levantar (Restart=always)
+    setTimeout(() => process.exit(0), 400);   // systemd lo vuelve a levantar (Restart=always) y restaura las salas
   });
   on('GET', '/backup', (req, res) => {
-    const data = { at: new Date().toISOString(), version: versionNow(), records: ctx.records(), stats, events };
+    // (con las llaves de Touch ID y las novedades: sin admin.json hay que volver a dar de alta por SSH)
+    const data = { at: new Date().toISOString(), version: versionNow(), records: ctx.records(), stats, events, novedades: ctx.novedades(), admin: auth };
     res.writeHead(200, { 'content-type': 'application/json', 'content-disposition': `attachment; filename="gramola-datos-${today()}.json"`, 'cache-control': 'no-store' });
     res.end(JSON.stringify(data, null, 1));
   });
@@ -540,7 +547,7 @@ module.exports = function admin(ctx) {
     fs.copyFileSync(path.join(dir, f), path.join(vd, new Date().toISOString().replace(/[:.]/g, '-') + '.txt'));
     const old = fs.readdirSync(vd).sort();
     for (const x of old.slice(0, Math.max(0, old.length - 60))) fs.unlinkSync(path.join(vd, x));
-    fs.writeFileSync(path.join(dir, f), text.replace(/\r?\n/g, '\r\n'), 'utf8');
+    writeAtomic(path.join(dir, f), text.replace(/\r?\n/g, '\r\n'));
     ctx.songsChanged();
     ev('songs', `Editor: «${id}» guardada${b.note ? ' (' + String(b.note).slice(0, 80) + ')' : ''}`);
     json(res, 200, { ok: true });
@@ -614,6 +621,7 @@ module.exports = function admin(ctx) {
     if (ext !== 'mp3') {
       const r = await run('ffmpeg', ['-y', '-loglevel', 'error', '-i', jobPath(j.id, 'entrada.' + ext), '-vn', '-c:a', 'libmp3lame', '-b:a', '192k', jobPath(j.id, 'entrada.mp3')]);
       if (r.code !== 0) throw httpErr(400, 'No se pudo convertir el audio: ' + r.err);
+      try { fs.unlinkSync(jobPath(j.id, 'entrada.' + ext)); } catch {}   // (el original ya no hace falta: no se guardan dos audios)
     }
     j.state = 'pendiente'; j.size = buf.length; jobPut(j);
     json(res, 200, j);
@@ -812,6 +820,7 @@ module.exports = function admin(ctx) {
     const dest = path.join(SONGS_DIR, to);
     if (fs.existsSync(dest)) throw httpErr(409, 'Ya hay una canción con ese nombre de carpeta');
     fs.renameSync(dir, dest);
+    try { if (fs.existsSync(verDir(id))) fs.renameSync(verDir(id), verDir(to)); } catch {}   // (las versiones del editor siguen a la canción)
     const nv = ctx.novedades();
     if (nv[id]) { nv[to] = nv[id]; delete nv[id]; ctx.saveNovedades(); }
     const rec = ctx.records();
@@ -862,13 +871,15 @@ module.exports = function admin(ctx) {
     const buf = await readRaw(req, 60 * 1024 * 1024);
     const nueva = !fs.existsSync(dir);
     fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, name), buf);
+    writeAtomic(path.join(dir, name), buf);   // (un .mp3 de 60 MB a medias no se sirve nunca a una tele)
     ctx.songsChanged();
     ev('songs', `${nueva ? 'Canción nueva' : 'Fichero subido'}: «${id}/${name}» (${(buf.length / 1048576).toFixed(1)} MB)`);
     json(res, 200, { ok: true });
   });
   on('DELETE', '/songs/([^/]+)/files/([^/]+)', (req, res, m) => {
-    const id = decodeURIComponent(m[1]), dir = songDir(id), name = safeName(decodeURIComponent(m[2]));
+    // (también los que empiezan por punto: .DS_Store y ._Cancion.mp3 que deja un Mac al copiar)
+    const id = decodeURIComponent(m[1]), dir = songDir(id), name = decodeURIComponent(m[2]).normalize('NFC');
+    if (!name || name.length > 200 || name === '.' || name === '..' || /[\/\\\0]/.test(name)) throw httpErr(400, 'Nombre no válido');
     const f = path.join(dir, name);
     if (!fs.existsSync(f)) throw httpErr(404, 'No existe ese fichero');
     fs.unlinkSync(f);
@@ -1031,10 +1042,12 @@ module.exports = function admin(ctx) {
       (async () => {
         try {
           const l = await buscarLetra(j.artista, j.titulo, j.duracion);
-          if (!l || j.state !== 'borrador') return;
+          // Puede haber pasado un minuto: se relee el trabajo de disco y solo se toca si sigue siendo un borrador sin
+          // letra (si el admin ya escribió la suya o pulsó «Continuar», no se pisa nada)
+          const cur = readJson(jobPath(j.id), null);
+          if (!l || !cur || cur.state !== 'borrador' || fs.existsSync(src('letra.txt'))) return;
           fs.writeFileSync(src('letra.txt'), l.texto); if (l.lrc) fs.writeFileSync(src('letra.lrc'), l.lrc);
-          j.letraFuente = l.fuente + (l.sincronizada ? ' (sincronizada)' : '');
-          jobPut(j);
+          jobPut({ ...cur, letraFuente: l.fuente + (l.sincronizada ? ' (sincronizada)' : '') });
         } catch {}
       })();
       return;
@@ -1054,8 +1067,8 @@ module.exports = function admin(ctx) {
       const nuevo = readText(src('cancion.txt')), viejo = readText(path.join(dir, f));
       const cab = viejo.split(/\r?\n/).filter(l => /^#/.test(l) && !/^#(GAP|BPM|RELATIVE):/i.test(l));
       const de = nuevo.split(/\r?\n/), cuerpo = de.filter(l => !/^#/.test(l)), gb = de.filter(l => /^#(GAP|BPM):/i.test(l));
-      fs.writeFileSync(path.join(dir, f), [...cab, ...gb, ...cuerpo].join('\r\n'), 'utf8');
-      for (const x of ['voz.mp3', 'voz-tono.json']) if (fs.existsSync(src(x))) fs.copyFileSync(src(x), path.join(dir, x));
+      writeAtomic(path.join(dir, f), [...cab, ...gb, ...cuerpo].join('\r\n'));
+      for (const x of ['voz.mp3', 'voz-tono.json']) if (fs.existsSync(src(x))) copyAtomic(src(x), path.join(dir, x));
       j.reencajar = false;
       ctx.songsChanged();
       ev('songs', `Vuelta a encajar: «${j.song}» (la versión anterior está en Versiones)`);
@@ -1065,9 +1078,9 @@ module.exports = function admin(ctx) {
     const folder = fs.existsSync(path.join(SONGS_DIR, j.folder)) ? folderFor(j.artista, j.titulo) : j.folder;
     const dir = path.join(SONGS_DIR, folder);
     fs.mkdirSync(dir, { recursive: true });
-    fs.copyFileSync(src('entrada.mp3'), path.join(dir, j.audioName));
-    fs.copyFileSync(src('cancion.txt'), path.join(dir, folder + '.txt'));
-    for (const f of ['voz.mp3', 'voz-tono.json']) if (fs.existsSync(src(f))) fs.copyFileSync(src(f), path.join(dir, f));
+    copyAtomic(src('entrada.mp3'), path.join(dir, j.audioName));
+    copyAtomic(src('cancion.txt'), path.join(dir, folder + '.txt'));
+    for (const f of ['voz.mp3', 'voz-tono.json']) if (fs.existsSync(src(f))) copyAtomic(src(f), path.join(dir, f));
     writeJson(path.join(dir, 'borrador.json'), { trabajo: j.id, creada: Date.now() });
     j.song = folder;
     ctx.songsChanged();
@@ -1090,8 +1103,27 @@ module.exports = function admin(ctx) {
   }
   const wroutes = [];
   const won = (method, pattern, fn) => wroutes.push({ method, re: new RegExp('^/api/worker' + pattern + '$'), fn });
+  // Trabajos viejos: lo que queda en data/trabajos/ (audio de entrada, voz, partitura) solo sirve para «volver a
+  // encajar» una canción en preparación. A los 30 días, si ya no está en preparación, se borra
+  function limpiarTrabajos() {
+    try {
+      for (const j of jobsAll()) {
+        if (!['hecho', 'error'].includes(j.state) || Date.now() - (j.finished || j.updated || j.created || 0) < 30 * 86400e3) continue;
+        if (j.song && fs.existsSync(path.join(SONGS_DIR, j.song, 'borrador.json'))) continue;
+        fs.rmSync(path.join(JOBS, safeName(j.id)), { recursive: true, force: true });
+      }
+    } catch (e) { console.error('trabajos: no se pudieron limpiar', e.message); }
+  }
+  setTimeout(limpiarTrabajos, 60e3).unref(); setInterval(limpiarTrabajos, 6 * 3600e3).unref();
   won('POST', '/next', async (req, res) => {
     const b = await body(req);
+    // Si el trabajador reaparece tras más de un minuto callado con un trabajo a medias, es que se reinició: el trabajo
+    // vuelve a la cola ahora y no a los 20 min
+    if (worker.job && worker.seen && Date.now() - worker.seen > 60e3) {
+      const x = jobsAll().find(j => j.id === worker.job);
+      if (x && x.state === 'procesando') { x.retries = (x.retries || 0) + 1; x.state = x.retries > 1 ? 'error' : 'pendiente'; x.msg = 'El trabajador se reinició: vuelve a la cola'; if (x.state === 'error') x.error = 'El trabajador se ha caído dos veces con este trabajo'; jobPut(x); }
+      worker.job = null;
+    }
     worker = { seen: Date.now(), host: String(b.host || '').slice(0, 60), job: worker.job, version: String(b.version || '').slice(0, 20) };
     // Un trabajo que lleva 20 min sin dar señales (el trabajador se reinició a medias) vuelve a la cola, una vez:
     // si vuelve a pasar, se da por fallido (si no, un audio que revienta al trabajador se repetiría sin fin)
@@ -1204,5 +1236,5 @@ module.exports = function admin(ctx) {
     return true;
   }
 
-  return { handle, isAuthed, ev, count, peaks };
+  return { handle, isAuthed, ev, count, peaks, flush };
 };

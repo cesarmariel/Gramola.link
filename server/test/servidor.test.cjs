@@ -29,7 +29,7 @@ before(async () => {
   fs.mkdirSync(path.join(web, 'js'));
   fs.copyFileSync(path.join(__dirname, '..', '..', 'web', 'js', 'ultrastar.js'), path.join(web, 'js', 'ultrastar.js'));
   child = spawn(process.execPath, [path.join(__dirname, '..', 'server.js')], {
-    env: { ...process.env, PORT: '0', HOST: '127.0.0.1', WEB_DIR: web, SONGS_DIR: songs, DATA_DIR: path.join(dir, 'data'), ADMIN_HOST: '', MAX_ROOMS: '3' },
+    env: { ...process.env, PORT: '0', HOST: '127.0.0.1', WEB_DIR: web, SONGS_DIR: songs, DATA_DIR: path.join(dir, 'data'), ADMIN_HOST: '', MAX_ROOMS: '6' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   await new Promise((resolve, reject) => {
@@ -67,7 +67,9 @@ const msg = async s => JSON.parse((await once(s, 'message'))[0]);
 async function abrirSala() {
   const host = ws(); await once(host, 'open');
   host.send(JSON.stringify({ type: 'host' }));
-  return [host, await msg(host)];
+  const m = await msg(host);
+  if (m.type === 'room') { host._esHost = true; host._sala = m; }
+  return [host, m];
 }
 
 test('cookies y cuerpos mal formados no tumban el servidor', async () => {
@@ -179,26 +181,30 @@ test('el récord no puede pasar de lo que el servidor ha visto cantar', async ()
 });
 
 test('con el tope de salas alcanzado la tele recibe un error en vez de colgar el servidor', async () => {
-  // Las pruebas anteriores han dejado salas abiertas y el tope es 3: en pocas más tiene que llegar el aviso
-  let d = null;
-  for (let i = 0; i < 5 && !(d && d.type === 'error'); i++) [, d] = await abrirSala();
+  // Las pruebas anteriores han dejado salas abiertas y el tope es 6: en pocas más tiene que llegar el aviso
+  let d = null, abiertas = 0;
+  for (let i = 0; i < 8 && !(d && d.type === 'error'); i++) { [, d] = await abrirSala(); if (d.type === 'room') abiertas++; }
   assert.equal(d.type, 'error');
   assert.equal(d.code, 'busy');
+  assert.ok(abiertas >= 1, 'antes del tope se abren salas');
   await vivo();
 });
 
 test('al cerrar la sala con «nuevo código» los móviles salen y la tele recibe la sala nueva', async () => {
-  for (const s of sockets.splice(0)) s.terminate();
-  await new Promise(r => setTimeout(r, 100));   // que el servidor registre los cierres (las salas vacías no se borran, pero el tope es de 3)
-  const [host, room] = await abrirSala();
-  if (room.type === 'error') return;   // (las salas de antes siguen contando hasta que pasan 15 min: no se puede probar aquí)
+  // (una tele con sala pide «nuevo código»: la sala vieja se cierra y la nueva ocupa su hueco, aunque esté al tope)
+  const host = sockets.find(s => s.readyState === 1 && s._esHost);
+  assert.ok(host, 'hace falta una tele con sala abierta');
+  const room = host._sala;
   const player = ws(); await once(player, 'open');
   player.send(JSON.stringify({ type: 'join', code: room.code, name: 'Ana' }));
   await msg(player); await msg(host);
+  // (los avisos se esperan por tipo y con el oyente puesto antes de pedir: el «roster» del alta puede llegar entre medias)
+  const esperar = (s, type) => new Promise(r => { const f = d => { const m = JSON.parse(d); if (m.type === type) { s.off('message', f); r(m); } }; s.on('message', f); });
+  const pCerrada = esperar(player, 'closed'), pNueva = esperar(host, 'room');
   host.send(JSON.stringify({ type: 'new-code' }));
-  const closed = await msg(player);
+  const closed = await pCerrada;
   assert.equal(closed.type, 'closed');
-  const nueva = await msg(host);
+  const nueva = await pNueva;
   assert.equal(nueva.type, 'room');
   assert.notEqual(nueva.code, room.code);
   await vivo();

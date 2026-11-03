@@ -15,6 +15,23 @@ npm start                 # http://localhost:8877
 npm test                  # pruebas del servidor (arranca uno aparte con datos temporales)
 ```
 
+## Despliegue, copias y datos
+
+- `deploy/deploy.sh` comprueba la sintaxis, espera hasta 90 s a que nadie esté cantando (`DEPLOY_FORCE=1` lo salta),
+  instala las dependencias en una copia (`server.new`) y solo entonces cambia de carpeta y reinicia: un fallo de `npm`
+  nunca deja el servicio sin arrancar. Al parar, el servidor guarda las salas en `data/salas.json` y las restaura al
+  arrancar, así que un despliegue no echa a nadie de su sala.
+- Lo que hay que guardar: `data/` (récords, estadísticas, actividad, **llaves de Touch ID** en `admin.json`, novedades,
+  versiones del editor, retiradas; `data/trabajos` es prescindible) y `web/songs` (las canciones con sus portadas,
+  Megamix y volumen igualado). En el servidor de producción hay una copia diaria a las 04:10 en
+  `/root/backups/gramola/` (`datos-AAAA-MM-DD.tgz`, 14 días, y una réplica de `web/songs`), hecha por
+  `/root/backups/gramola/backup.sh`. El admin (Servidor → Descargar copia) baja récords, estadísticas, actividad,
+  novedades y llaves.
+- Un fichero de datos que no sea JSON válido no se pisa en silencio: el servidor lo aparta como
+  `*.corrupto-<fecha>` y lo dice en el registro (`journalctl -u gramola`).
+```
+```
+
 Variables de entorno:
 
 | Variable | Por defecto | Uso |

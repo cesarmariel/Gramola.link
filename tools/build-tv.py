@@ -159,7 +159,7 @@ sub("const FILTERS=['Orden','Idioma','Década','Género','Solo dúos'];", "const
 sub(",'Género · '+GENS[s.gen],'Solo dúos'],chipAct=[!!s.query,false,s.lng>0,s.dec>0,s.gen>0,s.duoOnly];", ",'Género · '+GENS[s.gen]],chipAct=[!!s.query,false,s.lng>0,s.dec>0,s.gen>0];", name='sin chip dúos')
 
 # --- Megamix: teclas de su pantalla, ficha «Megamix» en Preparar/Resultados, sin récord por canción
-sub("  act(a){const s=this.state;", "  act(a){const s=this.state;if(GR.megaKey(this,a))return;GR.navBefore(this,a);", name='Megamix y zzzup: teclas')
+sub("  act(a){const s=this.state;", "  act(a){const s=this.state;if(!s.err&&GR.megaKey(this,a))return;GR.navBefore(this,a);", name='Megamix y zzzup: teclas')
 sub("const recN=parseInt((song.rec.split(' ')[0]||'0').replace('.',''))||0;", "const recN=GR.mega?Infinity:(parseInt((song.rec.split(' ')[0]||'0').replace('.',''))||0);", name='Megamix: sin récord')
 sub("resAct(i){this.conf=[];", "resAct(i){this.conf=[];if(GR.megaRes(this,i))return;", name='Megamix: resultados')
 
@@ -282,6 +282,38 @@ sub('<head>', '<head>\n<base href="/tv/">\n<title>Gramola</title>\n<meta name="t
     '<link rel="icon" href="/assets/iconos/favicon-32.png" sizes="32x32">\n<link rel="apple-touch-icon" href="/assets/iconos/favicon-180.png">\n'
     '<style>html,body{margin:0;background:#0e0f0f;overflow:hidden;cursor:none}</style>\n'
     '<script src="/vendor/qrcode.js"></script>\n<script src="/tv/gramola-bridge.js?v=' + VERSION + '"></script>', name='head')
+
+# --- revisión del 03-nov-2026: récords comprobados en el servidor y casos límite de Pásalo/Preparar/Resultados
+# Cada fila de resultados lleva el id del jugador (el servidor solo guarda récords de jugadores de la sala) y la
+# precisión no es NaN en una canción sin ranuras
+sub("return {name:s.name,color:s.color,shape:s.shape,score:Math.round(this.score[k]),prec:Math.round(100*h/t),",
+    "return {id:s.id,name:s.name,color:s.color,shape:s.shape,score:Math.round(this.score[k]),prec:t?Math.round(100*h/t):0,", name='resultados: id y precisión')
+# Pásalo: un equipo que se queda sin jugadores no deja la pantalla en blanco
+sub("turnPlayer(p){const ids=this.teamIds(p,p.turn);return ids[", "turnPlayer(p){const ids=this.teamIds(p,p.turn);if(!ids.length)return null;return ids[", name='Pásalo: equipo vacío')
+sub("partyGo(){const p=this.state.party,P0=PLAYERS[this.turnPlayer(p)];this.beginCount(",
+    "partyGo(){const p=this.state.party,pi=this.turnPlayer(p);if(pi==null){this.toast('Ese equipo se ha quedado sin jugadores');this.P({step:'teams'});return;}const P0=PLAYERS[pi];this.beginCount(", name='Pásalo: ir sin jugador')
+sub("if(sp==='turn'){const pi=this.turnPlayer(p);V.turnName=PLAYERS[pi][0];", "if(sp==='turn'){const pi=this.turnPlayer(p);V.turnName=pi==null?'—':PLAYERS[pi][0];", name='Pásalo: nombre del turno')
+# Preparar partida: un jugador que se ha ido (fila sin nombre) no se convierte en cantante fantasma
+sub("singersFromSetup(){const m=this.state.mode;return this.state.setup.map((s,i)=>{if(this.isOff(i))return null;",
+    "singersFromSetup(){const m=this.state.mode;return this.state.setup.map((s,i)=>{if(this.isOff(i)||!PLAYERS[i][0])return null;", name='preparar: sin fantasmas')
+# Calibración: cancelar con Atrás también para la toma de arranques de voz en el puente
+sub("calKey(a){const c=this.state.calib;if(c.phase==='measure'||c.phase==='test'){if(a==='back'){clearInterval(this.bTimer);this.setState(",
+    "calKey(a){const c=this.state.calib;if(c.phase==='measure'||c.phase==='test'){if(a==='back'){clearInterval(this.bTimer);if(GR.cal)GR.cal.on=false;this.setState(", name='calibración: cancelar')
+# Transición cancelada: si se sale de la cuenta atrás (o del fundido hacia el canto) antes de que llegue, se para la cuenta
+# y la canción (antes la cuenta seguía viva y arrancaba la canción sola en otra pantalla, o el audio se quedaba sonando)
+sub("if(this.state.tr==='out'){clearTimeout(this.trT);}",
+    "if(this.state.tr==='out'){clearTimeout(this.trT);if(this.trTo==='count'&&screen!=='count'){clearTimeout(this.cWait);clearInterval(this.cTimer);}if(this.trTo==='sing'&&screen!=='sing'){this.chart=null;GR.stopAudio&&GR.stopAudio();}}clearTimeout(this.trI);", name='transición cancelada')
+# Récords «Por canción»: solo las que tienen récord, 8 como mucho (cabían en pantalla; la biblioteca entera se salía)
+sub("return [so.title,sc||'—',nm||'Sin récord todavía',parseInt((sc||'0').replace('.',''))||0];}).sort((a,b)=>b[3]-a[3]);",
+    "return [so.title,sc||'—',nm||'Sin récord todavía',parseInt((sc||'0').replace('.',''))||0];}).sort((a,b)=>b[3]-a[3]).filter(r=>r[3]>0).slice(0,8);", name='récords por canción: 8')
+# Pásalo: tantas rondas como hagan falta para que canten todos (con 3 equipos o equipos desiguales, 4 fijas era injusto)
+sub("this.P({step:'roulette'});}else if(a==='back')this.go('menu');}",
+    "this.P({step:'roulette',rounds:p.nT*Math.max(...[...Array(p.nT).keys()].map(t=>this.teamIds(p,t).length))});}else if(a==='back')this.go('menu');}", name='Pásalo: rondas')
+# Fin de canción con la biblioteca recargada a medias (sala perdida): la canción puede no estar en su índice
+sub("const song=SONGS[this.state.songSel];const recN=", "const song=SONGS[this.state.songSel]||{rec:'—'};const recN=", name='fin: canción desaparecida')
+# La lista de canciones filtrada y ordenada se calcula solo cuando cambia algo (antes, en cada render, también cantando)
+sub("  songsList(){const s=this.state;let l=SONGS.filter(x=>x.id);",
+    "  songsList(){const s=this.state;const key=[SONGS.length,GR.songsRev||0,s.query||'',s.lng,s.dec,s.gen,s.duoOnly?1:0,s.ord].join('|');if(this._sl&&this._sl.key===key)return this._sl.list;const list=this.songsList0();this._sl={key,list};return list;}\n  songsList0(){const s=this.state;let l=SONGS.filter(x=>x.id);", name='lista de canciones memorizada')
 
 if fails:
     print('ERROR: estos enganches ya no encajan con el diseño nuevo:', *fails, sep='\n  - ')

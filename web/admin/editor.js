@@ -886,7 +886,11 @@
         await api('/songs/' + encodeURIComponent(id) + '/chart', { method: 'PUT', json: { text: serialize(doc), note: 'editor' } });
         setDirty(false); toast('Guardado');
         // El tramo del Megamix depende de los tiempos: si no es manual, se vuelve a cortar
-        if (data.megamix && data.megamix.origen !== 'manual') api('/songs/' + encodeURIComponent(id) + '/megamix', { method: 'POST', json: { mode: 'auto' } }).catch(() => {});
+        if (data.megamix && data.megamix.origen !== 'manual') {
+          // (si otro corte sigue en marcha, se vuelve a pedir en unos segundos para que el tramo lleve los tiempos nuevos)
+          const mm = () => api('/songs/' + encodeURIComponent(id) + '/megamix', { method: 'POST', json: { mode: 'auto' } });
+          mm().catch(e => { if (/procesando/.test(e.message || '')) setTimeout(() => mm().catch(() => {}), 8000); });
+        }
         loadVersions();
         return true;
       } catch (e) { fail(e); return false; } finally { saving = false; }

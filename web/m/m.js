@@ -155,13 +155,14 @@ function onMessage(m) {
     el.classList.add('on'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('on'), 6000);
     return;
   }
-  if (m.type === 'kicked' || m.type === 'closed') {
+  if (m.type === 'kicked' || m.type === 'closed' || m.type === 'replaced') {
     joined = false;
     hello = null;
     if (me) LS.del('g-token-' + me.code);
     $('closed-room').textContent = 'Sala ' + (me ? me.code : '');
     $('closed-text').textContent = m.type === 'kicked'
       ? 'La tele te ha sacado de la sala. Pide el código y vuelve a entrar.'
+      : m.type === 'replaced' ? 'Tu sesión se ha abierto en otro móvil. Si no has sido tú, vuelve a entrar con el código.'
       : 'La tele ha terminado la fiesta o ha generado un código nuevo. Pide el código y vuelve a entrar.';
     stopMic();
     show('s-closed');

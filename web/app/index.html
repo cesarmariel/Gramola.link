@@ -8,7 +8,7 @@
 <link rel="apple-touch-icon" href="/assets/iconos/favicon-180.png">
 <style>html,body{margin:0;background:#0e0f0f;overflow:hidden;cursor:none}</style>
 <script src="/vendor/qrcode.js"></script>
-<script src="/tv/gramola-bridge.js?v=1.26.1103.1023"></script>
+<script src="/tv/gramola-bridge.js?v=1.26.1103.1102"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="./support.js"></script>
@@ -60,7 +60,7 @@ a{color:var(--color-accent-700)}a:hover{color:var(--color-accent-600)}
   <div style="display:flex;justify-content:space-between;align-items:center;border-top:2px solid var(--color-text);padding-top:20px;font-size:28px;font-weight:600">
     <img src="assets/nuvola/nuvola-tinta.png" alt="nuvola" style="display:block;height:44px;width:auto;position:relative;top:-7px">
     
-    <span style="color:var(--color-neutral-700)">Versión 1.26.1103.1023</span>
+    <span style="color:var(--color-neutral-700)">Versión 1.26.1103.1102</span>
   </div>
 </div>
 </sc-if>
@@ -728,7 +728,7 @@ class Component extends DCLogic {
   go(screen,extra,cb){const from=this.state.screen,M=this.pickMode(from,screen);
     const set=(o,c)=>{this._inGo=true;try{super.setState(o,c);}finally{this._inGo=false;}};
     if(M==='Seco'||screen===from||this.trTo===screen){if(this.trTo!==screen)set({screen,...extra,trM:M},cb);return;}
-    if(this.state.tr==='out'){clearTimeout(this.trT);}
+    if(this.state.tr==='out'){clearTimeout(this.trT);if(this.trTo==='count'&&screen!=='count'){clearTimeout(this.cWait);clearInterval(this.cTimer);}if(this.trTo==='sing'&&screen!=='sing'){this.chart=null;GR.stopAudio&&GR.stopAudio();}}clearTimeout(this.trI);
     const O=['splash','boot','welcome','lobby','menu','songs','setup','count','sing','results','party','records','settings','calib'];const dir=O.indexOf(screen)>=O.indexOf(this.state.screen)?1:-1;
     this.trTo=screen;super.setState({tr:'out',trDir:dir,trM:M});clearTimeout(this.trT);this.trT=setTimeout(()=>{this.trTo=null;this.trVia=true;set({screen,...extra,tr:'pre'},()=>{this.enter();cb&&cb();});},TR[M].out);}
   trMode(){return TR[this.state.trM]?this.state.trM:'Zoom';}
@@ -750,7 +750,7 @@ class Component extends DCLogic {
     this.setState({screen:'sing',paused:false,scores:new Array(K).fill(0),teamScores:[0,0],pauseF:0});}
   finishSing(){if(this.state.mode==='jukebox'){this.jukeNext();return;}if(this.state.mode==='party'){const pts=Math.round(this.score[0]),p=this.state.party,sc=p.scores.slice();sc[p.turn]+=pts;this.chart=null;this.go('party',{party:{...p,scores:sc,step:'board',last:{name:this.state.singers[0].name,pts,t:p.turn}}});return;}const ch=this.chart,S=this.state.singers;const goldN=ch.notes.filter(n=>n.type==='gold').length;
     const rows=S.map((s,k)=>{let h=0,t=0;ch.notes.forEach(n=>{if(n.sl){h+=n.sl[k].reduce((a,b)=>a+b,0);t+=n.sl[k].length;}});return {id:s.id,name:s.name,color:s.color,shape:s.shape,score:Math.round(this.score[k]),prec:t?Math.round(100*h/t):0,gold:this.goldHit[k]+'/'+goldN,streak:this.best[k],bestPh:Math.round(100*Math.max(0,...ch.phrases.filter(p=>p.parts.includes(s.part)).map(p=>{let a=0,b=0;p.notes.forEach(n=>{if(n.sl){a+=n.sl[k].reduce((x,y)=>x+y,0);b+=n.sl[k].length;}});return b?a/b:0;})))};});
-    rows.sort((a,b)=>b.score-a.score);let head=null;if(this.state.mode==='duel'){const T=this.teams(),av=this.teamAvg(this.score).map(Math.round);head=av[0]===av[1]?'Empate.':'Gana '+T[av[0]>av[1]?0:1].name+'.';}const song=SONGS[this.state.songSel];const recN=GR.mega?Infinity:(parseInt((song.rec.split(' ')[0]||'0').replace('.',''))||0);
+    rows.sort((a,b)=>b.score-a.score);let head=null;if(this.state.mode==='duel'){const T=this.teams(),av=this.teamAvg(this.score).map(Math.round);head=av[0]===av[1]?'Empate.':'Gana '+T[av[0]>av[1]?0:1].name+'.';}const song=SONGS[this.state.songSel]||{rec:'—'};const recN=GR.mega?Infinity:(parseInt((song.rec.split(' ')[0]||'0').replace('.',''))||0);
     GR.saveRecord(this,rows);this.chart=null;this.showResults(rows,rows[0].score>recN,this.state.songSel,head);}
   showResults(rows,record,songSel,head){this.resStart=this.T||performance.now()/1000;
     if(record)this.conf=Array.from({length:140},()=>({x:Math.random()*1920,y:-Math.random()*1080,vy:180+Math.random()*260,vx:-40+Math.random()*80,r:Math.random()*6,vr:-4+Math.random()*8,w:10+Math.random()*14,h:6+Math.random()*8,c:[C.red,C.ink,C.gold,'#fff'][Math.floor(Math.random()*4)]}));else this.conf=[];
@@ -773,7 +773,7 @@ class Component extends DCLogic {
     if(p.step==='teams'){if(a==='u')this.P({pf:Math.max(0,p.pf-1)});else if(a==='d')this.P({pf:Math.min(n-1,p.pf+1)});else if(a==='l'||a==='r')this.partyMove(p.pf,a==='r'?1:-1);
       else if(a==='x'){if(p.nT<4)this.P({nT:p.nT+1});else this.toast('Máximo 4 equipos');}
       else if(a==='y'){if(p.nT>2){const nT=p.nT-1;this.P({nT,tOf:p.tOf.map(t=>t>=nT?nT-1:t)});}else this.toast('Mínimo 2 equipos');}
-      else if(a==='ok'){if(![...Array(p.nT).keys()].every(t=>this.teamIds(p,t).length)){this.toast('Cada equipo necesita al menos un jugador');return;}this.P({step:'roulette'});}else if(a==='back')this.go('menu');}
+      else if(a==='ok'){if(![...Array(p.nT).keys()].every(t=>this.teamIds(p,t).length)){this.toast('Cada equipo necesita al menos un jugador');return;}this.P({step:'roulette',rounds:p.nT*Math.max(...[...Array(p.nT).keys()].map(t=>this.teamIds(p,t).length))});}else if(a==='back')this.go('menu');}
     else if(p.step==='roulette'){if(p.spinning)return;if(a==='ok')this.spin();else if(a==='back')this.P({step:'teams'});}
     else if(p.step==='turn'){if(a==='ok')this.partyGo();else if(a==='back')this.P({step:'roulette'});}
     else if(p.step==='board'){if(a==='ok'){if(p.round>=p.rounds){this.conf=this.makeConf();this.P({step:'champs',cf:0});}else this.P({round:p.round+1,turn:(p.turn+1)%p.nT,step:'roulette'});}}
@@ -800,7 +800,7 @@ class Component extends DCLogic {
   setupToggle(i){if(this.isOff(i)){this.toast(PLAYERS[i][0]+' no tiene el micro conectado');return;}const m=this.state.mode;this.setState(s=>({setup:s.setup.map((r,j)=>j!==i?r:m==='sing'?{...r,on:!r.on}:{...r,side:r.side===0?2:r.side===2?1:0})}));}
   setupDiff(i,d){this.setState(s=>({setup:s.setup.map((r,j)=>j===i?{...r,diff:Math.max(0,Math.min(2,r.diff+d))}:r)}));}
   onKey(e){const map={ArrowLeft:'l',ArrowRight:'r',ArrowUp:'u',ArrowDown:'d',Enter:'ok',' ':'ok',Escape:'back',Backspace:'back',p:'menu',P:'menu',m:'menu',M:'menu',v:'v',V:'v',j:'add',J:'add','+':'add','-':'rem',q:'lb',Q:'lb',e:'rb',E:'rb',x:'x',X:'x',y:'y',Y:'y',GamepadA:'ok',GamepadB:'back',GamepadX:'x',GamepadY:'y',GamepadMenu:'menu',GamepadView:'v',GamepadLeftShoulder:'lb',GamepadRightShoulder:'rb',GamepadDPadUp:'u',GamepadDPadDown:'d',GamepadDPadLeft:'l',GamepadDPadRight:'r',GamepadLeftThumbstickUp:'u',GamepadLeftThumbstickDown:'d',GamepadLeftThumbstickLeft:'l',GamepadLeftThumbstickRight:'r'};const a=map[e.key];if(!a)return;e.preventDefault();if(e.key.startsWith('Gamepad'))this.padKeys=true;if(GR.inAct(this,a,'key'))this.act(a);}
-  act(a){const s=this.state;if(GR.megaKey(this,a))return;GR.navBefore(this,a);
+  act(a){const s=this.state;if(!s.err&&GR.megaKey(this,a))return;GR.navBefore(this,a);
     if(s.err){if(a==='ok'||a==='back')this.errAct();return;}
     if(s.screen==='splash'||s.screen==='boot')return;if(s.screen==='welcome'){if(a==='ok')this.go('lobby');return;}
     if(s.screen==='lobby'&&a==='y')a='add';
@@ -1051,7 +1051,7 @@ class Component extends DCLogic {
     V.recIsTable=s.recTab<3;V.recIsRanks=s.recTab===3;
     V.recHead=[['Canción','Récord','Quién'],['Cantante','Canciones','Mejor puntuación'],['Cantante','Racha','Canción']][Math.min(2,s.recTab)].map(l=>({l}));
     const pc=nm=>{const P=PLAYERS.find(p=>p[0]===nm);return P?P[1]:C.n3;};
-    const r0=SONGS.map(so=>{const [sc,nm]=so.rec.split(' · ');return [so.title,sc||'—',nm||'Sin récord todavía',parseInt((sc||'0').replace('.',''))||0];}).sort((a,b)=>b[3]-a[3]);
+    const r0=SONGS.map(so=>{const [sc,nm]=so.rec.split(' · ');return [so.title,sc||'—',nm||'Sin récord todavía',parseInt((sc||'0').replace('.',''))||0];}).sort((a,b)=>b[3]-a[3]).filter(r=>r[3]>0).slice(0,8);
     V.recRows=(s.recTab===0?r0.map(r=>({a:r[0],b:r[1],c:r[2],color:pc(r[2])})):(s.recTab===1?REC2:REC3).map(r=>({a:r[0],b:r[1],c:r[2],color:pc(r[0])}))).map((r,i)=>({...r,pos:String(i+1).padStart(2,'0'),bg:i===0?'#fff':'transparent'}));
     V.ranks=RANKS.map((r,i)=>({num:String(i+1).padStart(2,'0'),name:r[1],range:RANGE[i],bars:[5,4,3,2,1,0].map(j=>({w:Math.round((j+1)/6*100),c:j>i?C.n2:j===i?C.red:ink}))}));
     V.isSettings=s.screen==='settings';const st=s.settings;

@@ -33,7 +33,12 @@ window.GR = (() => {
   const g = () => G.g || window.__g;
 
   // ------------------------------------------------------------------ ajustes guardados
-  G.loadSettings = def => ({ ...def, ...LS.get('gramola-ajustes', {}) });
+  // Ajustes guardados: cada valor dentro de su rango (un localStorage tocado a mano no deja la pantalla en blanco)
+  G.loadSettings = def => {
+    const s = { ...def, ...LS.get('gramola-ajustes', {}) }, R = { diff: [0, 2], delay: [0, 400], music: [0, 10], fx: [0, 10], trail: [0, 1], lyr: [0, 1], lang: [0, 1] };
+    for (const k in R) { const v = Number(s[k]); s[k] = Number.isFinite(v) ? Math.max(R[k][0], Math.min(R[k][1], Math.round(v))) : def[k]; }
+    return s;
+  };
   let lastSettings = '';
   function persistSettings(st) {
     const j = JSON.stringify(st);
@@ -52,25 +57,30 @@ window.GR = (() => {
       if (st === 'open') { G.lostAt = 0; const c = g(); if (c && (c.state.err === 'server' || c.state.err === 'lost')) c.setState({ err: null, errBusy: false }); }
       else if (!G.lostAt) G.lostAt = performance.now();
     });
-    G.net.connect(() => ({ type: 'host', code: SS.get('g-room'), token: SS.get('g-token') }));
+    // La sala se recuerda en la pestaña (recarga) y, durante 14 min, en el aparato (reinicio de la app de la tele)
+    const recordada = () => { const s = LS.get('g-sala', null); return s && s.code && s.token && Date.now() - (+s.at || 0) < 14 * 60e3 ? s : null; };
+    G.net.connect(() => { const r = recordada(); return { type: 'host', code: SS.get('g-room') || (r && r.code), token: SS.get('g-token') || (r && r.token) }; });
   }
 
   function olvidarSala() {
     G.room = null; G.token = null;
-    try { sessionStorage.removeItem('g-room'); sessionStorage.removeItem('g-token'); } catch {}
+    try { sessionStorage.removeItem('g-room'); sessionStorage.removeItem('g-token'); localStorage.removeItem('g-sala'); } catch {}
   }
   function onMessage(m) {
     const c = g();
     if (m.type === 'room') {
       // «Sala perdida» solo si el código cambia sin haberlo pedido (Ajustes → Nuevo código lo pide a propósito)
-      const lost = G.room && G.room !== m.code && !m.recovered && !G.expectNew;
-      G.expectNew = false;
+      const lost = (G.room && G.room !== m.code && !m.recovered && !G.expectNew) || !!G.cerradaDesdeAdmin;
+      if (lost) G.lostFrom = G.room || G.lostFrom || null;
+      const tokenCambiado = !!G.token && G.token !== m.token;   // (con «Nuevo código» las direcciones de audio llevan ?k= nuevo)
+      G.expectNew = false; G.cerradaDesdeAdmin = false;
       G.room = m.code; G.token = m.token;
       SS.set('g-room', m.code); SS.set('g-token', m.token);
+      LS.set('g-sala', { code: m.code, token: m.token, at: Date.now() });   // (si la app de la tele se reinicia, no solo se recarga)
       // Pase de tele (cookie) para poder leer las canciones; después, cargarlas. Si la petición falla (red a medias al
       // arrancar) se reintenta con espera creciente: si no, la tele se quedaba en «Cargando… 95 %» para siempre
       const pase = (wait = 1000) => fetch('/api/tv-pass', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: m.code, token: m.token }) })
-        .then(r => { if (r.ok) { if (!G.ready || lost) loadSongs(); } else if (r.status !== 403) throw new Error(); })
+        .then(r => { if (r.ok) { if (!G.ready || lost || tokenCambiado) loadSongs(); } else if (r.status !== 403) throw new Error(); })
         .catch(() => { if (G.room === m.code) setTimeout(() => pase(Math.min(8000, wait * 2)), wait); });
       pase();
       setPlayers(m.players, true);
@@ -90,6 +100,8 @@ window.GR = (() => {
       // En la sala, Y añade un simulado y X echa al último: eso solo desde el mando de la tele, no desde un móvil
       if (k && c && !(c.state.screen === 'lobby' && (k === 'y' || k === 'x'))) c.act(k);
     } else if (m.type === 'full-attempt') { if (c) { if (c.state.screen === 'sing') c.toast(`${String(m.name || 'Alguien').slice(0, 16)} ha intentado entrar: la sala está llena`); else c.setState({ err: 'full' }); } }
+    // La sala se ha cerrado desde la administración: se pide otra (la pantalla avisa de que se ha perdido la sala)
+    else if (m.type === 'closed') { olvidarSala(); G.cerradaDesdeAdmin = true; if (G.net) G.net.send({ type: 'host' }); }
     else if (m.type === 'replaced') {
       // Otra pantalla ha abierto esta misma sala (pestaña duplicada): esta deja de reclamarla, si no se la robarían
       // la una a la otra sin parar; al reconectar pedirá una sala nueva
@@ -109,6 +121,7 @@ window.GR = (() => {
   function setPlayers(list, silent) {
     const c = g();
     const before = new Map(G.players.map(p => [p.id, p]));
+    const idxAntes = new Map(G.players.map((p, i) => [p.id, i]));
     const order = G.players.map(p => p.id).filter(id => list.some(p => p.id === id));
     for (const p of list) if (!order.includes(p.id)) order.push(p.id);
     G.players = order.map(id => list.find(p => p.id === id));
@@ -118,6 +131,13 @@ window.GR = (() => {
     for (let i = G.players.length; i < 8; i++) PLAYERS[i] = ['', COLORS[i], SHAPES[i], null, false, false];
     if (!c) return;
     const upd = { count: G.players.length };
+    // Equipos de Pásalo y filas de Preparar van por posición: si alguien se va, cada jugador conserva lo suyo
+    const movido = G.players.some((p, i) => idxAntes.get(p.id) !== i);
+    if (movido) {
+      const re = (arr, def) => { const out = arr.slice(); G.players.forEach((p, i) => { const oi = idxAntes.get(p.id); out[i] = oi != null && arr[oi] !== undefined ? arr[oi] : def(i); }); return out; };
+      if (c.state.party && Array.isArray(c.state.party.tOf)) upd.party = { ...c.state.party, tOf: re(c.state.party.tOf, i => i % (c.state.party.nT || 2)) };
+      if (Array.isArray(c.state.setup) && c.state.setup.length) upd.setup = re(c.state.setup, i => c.state.setup[i] || { on: true, diff: c.state.settings.diff, side: i % 2 === 0 ? 0 : 2 });
+    }
     G.players.forEach((p, i) => {
       const b = before.get(p.id);
       if (!b && !silent) { upd.justJ = i; c.toast(p.name + ' se ha unido'); clearTimeout(c.jT); c.jT = setTimeout(() => c.setState({ justJ: null }), 650); }
@@ -891,6 +911,7 @@ window.GR = (() => {
     a.play().catch(() => {});
   }
   function stopAudio() { megaStop(); if (G.audio) { G.audio.pause(); G.audio.removeAttribute('src'); G.audio.load(); G.audio = null; } }
+  G.stopAudio = stopAudio;   // (el diseño lo llama si se cancela la transición hacia el canto)
   // Retraso de salida del audio de un AudioContext (lo que tarda el sonido en salir por los altavoces de la tele).
   // Cuando la canción suena por Web Audio, el reloj de la letra y las cajas lo descuenta para ir con lo que se oye.
   G.AV_EXTRA = 0;   // ajuste fino manual (s), por si una tele concreta lo necesita
@@ -1154,7 +1175,7 @@ window.GR = (() => {
     const ch = c.chart;
     if (!ch) return;
     megaPause(c.state.paused);
-    if (c.state.paused) { if (G.audio && !G.audio.paused) { songPause(G.audio); sendClock(c, audioNow()); } return; }
+    if (c.state.paused) { if (G.audio && !G.audio.paused && !G.audio._pausing) { const at = audioNow(); songPause(G.audio); sendClock(c, at); } return; }
     if (G.audio && G.audio.paused && !G.songEnded) { songResume(G.audio); G.clockSent = 0; }
     const S = c.state.singers, K = S.length, duel = c.state.mode === 'duel';
     const now = audioNow();
@@ -1271,7 +1292,7 @@ window.GR = (() => {
     }
     c.parts = c.parts.filter(p => (p.life -= dt) > 0);
     c.parts.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 300 * dt; });
-    if (G.songEnded || now >= ch.duration) { stopAudio(); c.finishSing(); }
+    if (G.songEnded || now >= ch.duration) { G.songEnded = false; stopAudio(); c.finishSing(); }
   };
 
   // ------------------------------------------------------------------ récords
@@ -1279,14 +1300,29 @@ window.GR = (() => {
     const S = SONGS[c.state.songSel];
     if (!S || !G.room || G.mega || c.state.mode === 'jukebox' || c.state.mode === 'party') return;
     const sing = c.state.singers;
+    // El récord lo decide el servidor (comprueba la voz que ha visto): la pantalla de resultados se corrige con su
+    // respuesta: puntos recortados, «¡Récord!» solo si lo es de verdad, o aviso si no se ha podido guardar
+    const ajustar = (ok, j) => {
+      const R = c.state.results; if (!R || R.rows !== rows) return;
+      if (!ok) { c.conf = []; c.setState({ results: { ...R, record: false } }); c.toast(j && j.error === 'sesion' ? 'El servidor no ha visto esta canción: sin récord' : 'No se ha podido guardar el récord'); return; }
+      const por = new Map((j.players || []).map(p => [p.name, p]));
+      let cambio = false;
+      const nuevas = rows.map(r => { const p = por.get(r.name); if (!p) return r; if (p.score !== r.score || p.streak !== r.streak) cambio = true; return { ...r, score: p.score, streak: p.streak }; });
+      nuevas.sort((a, b) => b.score - a.score);
+      if (!j.isNew) c.conf = [];
+      if (cambio || !!j.isNew !== !!R.record) c.setState({ results: { ...R, rows: nuevas, record: !!j.isNew } });
+      if (cambio) c.toast('Puntos ajustados por el servidor');
+    };
     try {
       const r = await fetch('/api/records', {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ code: G.room, token: G.token, song: S.id, title: S.title, artist: S.artist,
           players: rows.map(r => ({ id: r.id, name: r.name, score: r.score, streak: r.streak, bot: !!(sing.find(s => s.name === r.name) || {}).bot })) }),
       });
+      let j = null; try { j = await r.json(); } catch {}
+      ajustar(r.ok, j);
       if (r.ok) { G.records = await (await fetch('/api/records', { cache: 'no-store' })).json(); refreshRecords(); }
-    } catch {}
+    } catch { ajustar(false, null); }
   };
 
   // ------------------------------------------------------------------ avisos (errores reales)
@@ -1297,7 +1333,7 @@ window.GR = (() => {
       c.setState({ errBusy: true });
       if (G.net) { G.net.retry = 0; G.net.connect(); }
       setTimeout(() => { if (G.netOk) { c.setState({ err: null, errBusy: false }); c.toast('Conexión recuperada'); } else c.setState({ errBusy: false }); }, 1600);
-    } else { c.setState({ err: null }); if (e === 'song') c.go('songs'); }
+    } else { c.setState({ err: null }); if (e === 'song') c.go(c.state.mode === 'party' ? 'party' : c.state.mode === 'jukebox' ? 'menu' : 'songs'); }   // (en Pásalo o Jukebox no se vuelve a Canciones con ese modo)
   };
 
   // ------------------------------------------------------------------ calibración real del retraso
@@ -1720,7 +1756,8 @@ window.GR = (() => {
     if (!G.netOk && G.lostAt && performance.now() - G.lostAt > (s.screen === 'boot' ? 10000 : 3000) && !s.err && !['splash', 'welcome'].includes(s.screen)) c.setState({ err: G.room ? 'lost' : 'server' });
     // Estado para los móviles
     const screen = s.screen === 'count' ? 'countdown' : s.screen === 'sing' && s.mode !== 'jukebox' && !s.paused ? 'sing' : s.screen === 'sing' && s.paused ? 'pause' : s.screen === 'calib' ? 'calibrate' : s.screen === 'setup' ? 'prepare' : s.screen;
-    const st = { type: 'state', screen, singers: (s.singers || []).map(x => x.id).filter(x => x != null) };
+    // (en la calibración del micro canta quien quiera: todos los móviles mandan voz)
+    const st = { type: 'state', screen, singers: screen === 'calibrate' ? G.players.map(p => p.id) : (s.singers || []).map(x => x.id).filter(x => x != null) };
     if (s.mode === 'party' && s.party && s.singers && s.singers[0]) st.turn = s.singers[0].name;
     // Para la administración: qué se canta y en qué modo
     if (s.mode) st.mode = s.mode;
@@ -1734,7 +1771,11 @@ window.GR = (() => {
   G.errText = (k, t) => {
     if (k === 'song' && G.failed) return t.replace('El último tren', G.failed);
     if (k === 'mic' && G.micLost) return t.replace(/Nerea/g, G.micLost);
-    if (k === 'lost') return t.replace('{room}', G.room || '');
+    if (k === 'lost') {
+      // Lo que ha pasado de verdad: la sala vieja ya no existe, hay una nueva y los móviles tienen que volver a entrar
+      if (G.lostFrom && G.room) return t.replace('Buscando la sala {room}… Los móviles volverán a entrar solos.', `La sala ${G.lostFrom} se ha perdido. La nueva es ${G.room}: los móviles tienen que volver a escanear el QR.`).replace('Reintentar ahora', 'Entendido').replace('{room}', G.room);
+      return t.replace('{room}', G.room || '');
+    }
     return t;
   };
 
@@ -1768,7 +1809,7 @@ window.GR = (() => {
         const note = vinfo + `ms/fotograma: update ${(T.update / n).toFixed(1)}, canto ${(T.sing / n).toFixed(1)}, fondo ${(T.bg / n).toFixed(1)}; React ${T.renders} renders (${T.renders ? (T.renderMs / T.renders).toFixed(1) : 0} ms c/u); reloj ${stp.length ? Math.round(stp[stp.length >> 1] * 1000) : '?'} ms, ${G.stats.resets} corr.; vídeo ${G.stats.seeks} recol.`;
         Object.assign(G.timing, { update: 0, sing: 0, bg: 0, n: 0, renders: 0, renderMs: 0 });
         if (silentMeter && st.screen !== 'sing' && !G.sentCam) { G.sentCam = true; } else if (silentMeter && st.screen !== 'sing') return; // en la tele, solo durante el canto (y un aviso inicial)
-        fetch('/api/telemetry', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ fps, p95, worst, heap, screen: st.screen, singers: (st.singers || []).length, video, note, ua: navigator.userAgent }) }).catch(() => {});
+        fetch(G.withK ? G.withK('/api/telemetry') : '/api/telemetry', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ fps, p95, worst, heap, screen: st.screen, singers: (st.singers || []).length, video, note, ua: navigator.userAgent }) }).catch(() => {});
       }
     }, 500);
   }

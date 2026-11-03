@@ -19,10 +19,13 @@ function buildChart(song, duo) {
   const duet = song.tracks.length > 1;
   const tracks = duo && duet ? [[song.tracks[0], [0]], [song.tracks[1], [1]]] : [[song.tracks[0], null]];
   const notes = [];
+  const start = +song.start || 0;   // #START (ms): como la tele, las notas anteriores no se cantan
+  const endMs = parseFloat(String((song.head && song.head.END) || '0').replace(',', '.')) || 0;   // #END (ms)
   for (const [lines, fixed] of tracks) {
     lines.forEach((l, li) => {
       const parts = fixed || (duo ? [li % 2] : [0, 1]);   // canción normal en Dúo: una frase cada uno
       for (const u of l.notes) {
+        if (start && u.end <= start) continue;
         const type = u.type === 'golden' ? 'gold' : u.type === 'free' ? 'free' : u.type === 'rap' || u.type === 'rapgolden' ? 'rap' : 'n';
         const dur = Math.max(0.06, (u.end - u.start) / 1000);
         notes.push({ midi: u.midi, start: u.start / 1000, dur, type, parts, slots: type === 'free' ? 0 : Math.max(1, Math.ceil(dur / SL)) });
@@ -33,7 +36,8 @@ function buildChart(song, duo) {
   let cend = 0;
   notes.forEach((n, i) => { cend = Math.max(cend, n.start + n.dur); n.i = i; n.cend = cend; });   // fin máximo hasta aquí (para el cursor)
   const unitP = [0, 1].map(q => { let tot = 0; for (const n of notes) if (n.slots && n.parts.includes(q)) tot += n.slots * (n.type === 'gold' ? 2 : 1); return tot ? 10000 / tot : 0; });
-  const end = notes.length ? Math.max(...notes.map(n => n.start + n.dur)) : 0;
+  let end = notes.length ? Math.max(...notes.map(n => n.start + n.dur)) : 0;
+  if (endMs > 0) end = Math.min(end, endMs / 1000);
   return { notes, unitP, end };
 }
 
@@ -68,8 +72,11 @@ class Sesion {
     const s = this.singers.get(id);
     const pos = this.posAt(now);
     if (!s || pos == null) return;
-    // La tele coloca cada lectura en «reloj − (ajuste + latencia del móvil + latencia de la tele)» y la usa hasta que llega la siguiente
-    const t = pos - this.delay - Math.max(0, Math.min(2, (+lat || 0) / 1000)) - (this.clock.lat || 0);
+    s.muestras = (s.muestras || 0) + 1;
+    // La tele coloca cada lectura en «reloj − (ajuste + latencia del móvil + latencia de la tele)» y la usa hasta que
+    // llega la siguiente. Aquí posAt() ya es el reloj de la tele en este instante; la lectura le llegará a la tele media
+    // latencia más tarde y ella descuenta esa misma media latencia: se cancelan, así que no se resta otra vez.
+    const t = pos - this.delay - Math.max(0, Math.min(2, (+lat || 0) / 1000));
     if (s.last) this.cover(s, s.last, Math.min(t, s.last.t + HOLD));
     s.last = (typeof n === 'number' && isFinite(n) && v > 0.02) ? { t, n } : null;
     if (s.last) this.cover(s, s.last, t + STEP);   // lo que cubre la propia lectura al llegar
@@ -124,8 +131,8 @@ class Sesion {
   }
   // Lo que se admite guardar para lo que dice la tele, visto lo que ha visto el servidor
   verify(id, claimedScore, claimedStreak) {
-    const r = this.result(id);
-    if (!r || r.score <= 0) return null;   // no ha cantado: sin récord
+    const r = this.result(id), s = this.singers.get(id);
+    if (!r || !s || !s.muestras) return null;   // no ha mandado ni una lectura de voz: sin récord (quien canta y falla cuenta con 0)
     const score = Math.min(Math.max(0, Math.round(+claimedScore || 0)), Math.round(r.score * MARGEN.factor + MARGEN.puntos), 10000);
     const streak = Math.min(Math.max(0, Math.round(+claimedStreak || 0)), r.streak + MARGEN.racha);
     return { score, streak, visto: r };
