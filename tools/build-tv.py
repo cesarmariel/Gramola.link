@@ -184,7 +184,7 @@ GRID_HTML = """      <div style="position:absolute;left:0;top:0;height:100%;tran
           <div style="position:absolute;left:{{ g.x }}px;top:{{ g.y }}px;width:52px;height:52px;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800;color:#fff;background:{{ g.bg }}">{{ g.l }}</div>
         </sc-for>
         <sc-for list="{{ grid.tiles }}" as="s" hint-placeholder-count="10">
-          <div onClick="{{ s.click }}" onMouseEnter="{{ s.hover }}" style="position:absolute;left:{{ s.x}}px;top:{{ s.y }}px;width:{{ s.w }}px;height:{{ s.h }}px;overflow:hidden;cursor:pointer;background:{{ s.tbg }};box-shadow:{{ s.sh }};transform:{{ s.t }};z-index:{{ s.z }}">
+          <div onClick="{{ s.click }}" style="position:absolute;left:{{ s.x}}px;top:{{ s.y }}px;width:{{ s.w }}px;height:{{ s.h }}px;overflow:hidden;cursor:pointer;background:{{ s.tbg }};box-shadow:{{ s.sh }};transform:{{ s.t }};z-index:{{ s.z }}">
             <div style="position:relative;width:100%;height:{{ s.ch }}px;overflow:hidden;background:{{ s.bg }}">
               <div style="position:absolute;right:0;bottom:0;width:58%;height:46%;background:{{ s.blk }}"></div>
               <div style="position:absolute;left:6%;top:3%;font-weight:800;line-height:1;letter-spacing:-0.05em;font-size:{{ s.fs }}px;color:{{ s.fg }}">{{ s.ini }}</div>

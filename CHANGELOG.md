@@ -2,7 +2,7 @@
 
 Versiones con el esquema `1.AA.MMDD.HHMM` (fecha y hora del despliegue).
 
-## 1.26.1103.1251
+## 1.26.1103.1252
 - Rejilla de canciones: se deja como estaba antes de los cambios del desplazamiento (transición de 260 ms, repetición de teclas y cruceta de siempre, y las fichas se eligen con clic, no al pasar el ratón). Las fichas del menú sí se siguen eligiendo al pasar por encima.
 
 ## 1.26.1103.1249
