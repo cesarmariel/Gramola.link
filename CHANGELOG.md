@@ -2,6 +2,9 @@
 
 Versiones con el esquema `1.AA.MMDD.HHMM` (fecha y hora del despliegue).
 
+## 1.26.1103.1249
+- Lista de canciones más tranquila: al mantener pulsada una flecha o la cruceta avanza una ficha cada 200 ms (antes el teclado repetía unas 30 veces por segundo y la cruceta cada 110 ms) y el desplazamiento dura 520 ms.
+
 ## 1.26.1103.1240
 - La rejilla de canciones se desplaza más suave (420 ms con una curva más tendida, antes 260 ms).
 

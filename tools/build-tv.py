@@ -66,7 +66,8 @@ sub("this.pollPad(ts);\n", "this.pollPad(ts);GR.tick(this,ts);\n", name='tick')
 sub("if(!this.padKeys)for(const i in PAD_MAP){if(B[i]&&!pv[i]&&!(i>=12))this.act(PAD_MAP[i]);}",
     "if(!this.padKeys)for(const i in PAD_MAP){if(B[i]&&!pv[i]&&!(i>=12)&&GR.inAct(this,PAD_MAP[i],'pad'))this.act(PAD_MAP[i]);}", name='pad-botones')
 sub("const d=dp!=null?(this.padKeys?null:PAD_MAP[dp]):st;\n    if(d){if(this.holdDir!==d){this.holdDir=d;this.holdT=ts+380;this.act(d);}else if(ts>this.holdT){this.holdT=ts+110;this.act(d);}}else this.holdDir=null;",
-    "const d=dp!=null?(this.padKeys?null:PAD_MAP[dp]):st;const ds=dp!=null?'pad':'stick';\n    if(d){if(this.holdDir!==d){this.holdDir=d;this.holdT=ts+380;if(GR.inAct(this,d,ds))this.act(d);}else if(ts>this.holdT){this.holdT=ts+110;if(GR.inAct(this,d,ds))this.act(d);}}else this.holdDir=null;", name='pad-direcciones')
+    "const d=dp!=null?(this.padKeys?null:PAD_MAP[dp]):st;const ds=dp!=null?'pad':'stick';\n    if(d){if(this.holdDir!==d){this.holdDir=d;this.holdT=ts+380;if(GR.inAct(this,d,ds))this.act(d);}else if(ts>this.holdT){this.holdT=ts+(GR.holdStep||110);if(GR.inAct(this,d,ds))this.act(d);}}else this.holdDir=null;", name='pad-direcciones')
+sub("const a=map[e.key];if(!a)return;e.preventDefault();", "const a=map[e.key];if(!a)return;e.preventDefault();if(e.repeat){const t=performance.now();if(t-(this._repT||0)<(GR.holdStep||160))return;this._repT=t;}", name='teclas: repetición más lenta')
 sub("if(e.key.startsWith('Gamepad'))this.padKeys=true;this.act(a);}",
     "if(e.key.startsWith('Gamepad'))this.padKeys=true;if(GR.inAct(this,a,'key'))this.act(a);}", name='teclas-dedupe')
 sub("const k=Math.max(0,Math.min(1,(ts-this.bootT)/2600));", "const k=GR.bootK(ts,this.bootT);", name='arranque')
@@ -179,7 +180,7 @@ sub("Pasa el micro", "Pásalo", count=0, name='Pásalo')
 
 # --- lista de canciones en rejilla de dos filas (sin transiciones en las fichas: se reutilizan al desplazarse y
 #     una animación de color hacía parpadear en rojo la ficha que antes estaba seleccionada) (en lugar del carrusel de una en una); el resto de la pantalla igual
-GRID_HTML = """      <div style="position:absolute;left:0;top:0;height:100%;transition:transform 420ms cubic-bezier(.25,.8,.25,1);transform:translateX({{ grid.tx }}px)">
+GRID_HTML = """      <div style="position:absolute;left:0;top:0;height:100%;transition:transform 520ms cubic-bezier(.25,.8,.25,1);transform:translateX({{ grid.tx }}px)">
         <sc-for list="{{ grid.tags }}" as="g" hint-placeholder-count="3">
           <div style="position:absolute;left:{{ g.x }}px;top:{{ g.y }}px;width:52px;height:52px;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800;color:#fff;background:{{ g.bg }}">{{ g.l }}</div>
         </sc-for>

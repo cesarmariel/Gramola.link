@@ -1106,6 +1106,9 @@ window.GR = (() => {
   }
   // ------------------------------------------------------------------ rendimiento
   G.hudEvery = 0.5;
+  // Al mantener pulsada una tecla o la cruceta, una orden cada 180 ms (antes 110 ms con la cruceta y lo que repitiera
+  // el teclado, unas 30 por segundo: la lista de canciones pasaba volando)
+  G.holdStep = 200;
   let bgFrame = 0, bgDrawn = false;
   G.skipBg = c => {
     const s = c.state;
