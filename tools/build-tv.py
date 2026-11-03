@@ -179,7 +179,7 @@ sub("Pasa el micro", "Pásalo", count=0, name='Pásalo')
 
 # --- lista de canciones en rejilla de dos filas (sin transiciones en las fichas: se reutilizan al desplazarse y
 #     una animación de color hacía parpadear en rojo la ficha que antes estaba seleccionada) (en lugar del carrusel de una en una); el resto de la pantalla igual
-GRID_HTML = """      <div style="position:absolute;left:0;top:0;height:100%;transition:transform 260ms cubic-bezier(.2,.8,.2,1);transform:translateX({{ grid.tx }}px)">
+GRID_HTML = """      <div style="position:absolute;left:0;top:0;height:100%;transition:transform 420ms cubic-bezier(.25,.8,.25,1);transform:translateX({{ grid.tx }}px)">
         <sc-for list="{{ grid.tags }}" as="g" hint-placeholder-count="3">
           <div style="position:absolute;left:{{ g.x }}px;top:{{ g.y }}px;width:52px;height:52px;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800;color:#fff;background:{{ g.bg }}">{{ g.l }}</div>
         </sc-for>

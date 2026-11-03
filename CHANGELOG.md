@@ -2,6 +2,9 @@
 
 Versiones con el esquema `1.AA.MMDD.HHMM` (fecha y hora del despliegue).
 
+## 1.26.1103.1240
+- La rejilla de canciones se desplaza más suave (420 ms con una curva más tendida, antes 260 ms).
+
 ## 1.26.1103.1239
 - Créditos: «Volver» responde al clic y la rueda del ratón desplaza el texto.
 
