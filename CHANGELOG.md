@@ -2,6 +2,10 @@
 
 Versiones con el esquema `1.AA.MMDD.HHMM` (fecha y hora del despliegue).
 
+## 1.26.1103.1233
+- El clic en «Créditos» del pie de la bienvenida no abría el panel: el mismo clic subía a la pantalla y lo cerraba como si fuera «OK».
+- Rejilla de canciones con ratón: al elegir una ficha pasando por encima, la rejilla ya no se desplaza mientras la ficha se vea entera (antes se movía, la ficha de debajo del puntero cambiaba y se elegía otra, y así sin parar). Con el mando sigue desplazándose como siempre.
+
 ## 1.26.1103.1201
 - Con ratón, las fichas del menú y de la rejilla de canciones se eligen al pasar por encima (clic = entrar).
 - Canciones: al cambiar un filtro (década, idioma, género) o buscar, el avance que suena pasa a ser el de la canción que enseña la ficha (antes seguía sonando la de antes).

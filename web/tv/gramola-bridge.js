@@ -583,6 +583,7 @@ window.GR = (() => {
   { const st = document.createElement('style'); st.textContent = 'body * { cursor: inherit !important; }'; document.head.appendChild(st); }
   let mouseT = 0;
   addEventListener('mousemove', () => {
+    G.mouseAt = performance.now();
     // Durante el arranque (logo, aviso y carga) no se enseña: a partir de la bienvenida
     const c = g();
     if (!c || ['splash', 'boot'].includes(c.state.screen)) return;
@@ -659,8 +660,13 @@ window.GR = (() => {
     if (!list.length) return { tiles: [], tags: [], abc: [], tx: 0 };
     const p = L.pos[Math.min(sf, list.length - 1)] || { c: 0, r: 0 };
     const fx = L.cols[p.c].x;
-    // Desplazamiento: el foco se queda en el tercio izquierdo; sin pasarse de los bordes
-    const tx = -Math.max(0, Math.min(fx - 560, L.width - GRID.VIEW));
+    // Desplazamiento: con el mando, el foco se queda en el tercio izquierdo; sin pasarse de los bordes. Con el ratón
+    // (ficha elegida al pasar por encima) la rejilla NO se mueve mientras la ficha se vea entera: si se moviera, la
+    // ficha de debajo del puntero cambiaría y se elegiría otra, y así sin parar
+    const want = -Math.max(0, Math.min(fx - 560, L.width - GRID.VIEW));
+    let tx = want;
+    if (G.gridHover && G.gridTx != null) { const l = fx + G.gridTx, r = l + GRID.W; tx = l >= GRID.LEFT - 8 && r <= GRID.VIEW - 96 ? G.gridTx : want; }
+    G.gridTx = tx;
     const lo = -tx - 400, hi = -tx + GRID.VIEW + 400;
     const tiles = [];
     L.cols.forEach((col, ci) => {
@@ -672,7 +678,8 @@ window.GR = (() => {
           title: S.title, artist: S.artist, nw: S.isNew ? 'block' : 'none', tbg: on ? '#ec3013' : '#fff', c1: on ? '#fff' : '#201e1d', c2: on ? 'rgba(255,255,255,.85)' : '#6b6767',
           sh: on ? '0 14px 34px rgba(32,30,29,.28)' : '0 1px 0 rgba(32,30,29,.08)', t: on ? 'scale(1.06)' : 'scale(1)', z: on ? 5 : 1,
           click: () => { if (on) c.startSetup(); else c.setState({ songF: i, zone: 'grid' }); },
-          hover: () => { if (!on || s.zone !== 'grid') c.setState({ songF: i, zone: 'grid' }); } });   // (ratón: la ficha se elige al pasar por encima)
+          // Ratón: la ficha se elige al pasar por encima (y la rejilla no se desplaza mientras se vea entera: ver arriba)
+          hover: () => { if (on && s.zone === 'grid') return; G.gridHover = true; c.setState({ songF: i, zone: 'grid' }); } });
       });
     });
     const curTag = L.tags.filter(t => t.col <= p.c).pop();
@@ -682,6 +689,7 @@ window.GR = (() => {
   };
   // Movimiento del foco en la rejilla; null = no lo gestiona (↑ desde la fila de arriba → filtros)
   G.gridMove = (c, list, sf, a) => {
+    G.gridHover = false;   // (con el mando vuelve el desplazamiento normal)
     if (!list.length || !'lrud'.includes(a)) return null;
     const L = gridLayout(list, c.state.ord), p = L.pos[Math.min(sf, list.length - 1)];
     if (!p) return null;

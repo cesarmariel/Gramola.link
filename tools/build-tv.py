@@ -237,7 +237,7 @@ sub(r'(<img src="assets/nuvola/nuvola-blanco\.png"[^\n]*\n    </div>\n  </div>\n
 # --- ayudas de botones según el mando conectado (PlayStation ✕○□△, Xbox ABXY, o las del diseño)
 GK = {'OK': 'ok', '←': 'back', 'X': 'x', 'Y': 'y', 'L': 'l', 'R': 'r', 'L R': 'lr', '≡': 'menu'}
 sub(r'((?:min-width|width):4[48]px;height:4[48]px;[^>]*>)(OK|←|X|Y|L|R|L R|≡)(</div>)', lambda m: m.group(1) + '{{ gk.' + GK[m.group(2)] + ' }}' + m.group(3), regex=True, count=0, name='ayudas: símbolos')
-sub("V.isSplash=s.screen==='splash';", "V.gk=GR.gk();V.isSplash=s.screen==='splash';", name='ayudas: datos')
+sub("V.isSplash=s.screen==='splash';", "V.gk=GR.gk();V.onCredits=e=>{if(e&&e.stopPropagation)e.stopPropagation();GR.creditsOpen(this);};V.isSplash=s.screen==='splash';", name='ayudas: datos')
 sub("if(!this._pressEl){const h=React.createElement;this._pressEl=", "if(!this._pressEl||this._pressGk!==GR.gk().ok){this._pressGk=GR.gk().ok;const h=React.createElement;this._pressEl=", name='ayudas: pulsa')
 sub("fontSize:26,fontWeight:800}},'OK'),h('span',null,'para continuar')", "fontSize:26,fontWeight:800}},GR.gk().ok),h('span',null,'para continuar')", name='ayudas: pulsa OK')
 
@@ -272,7 +272,7 @@ sub('\n    <div style="font-size:40px;font-weight:300;letter-spacing:-0.01em">Ka
 VERSION = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'VERSION')).read().strip()
 sub('<span style="color:var(--color-neutral-700)">Versión 1.0.0</span>',
     f'<span style="color:var(--color-neutral-700);font-size:22px;font-weight:500;justify-self:center">{VERSION}</span>'
-    '<span style="justify-self:end;display:flex;align-items:center;gap:12px;font-size:24px;font-weight:600;color:var(--color-neutral-700)">'
+    '<span onClick="{{ onCredits }}" style="justify-self:end;display:flex;align-items:center;gap:12px;font-size:24px;font-weight:600;color:var(--color-neutral-700)">'
     '<span style="width:40px;height:40px;border-radius:50%;border:2px solid var(--color-text);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:var(--color-text)">{{ gk.y }}</span>Créditos</span>', name='versión')
 # …y la misma versión en la insignia del README (así el repo muestra siempre la versión desplegada)
 _readme = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'README.md')
