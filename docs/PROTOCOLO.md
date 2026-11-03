@@ -46,6 +46,12 @@ Máximo 8 jugadores; mensajes de 16 KB; códigos consonante-vocal-consonante-voc
 la sala dura 15 min sin tele; ping de WebSocket cada 25 s; como mucho 500 salas abiertas a la vez (hay 6.390 códigos;
 con el tope nunca se agotan y el servidor no se puede quedar colgado buscando uno libre).
 
+El WebSocket solo se acepta desde la propia web (`Origin` del mismo dominio, con `micro.`/`admin.`/`www.`, o
+`localhost` en pruebas; sin `Origin` también, para clientes que no son navegador): una página ajena no puede usar los
+navegadores de sus visitantes para abrir salas. Como mucho 300 sockets a la vez por dirección IP y 300 mensajes por
+segundo por socket. Los nombres de jugador se limpian de caracteres de control e invisibles (anchura cero, marcas
+bidi) y un nombre como `__proto__` o `constructor` no toca el prototipo de los objetos de récords.
+
 Las rutas se descodifican y normalizan una sola vez antes de mirar permisos: `/%73ongs/…`, `//songs/…` o
 `/app/../songs/…` son `/songs/…` y piden el pase de tele igual. Cualquier error no previsto en una petición responde
 500 sin tumbar el servidor (una cookie mal codificada o un cuerpo JSON que no sea un objeto dan 400 o se ignoran).

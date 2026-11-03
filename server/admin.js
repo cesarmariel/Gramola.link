@@ -459,7 +459,7 @@ module.exports = function admin(ctx) {
     const p = roomOf(m[1]).players.get(+m[2]);
     if (!p || !p.photo) throw httpErr(404, 'Sin foto');
     const buf = Buffer.from(p.photo.split(',')[1], 'base64');
-    res.writeHead(200, { 'content-type': 'image/jpeg', 'cache-control': 'no-store' });
+    res.writeHead(200, { 'content-type': 'image/jpeg', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'" });
     res.end(buf);
   });
   on('POST', '/broadcast', async (req, res) => {
@@ -938,7 +938,7 @@ module.exports = function admin(ctx) {
       const u = new URL(String(b.url || ''));
       const src = /(^|\.)mzstatic\.com$/.test(u.hostname) ? 'itunes' : /(^|\.)dzcdn\.net$/.test(u.hostname) ? 'deezer' : null;
       if (u.protocol !== 'https:' || !src) throw httpErr(400, 'Solo portadas de iTunes o Deezer');
-      const r = await fetch(u, { signal: AbortSignal.timeout(20000) });
+      const r = await fetch(u, { signal: AbortSignal.timeout(20000), redirect: 'error' });   // (sin seguir redirecciones: la portada viene de donde se ha dicho)
       if (!r.ok) throw httpErr(502, 'No se pudo descargar la portada');
       const buf = Buffer.from(await r.arrayBuffer());
       if (buf.length < 2000 || buf.length > 8e6) throw httpErr(502, 'La portada descargada no es válida');

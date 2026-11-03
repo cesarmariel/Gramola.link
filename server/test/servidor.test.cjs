@@ -90,6 +90,18 @@ test('las canciones solo se sirven con pase de tele, también con rutas codifica
   assert.equal((await raw('/')).status, 200);
 });
 
+test('un WebSocket abierto desde otra web se rechaza; desde la propia web o sin Origin, no', async () => {
+  const intento = headers => new Promise(resolve => {
+    const s = new WebSocket(`ws://127.0.0.1:${port}/ws`, { headers }); sockets.push(s);
+    s.on('open', () => resolve('abierto')); s.on('unexpected-response', (_, res) => resolve('rechazado ' + res.statusCode)); s.on('error', e => resolve('error ' + e.message));
+  });
+  assert.match(await intento({ origin: 'https://malo.example' }), /^rechazado|^error/);
+  assert.equal(await intento({ origin: `http://localhost:${port}` }), 'abierto');
+  assert.equal(await intento({ origin: 'https://micro.gramola.test', host: 'gramola.test' }), 'abierto');
+  assert.equal(await intento({}), 'abierto');
+  await vivo();
+});
+
 test('la telemetría solo la manda una tele con sala y solo la ve el admin', async () => {
   assert.equal((await raw('/api/telemetry', {}, 'POST', '{"fps":60}')).status, 403);
   assert.equal((await raw('/api/telemetry')).status, 401);

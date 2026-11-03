@@ -142,27 +142,30 @@ function saveRecords() {
   fs.renameSync(tmp, RECORDS_FILE);
 }
 
-const clean = (s, n) => String(s || '').replace(/[\u0000-\u001f]/g, '').trim().slice(0, n);
+// Texto de usuario: sin caracteres de control ni invisibles (anchura cero, marcas de dirección bidi: un nombre que
+// parece vacío o que se escribe al revés), recortado
+const clean = (s, n) => String(s || '').replace(/[\u0000-\u001f\u007f​-‏‪-‮⁦-⁩﻿]/g, '').trim().slice(0, n);
+const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);   // (un cantante llamado «constructor» no toca el prototipo)
 
 function addRecord(body) {
   const songId = clean(body.song, 200);
   if (!songId || !Array.isArray(body.players)) return null;
   const now = new Date().toISOString().slice(0, 10);
-  const best = records.songs[songId] || null;
+  const best = own(records.songs, songId) ? records.songs[songId] : null;
   let isNew = false;
-  records.plays[songId] = (records.plays[songId] || 0) + 1;
+  records.plays[songId] = (own(records.plays, songId) ? records.plays[songId] : 0) + 1;
   for (const p of body.players.slice(0, MAX_PLAYERS)) {
     if (!p || typeof p !== 'object') continue;
     const name = clean(p.name, 16);
     const score = Math.max(0, Math.min(10000, Math.round(+p.score || 0)));
     const streak = Math.max(0, Math.min(10000, Math.round(+p.streak || 0)));
-    if (!name || p.bot) continue;
-    const s = records.singers[name] || { songs: 0, best: 0, streak: 0 };
+    if (!name || p.bot || name === '__proto__') continue;
+    const s = own(records.singers, name) ? records.singers[name] : { songs: 0, best: 0, streak: 0 };
     s.songs++;
     s.best = Math.max(s.best, score);
     s.streak = Math.max(s.streak, streak);
     records.singers[name] = s;
-    const cur = records.songs[songId];
+    const cur = own(records.songs, songId) ? records.songs[songId] : null;
     if (!cur || score > cur.score) {
       records.songs[songId] = { score, name, date: now, title: clean(body.title, 80), artist: clean(body.artist, 80) };
       if (score > 0) isNew = true;
@@ -244,8 +247,10 @@ setInterval(() => {
 
 // ======================================================================= HTTP
 const telemetry = [];
+// Cabeceras de seguridad comunes a todo lo que sirve Node (la tele y el móvil usan micro y cámara; nada más)
+const SEG = { 'x-content-type-options': 'nosniff', 'referrer-policy': 'strict-origin-when-cross-origin', 'permissions-policy': 'microphone=(self), camera=(self), geolocation=(), payment=(), usb=()' };
 function json(res, code, data) {
-  res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+  res.writeHead(code, { ...SEG, 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
   res.end(JSON.stringify(data));
 }
 
@@ -438,9 +443,8 @@ function serveStatic(req, res, pathname) {
     const type = MIME[path.extname(file).toLowerCase()] || 'application/octet-stream';
     const long = /\/assets\/|\/audio\//.test(rel) || isSong;
     const headers = {
-      'content-type': type, 'accept-ranges': 'bytes',
+      ...SEG, 'content-type': type, 'accept-ranges': 'bytes',
       'cache-control': type.startsWith('text/html') || type.startsWith('text/javascript') ? 'no-cache' : long ? 'public, max-age=86400' : 'public, max-age=300',
-      'x-content-type-options': 'nosniff',
     };
     const m = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
     if (m && (m[1] || m[2])) {
@@ -465,10 +469,32 @@ function serveStatic(req, res, pathname) {
 }
 
 // ======================================================================= WebSocket
-const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 64 * 1024 });   // (la foto del jugador ~10 KB)
+// Solo se aceptan sockets abiertos desde la propia web (tele, micro o admin del mismo dominio, o pruebas en local):
+// una página ajena no puede usar los navegadores de sus visitantes para abrir salas o entrar en ellas.
+// (los clientes que no son navegador no mandan Origin: se admiten)
+function origenPermitido(req) {
+  const o = String(req.headers.origin || '');
+  if (!o) return true;
+  let h;
+  try { h = new URL(o).hostname.toLowerCase(); } catch { return false; }
+  if (/^(localhost|127\.0\.0\.1|\d+\.\d+\.\d+\.\d+)$/.test(h) || h.endsWith('.localhost')) return true;
+  const base = String(req.headers.host || '').toLowerCase().split(':')[0].replace(/^(www|micro|admin)\./, '');
+  return !!base && (h === base || h.endsWith('.' + base));
+}
+// Conexiones a la vez por dirección IP (según Cloudflare): un local con 20 teles y 160 móviles entra de sobra
+const MAX_WS_POR_IP = 300;
+const wsPorIp = new Map();
+const ipDe = req => String(req.headers['cf-connecting-ip'] || req.socket.remoteAddress || '');
+const wss = new WebSocketServer({
+  server, path: '/ws', maxPayload: 64 * 1024,   // (la foto del jugador ~10 KB)
+  verifyClient: ({ req }) => origenPermitido(req) && (wsPorIp.get(ipDe(req)) || 0) < MAX_WS_POR_IP,
+});
 
 wss.on('connection', (ws, req) => {
   ws.isAlive = true;
+  const ip = ipDe(req);
+  wsPorIp.set(ip, (wsPorIp.get(ip) || 0) + 1);
+  ws.once('close', () => { const n = (wsPorIp.get(ip) || 1) - 1; if (n <= 0) wsPorIp.delete(ip); else wsPorIp.set(ip, n); });
   // Para el admin: de dónde se conecta (país según Cloudflare) y con qué aparato
   ws.info = { country: String(req.headers['cf-ipcountry'] || ''), ua: String(req.headers['user-agent'] || '').slice(0, 200), at: Date.now() };
   ws.on('pong', () => { ws.isAlive = true; });
