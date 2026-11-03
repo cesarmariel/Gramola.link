@@ -2,6 +2,9 @@
 
 Versiones con el esquema `1.AA.MMDD.HHMM` (fecha y hora del despliegue).
 
+## 1.26.1103.1251
+- Rejilla de canciones: se deja como estaba antes de los cambios del desplazamiento (transición de 260 ms, repetición de teclas y cruceta de siempre, y las fichas se eligen con clic, no al pasar el ratón). Las fichas del menú sí se siguen eligiendo al pasar por encima.
+
 ## 1.26.1103.1249
 - Lista de canciones más tranquila: al mantener pulsada una flecha o la cruceta avanza una ficha cada 200 ms (antes el teclado repetía unas 30 veces por segundo y la cruceta cada 110 ms) y el desplazamiento dura 520 ms.
 

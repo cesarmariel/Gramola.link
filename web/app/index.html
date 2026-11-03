@@ -8,7 +8,7 @@
 <link rel="apple-touch-icon" href="/assets/iconos/favicon-180.png">
 <style>html,body{margin:0;background:#0e0f0f;overflow:hidden;cursor:none}</style>
 <script src="/vendor/qrcode.js"></script>
-<script src="/tv/gramola-bridge.js?v=1.26.1103.1249"></script>
+<script src="/tv/gramola-bridge.js?v=1.26.1103.1251"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="./support.js"></script>
@@ -60,7 +60,7 @@ a{color:var(--color-accent-700)}a:hover{color:var(--color-accent-600)}
   <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;border-top:2px solid var(--color-text);padding-top:20px;font-size:28px;font-weight:600">
     <img src="assets/nuvola/nuvola-tinta.png" alt="nuvola" style="display:block;height:44px;width:auto;position:relative;top:-7px">
     
-    <span style="color:var(--color-neutral-700);font-size:22px;font-weight:500;justify-self:center">1.26.1103.1249</span><span onClick="{{ onCredits }}" style="justify-self:end;display:flex;align-items:center;gap:12px;font-size:24px;font-weight:600;color:var(--color-neutral-700)"><span style="width:40px;height:40px;border-radius:50%;border:2px solid var(--color-text);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:var(--color-text)">{{ gk.y }}</span>Créditos</span>
+    <span style="color:var(--color-neutral-700);font-size:22px;font-weight:500;justify-self:center">1.26.1103.1251</span><span onClick="{{ onCredits }}" style="justify-self:end;display:flex;align-items:center;gap:12px;font-size:24px;font-weight:600;color:var(--color-neutral-700)"><span style="width:40px;height:40px;border-radius:50%;border:2px solid var(--color-text);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:var(--color-text)">{{ gk.y }}</span>Créditos</span>
   </div>
 </div>
 </sc-if>
@@ -183,7 +183,7 @@ a{color:var(--color-accent-700)}a:hover{color:var(--color-accent-600)}
   </div>
   <sc-if value="{{ hasSongs }}" hint-placeholder-val="{{ true }}">
     <div style="position:relative;flex:1;min-height:0;margin:24px -96px 0;overflow:hidden;-webkit-mask-image:linear-gradient(to right,transparent 0,#000 120px,#000 calc(100% - 120px),transparent 100%);mask-image:linear-gradient(to right,transparent 0,#000 120px,#000 calc(100% - 120px),transparent 100%)">
-      <div style="position:absolute;left:0;top:0;height:100%;transition:transform 520ms cubic-bezier(.25,.8,.25,1);transform:translateX({{ grid.tx }}px)">
+      <div style="position:absolute;left:0;top:0;height:100%;transition:transform 260ms cubic-bezier(.2,.8,.2,1);transform:translateX({{ grid.tx }}px)">
         <sc-for list="{{ grid.tags }}" as="g" hint-placeholder-count="3">
           <div style="position:absolute;left:{{ g.x }}px;top:{{ g.y }}px;width:52px;height:52px;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800;color:#fff;background:{{ g.bg }}">{{ g.l }}</div>
         </sc-for>
@@ -692,7 +692,7 @@ class Component extends DCLogic {
   pollPad(ts){let pads=[];try{pads=navigator.getGamepads?[...navigator.getGamepads()]:[];}catch(e){return;}const p=pads.find(Boolean);if(!p){this.padOn=false;return;}if(!this.padOn){this.padOn=true;this.toast('Mando conectado');}
     const B=p.buttons.map(b=>b.pressed),ax=p.axes||[],pv=this.prevB||[];if(!this.padKeys)for(const i in PAD_MAP){if(B[i]&&!pv[i]&&!(i>=12)&&GR.inAct(this,PAD_MAP[i],'pad'))this.act(PAD_MAP[i]);}
     const dp=[12,13,14,15].find(i=>B[i]);const st=Math.abs(ax[0]||0)>Math.abs(ax[1]||0)?((ax[0]||0)<-0.5?'l':(ax[0]||0)>0.5?'r':null):((ax[1]||0)<-0.5?'u':(ax[1]||0)>0.5?'d':null);const d=dp!=null?(this.padKeys?null:PAD_MAP[dp]):st;const ds=dp!=null?'pad':'stick';
-    if(d){if(this.holdDir!==d){this.holdDir=d;this.holdT=ts+380;if(GR.inAct(this,d,ds))this.act(d);}else if(ts>this.holdT){this.holdT=ts+(GR.holdStep||110);if(GR.inAct(this,d,ds))this.act(d);}}else this.holdDir=null;this.prevB=B;}
+    if(d){if(this.holdDir!==d){this.holdDir=d;this.holdT=ts+380;if(GR.inAct(this,d,ds))this.act(d);}else if(ts>this.holdT){this.holdT=ts+110;if(GR.inAct(this,d,ds))this.act(d);}}else this.holdDir=null;this.prevB=B;}
   applyErr(){const m={'Sin conexión':'server','Sala perdida':'lost','Canción no disponible':'song','Sala llena':'full','Micro desconectado':'mic'};this.setState({err:m[this.props.errorPreview]||null,errBusy:false});}
   errAct(){if(GR.errAct)return GR.errAct(this);const e=this.state.err;if(this.state.errBusy)return;if(e==='server'||e==='lost'){this.setState({errBusy:true});setTimeout(()=>{this.setState({err:null,errBusy:false});this.toast('Conexión recuperada');},1600);}else{this.setState({err:null});if(e==='song')this.go('songs');}}
   componentWillUnmount(){clearInterval(this.bTimer);clearTimeout(this.spT);this.ro&&this.ro.disconnect();cancelAnimationFrame(this.raf);window.removeEventListener('resize',this.onResize);window.removeEventListener('keydown',this.onKeyH);(clearTimeout(this.cWait),clearInterval(this.cTimer));}
@@ -799,7 +799,7 @@ class Component extends DCLogic {
   filterAct(i){const s=this.state;if(i===0)return this.setState({search:{open:true,f:0}});const up={songF:0};if(i===1)up.ord=(s.ord+1)%ORDERS.length;else if(i===2)up.lng=(s.lng+1)%LANGS.length;else if(i===3)up.dec=(s.dec+1)%DECS.length;else if(i===4)up.gen=(s.gen+1)%GENS.length;else up.duoOnly=!s.duoOnly;this.setState(up);}
   setupToggle(i){if(this.isOff(i)){this.toast(PLAYERS[i][0]+' no tiene el micro conectado');return;}const m=this.state.mode;this.setState(s=>({setup:s.setup.map((r,j)=>j!==i?r:m==='sing'?{...r,on:!r.on}:{...r,side:r.side===0?2:r.side===2?1:0})}));}
   setupDiff(i,d){this.setState(s=>({setup:s.setup.map((r,j)=>j===i?{...r,diff:Math.max(0,Math.min(2,r.diff+d))}:r)}));}
-  onKey(e){const map={ArrowLeft:'l',ArrowRight:'r',ArrowUp:'u',ArrowDown:'d',Enter:'ok',' ':'ok',Escape:'back',Backspace:'back',p:'menu',P:'menu',m:'menu',M:'menu',v:'v',V:'v',j:'add',J:'add','+':'add','-':'rem',q:'lb',Q:'lb',e:'rb',E:'rb',x:'x',X:'x',y:'y',Y:'y',GamepadA:'ok',GamepadB:'back',GamepadX:'x',GamepadY:'y',GamepadMenu:'menu',GamepadView:'v',GamepadLeftShoulder:'lb',GamepadRightShoulder:'rb',GamepadDPadUp:'u',GamepadDPadDown:'d',GamepadDPadLeft:'l',GamepadDPadRight:'r',GamepadLeftThumbstickUp:'u',GamepadLeftThumbstickDown:'d',GamepadLeftThumbstickLeft:'l',GamepadLeftThumbstickRight:'r'};const a=map[e.key];if(!a)return;e.preventDefault();if(e.repeat){const t=performance.now();if(t-(this._repT||0)<(GR.holdStep||160))return;this._repT=t;}if(e.key.startsWith('Gamepad'))this.padKeys=true;if(GR.inAct(this,a,'key'))this.act(a);}
+  onKey(e){const map={ArrowLeft:'l',ArrowRight:'r',ArrowUp:'u',ArrowDown:'d',Enter:'ok',' ':'ok',Escape:'back',Backspace:'back',p:'menu',P:'menu',m:'menu',M:'menu',v:'v',V:'v',j:'add',J:'add','+':'add','-':'rem',q:'lb',Q:'lb',e:'rb',E:'rb',x:'x',X:'x',y:'y',Y:'y',GamepadA:'ok',GamepadB:'back',GamepadX:'x',GamepadY:'y',GamepadMenu:'menu',GamepadView:'v',GamepadLeftShoulder:'lb',GamepadRightShoulder:'rb',GamepadDPadUp:'u',GamepadDPadDown:'d',GamepadDPadLeft:'l',GamepadDPadRight:'r',GamepadLeftThumbstickUp:'u',GamepadLeftThumbstickDown:'d',GamepadLeftThumbstickLeft:'l',GamepadLeftThumbstickRight:'r'};const a=map[e.key];if(!a)return;e.preventDefault();if(e.key.startsWith('Gamepad'))this.padKeys=true;if(GR.inAct(this,a,'key'))this.act(a);}
   act(a){const s=this.state;if(!s.err&&(GR.creditsKey(this,a)||GR.megaKey(this,a)))return;GR.navBefore(this,a);
     if(s.err){if(a==='ok'||a==='back')this.errAct();return;}
     if(s.screen==='splash'||s.screen==='boot')return;if(s.screen==='welcome'){if(a==='ok')this.go('lobby');else if(a==='y'||a==='x')GR.creditsOpen(this);return;}
