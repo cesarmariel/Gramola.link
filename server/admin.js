@@ -453,8 +453,14 @@ module.exports = function admin(ctx) {
     ev('admin', `Mensaje a la sala ${r.code}: «${text}»`);
     json(res, 200, { ok: true });
   });
-  on('POST', '/rooms/([A-Z]{4})/reload', (req, res, m) => {
-    const r = roomOf(m[1]);
+  on('POST', '/rooms/([A-Z]{4})/reload', async (req, res, m) => {
+    const r = roomOf(m[1]), b = await body(req);
+    if (b.phones) {   // los móviles de la sala (tras un despliegue del micro)
+      let n = 0;
+      for (const p of r.players.values()) if (p.ws) { ctx.sendTo(p.ws, { type: 'admin', action: 'reload' }); n++; }
+      ev('admin', `Recarga de ${n} móviles de la sala ${r.code}`);
+      return json(res, 200, { ok: true, phones: n });
+    }
     if (!r.host) throw httpErr(400, 'La tele de esa sala no está conectada');
     ctx.sendTo(r.host, { type: 'admin', action: 'reload' });
     ev('admin', `Recarga de la tele de la sala ${r.code}`);

@@ -263,6 +263,7 @@
       try {
         if (a === 'close') { if (await ask(`¿Cerrar la sala ${code}?`, 'La tele y todos los móviles salen de la sala.')) { await api(`/rooms/${code}/close`, { method: 'POST', json: {} }); toast('Sala cerrada'); } }
         else if (a === 'reload') { await api(`/rooms/${code}/reload`, { method: 'POST', json: {} }); toast('Recargando la tele'); }
+        else if (a === 'reload-ph') { if (await ask('¿Recargar los móviles de esta sala?', 'Cada móvil vuelve a cargar la app (un par de segundos) y entra solo en la sala.')) { const r = await api(`/rooms/${code}/reload`, { method: 'POST', json: { phones: true } }); toast(`Recargando ${r.phones} móviles`); } }
         else if (a === 'kick') { if (await ask(`¿Echar a ${b.dataset.name}?`, 'Su móvil sale de la sala; puede volver a entrar con el código.')) { await api(`/rooms/${code}/kick`, { method: 'POST', json: { p: +b.dataset.p } }); toast('Fuera'); } }
         else if (a === 'msg') {
           const t = await prompt2(`Mensaje a la sala ${code}`, 'Aparece en la tele (y en los móviles)', '', 'Enviar');
@@ -299,7 +300,7 @@
         ${p.singing ? `<span class="vu" title="Volumen"><i style="width:${Math.min(100, (p.vol || 0) * 250)}%"></i></span>` : ''}
         ${p.photo ? `<button class="btn sm ghost" data-a="photo" data-code="${r.code}" data-p="${p.id}" data-name="${esc(p.name)}">Foto</button>` : ''}
         <button class="btn sm danger" data-a="kick" data-code="${r.code}" data-p="${p.id}" data-name="${esc(p.name)}">Echar</button></div>`).join('') || '<div class="pl muted small">Sin jugadores todavía</div>'}
-      <div class="room-a"><button class="btn sm" data-a="msg" data-code="${r.code}">Mensaje</button><button class="btn sm" data-a="reload" data-code="${r.code}" ${r.hostOnline ? '' : 'disabled'}>Recargar la tele</button><button class="btn sm danger" data-a="close" data-code="${r.code}">Cerrar sala</button></div>
+      <div class="room-a"><button class="btn sm" data-a="msg" data-code="${r.code}">Mensaje</button><button class="btn sm" data-a="reload" data-code="${r.code}" ${r.hostOnline ? '' : 'disabled'}>Recargar la tele</button><button class="btn sm" data-a="reload-ph" data-code="${r.code}" ${r.players.some(p => p.online) ? '' : 'disabled'}>Recargar móviles</button><button class="btn sm danger" data-a="close" data-code="${r.code}">Cerrar sala</button></div>
     </div>`;
   }
 

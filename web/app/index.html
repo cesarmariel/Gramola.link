@@ -8,7 +8,7 @@
 <link rel="apple-touch-icon" href="/assets/iconos/favicon-180.png">
 <style>html,body{margin:0;background:#0e0f0f;overflow:hidden;cursor:none}</style>
 <script src="/vendor/qrcode.js"></script>
-<script src="/tv/gramola-bridge.js?v=1.26.1103.1102"></script>
+<script src="/tv/gramola-bridge.js?v=1.26.1103.1109"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="./support.js"></script>
@@ -60,7 +60,7 @@ a{color:var(--color-accent-700)}a:hover{color:var(--color-accent-600)}
   <div style="display:flex;justify-content:space-between;align-items:center;border-top:2px solid var(--color-text);padding-top:20px;font-size:28px;font-weight:600">
     <img src="assets/nuvola/nuvola-tinta.png" alt="nuvola" style="display:block;height:44px;width:auto;position:relative;top:-7px">
     
-    <span style="color:var(--color-neutral-700)">Versión 1.26.1103.1102</span>
+    <span style="color:var(--color-neutral-700)">Versión 1.26.1103.1109</span>
   </div>
 </div>
 </sc-if>
@@ -1093,7 +1093,7 @@ class Component extends DCLogic {
     const chipLab=['Buscar'+(s.query?' · «'+s.query+'»':''),'Orden · '+ORDERS[s.ord],'Idioma · '+LANGS[s.lng],'Década · '+(s.dec?'Años '+DECS[s.dec]:'Todas'),'Género · '+GENS[s.gen]],chipAct=[!!s.query,false,s.lng>0,s.dec>0,s.gen>0];
     const filters=chipLab.map((label,i)=>{const on=s.zone==='filters'&&s.filterF===i,act=chipAct[i];return {label,bg:on?C.red:act?C.ink:'transparent',fg:on||act?'#fff':C.ink,ol:'none',click:()=>{this.setState({zone:'filters',filterF:i});this.filterAct(i);}};});
     const CW=[440,280,200,150],CO=[0,400,660,860],COP=[1,0.9,0.7,0.45];
-    const covers=list.map((so,i)=>{const d=i-sf,ad=Math.min(Math.abs(d),4),on=d===0,gz=s.zone==='grid';const w=CW[Math.min(ad,3)],off=ad>3?1000:CO[ad];return {left:Math.round(960+Math.sign(d)*off-w/2),w,mt:-Math.round(w/2),op:ad>3?0:COP[ad],z:10-ad,s:on&&gz?SHADOW:'none',ol:on&&gz?'6px solid #ec3013':'0 solid transparent',bg:so.cv[0],blk:so.cv[1],fg:so.cv[2],ini:ini(so.title),fs:Math.round(w*0.24),duo:so.duo,click:()=>{if(on&&s.zone==='grid')this.startSetup();else this.setState({songF:i,zone:'grid'});}};});
+    const covers=[],_coversNo=((so,i)=>{const d=i-sf,ad=Math.min(Math.abs(d),4),on=d===0,gz=s.zone==='grid';const w=CW[Math.min(ad,3)],off=ad>3?1000:CO[ad];return {left:Math.round(960+Math.sign(d)*off-w/2),w,mt:-Math.round(w/2),op:ad>3?0:COP[ad],z:10-ad,s:on&&gz?SHADOW:'none',ol:on&&gz?'6px solid #ec3013':'0 solid transparent',bg:so.cv[0],blk:so.cv[1],fg:so.cv[2],ini:ini(so.title),fs:Math.round(w*0.24),duo:so.duo,click:()=>{if(on&&s.zone==='grid')this.startSetup();else this.setState({songF:i,zone:'grid'});}};});
     const cs=s.screen==='songs'?(list[sf]||SONGS[0]):(GR.megaCard(s)||SONGS[s.songSel]||SONGS[0]);
     const cur={tfs:GR.fitTitle(cs.title),title:cs.title,artist:cs.artist,durYear:cs.dur+' · '+cs.year,lang:cs.lang+(cs.duo?' · Dúo':''),diff:[1,2,3].map(k=>({c:k<=cs.diff?C.ink:C.n3})),record:cs.rec,bg:cs.cv[0],blk:cs.cv[1],fg:cs.cv[2],ini:ini(cs.title)};
     const N=s.setup.length;

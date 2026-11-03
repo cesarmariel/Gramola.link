@@ -311,6 +311,9 @@ sub("this.P({step:'roulette'});}else if(a==='back')this.go('menu');}",
     "this.P({step:'roulette',rounds:p.nT*Math.max(...[...Array(p.nT).keys()].map(t=>this.teamIds(p,t).length))});}else if(a==='back')this.go('menu');}", name='Pásalo: rondas')
 # Fin de canción con la biblioteca recargada a medias (sala perdida): la canción puede no estar en su índice
 sub("const song=SONGS[this.state.songSel];const recN=", "const song=SONGS[this.state.songSel]||{rec:'—'};const recN=", name='fin: canción desaparecida')
+# El carrusel «covers» del diseño ya no se usa (lo sustituye la rejilla): no se calcula en cada render (un objeto con
+# cierre por canción en cada toast o tic de marcador, también cantando)
+sub("const covers=list.map((so,i)=>{", "const covers=[],_coversNo=((so,i)=>{", name='sin carrusel de portadas')
 # La lista de canciones filtrada y ordenada se calcula solo cuando cambia algo (antes, en cada render, también cantando)
 sub("  songsList(){const s=this.state;let l=SONGS.filter(x=>x.id);",
     "  songsList(){const s=this.state;const key=[SONGS.length,GR.songsRev||0,s.query||'',s.lng,s.dec,s.gen,s.duoOnly?1:0,s.ord].join('|');if(this._sl&&this._sl.key===key)return this._sl.list;const list=this.songsList0();this._sl={key,list};return list;}\n  songsList0(){const s=this.state;let l=SONGS.filter(x=>x.id);", name='lista de canciones memorizada')

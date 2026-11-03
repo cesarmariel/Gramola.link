@@ -147,6 +147,8 @@ function onMessage(m) {
     }
     return;
   }
+  // Orden desde la administración: recargar la app (tras un despliegue)
+  if (m.type === 'admin' && m.action === 'reload') { setTimeout(() => location.reload(), 300 + Math.random() * 1500); return; }
   // Aviso desde la administración: una franja arriba unos segundos
   if (m.type === 'admin' && m.action === 'toast' && m.text) {
     let el = document.getElementById('g-aviso');

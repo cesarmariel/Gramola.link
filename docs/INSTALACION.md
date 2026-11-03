@@ -17,6 +17,10 @@ npm test                  # pruebas del servidor (arranca uno aparte con datos t
 
 ## Despliegue, copias y datos
 
+- La versión sigue el esquema `1.AA.MMDD.HHMM` con la hora real del despliegue y se pone en todos los sitios de una
+  vez con `python3 tools/version.py 1.26.1103.1102` (VERSION, insignia del README, página de la tele, `?v=` del
+  móvil y nombre de la caché de su service worker). `deploy.sh` no despliega si no coinciden.
+
 - `deploy/deploy.sh` comprueba la sintaxis, espera hasta 90 s a que nadie esté cantando (`DEPLOY_FORCE=1` lo salta),
   instala las dependencias en una copia (`server.new`) y solo entonces cambia de carpeta y reinicia: un fallo de `npm`
   nunca deja el servicio sin arrancar. Al parar, el servidor guarda las salas en `data/salas.json` y las restaura al

@@ -419,7 +419,11 @@ window.GR = (() => {
         // Versión borrosa con desenfoque de verdad (no una miniatura ampliada, que se ve pixelada)
         const bl = document.createElement('canvas'); bl.width = bl.height = 160; const bx = bl.getContext('2d');
         bx.filter = 'blur(7px)'; bx.drawImage(img, -16, -16, 192, 192); bx.filter = 'none';
-        bv.covers.push({ img, bl });
+        // Se guarda una copia a 320 px (como mucho se dibuja a ese tamaño), no la imagen entera: 90 portadas de
+        // 600-1000 px descodificadas eran decenas de MB vivos para siempre en la tele
+        const sm = document.createElement('canvas'); sm.width = sm.height = 320; sm.getContext('2d').drawImage(img, 0, 0, 320, 320);
+        img.src = '';
+        bv.covers.push({ img: sm, bl });
       };
       img.src = u;
     });
@@ -1703,6 +1707,9 @@ window.GR = (() => {
   G.tick = (c, ts) => {
     G.g = c;
     timeMethods(c);
+    // El selector del Megamix va por encima del diseño: mientras haya un aviso (sala llena, micro…) se esconde para
+    // que el aviso se vea y se pueda cerrar; al cerrarlo vuelve
+    if (megaUI) { const esc = c.state.err ? 'hidden' : ''; if (megaUI.el.style.visibility !== esc) megaUI.el.style.visibility = esc; }
     if (!c.__lanes) {
       c.__lanes = true;
       c.drawLaneC = function (cx, L, part, ks) { return G.pageLane.call(c, cx, L, part, ks, false); };

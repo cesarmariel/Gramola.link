@@ -13,6 +13,8 @@ source deploy/deploy.env
 SSH="ssh ${DEPLOY_SSH_OPTS:-}"
 
 for f in server/server.js server/admin.js server/puntuacion.js; do node --check "$f"; done
+# La misma versión en todos los sitios (VERSION, README, tele, móvil y su service worker): tools/version.py X.Y.MMDD.HHMM
+python3 tools/version.py --check
 
 if [ "${DEPLOY_FORCE:-0}" != 1 ]; then
   for i in $(seq 1 18); do
