@@ -537,8 +537,11 @@ window.GR = (() => {
   // ------------------------------------------------------------------ símbolos de los botones según el mando
   // Con un mando de PlayStation conectado, las ayudas muestran ✕ ○ □ △ L1 R1; con uno de Xbox, A B X Y LB RB;
   // sin mando (mando de la tele, teclado), los del diseño. Cambian solas al conectar o desconectar el mando.
+  // Sin mando a la vista, las ayudas son las del mando a distancia de la tele: OK, Atrás y los botones de colores
+  // (rojo=Y, verde=X, amarillo=L, azul=R). Los colores van como marcas de uso privado que se convierten en puntos de
+  // color al pintarse (dotsWatch y gkHtml); las letras no servían porque el mando de la tele no las tiene.
   const GLYPHS = {
-    tele: { ok: 'OK', back: '←', x: 'X', y: 'Y', l: 'L', r: 'R', lr: 'L R', menu: '≡' },
+    tele: { ok: 'OK', back: '←', x: '', y: '', l: '', r: '', lr: '', menu: '≡' },
     ps: { ok: '✕', back: '○', x: '□', y: '△', l: 'L1', r: 'R1', lr: 'L1 R1', menu: '≡' },
     xbox: { ok: 'A', back: 'B', x: 'X', y: 'Y', l: 'LB', r: 'RB', lr: 'LB RB', menu: '≡' },
   };
@@ -566,8 +569,30 @@ window.GR = (() => {
     c._lastIn = { a, t, src };
     return true;
   };
-  G.gk = () => GLYPHS.ps;   // por decisión del usuario: siempre los botones del mando de PlayStation
+  // Con mando conectado (PlayStation o Xbox, según se detecte al pulsar un botón), sus símbolos; sin mando, los del
+  // mando a distancia de la tele
+  G.gk = () => GLYPHS[padKind] || GLYPHS.tele;
   G.padKind = () => padKind;
+  const DOT = { '': '#e4262c', '': '#2eaa4a', '': '#f2c230', '': '#2f7de1' };
+  const DOT_KEY = { '': 'y', '': 'x', '': 'l', '': 'r', '': 'lr' };
+  const dotHtml = ch => `<span style="display:inline-block;width:18px;height:18px;border-radius:50%;background:${DOT[ch]};margin:0 2px;vertical-align:middle"></span>`;
+  const htmlEsc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  // Ayuda de un botón como HTML (para los paneles que se pintan con innerHTML: Megamix, Créditos)
+  G.gkHtml = k => [...(G.gk()[k] || '')].map(ch => DOT[ch] ? dotHtml(ch) : htmlEsc(ch)).join('');
+  // Las ayudas del diseño salen como texto ({{ gk.y }}): cuando el texto es una marca de color se cambia por puntos,
+  // y cuando vuelve a haber mando se restaura el símbolo del mando
+  let dotsAt = 0;
+  function dotsWatch() {
+    const now = performance.now();
+    if (now - dotsAt < 300) return;
+    dotsAt = now;
+    for (const el of document.querySelectorAll('span.sc-interp')) {
+      const t = el.textContent, key = el.dataset.gKey;
+      if (DOT_KEY[t]) { el.dataset.gKey = DOT_KEY[t]; el.innerHTML = [...t].map(dotHtml).join(''); }
+      else if (key && padKind !== 'tele' && t !== G.gk()[key]) el.textContent = G.gk()[key];
+      else if (key && padKind === 'tele' && !t) { /* ya son puntos */ }
+    }
+  }
   function padWatch(c) {
     const now = performance.now();
     if (now - padCheck < 500) return;
@@ -700,12 +725,12 @@ window.GR = (() => {
     const u = credUI; if (!u) return;
     const ink = '#201e1d', red = '#ec3013';
     const secs = CREDITOS.map(([t, ps]) => `<div style="display:flex;flex-direction:column;gap:14px"><div style="font-size:30px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:${red}">${esc(t)}</div>${ps.map(p => `<div style="font-size:30px;line-height:1.35;font-weight:400;color:${ink}">${esc(p)}</div>`).join('')}</div>`).join('');
-    const key = (k, l) => `<div style="display:flex;align-items:center;gap:12px"><div style="min-width:48px;height:48px;padding:0 8px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;border:2px solid ${ink};border-radius:24px">${esc(k)}</div><span style="font-size:26px;font-weight:600">${esc(l)}</span></div>`;
+    const key = (k, l) => `<div style="display:flex;align-items:center;gap:12px"><div style="min-width:48px;height:48px;padding:0 8px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;border:2px solid ${ink};border-radius:24px">${k}</div><span style="font-size:26px;font-weight:600">${esc(l)}</span></div>`;
     u.box.innerHTML = `<div style="position:absolute;inset:0;padding:54px 96px;box-sizing:border-box;display:flex;flex-direction:column;gap:28px">
       <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid ${ink};padding-bottom:20px"><span style="font-size:28px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:${red}">Créditos</span><span style="font-size:28px;font-weight:600;color:#4a4646">Gramola ${esc(((document.querySelector('script[src*="gramola-bridge.js"]') || {}).src || '').split('?v=')[1] || '')}</span></div>
       <div style="position:relative;flex:1;overflow:hidden"><div id="g-cred" style="position:absolute;left:0;right:0;top:0;display:flex;flex-direction:column;gap:40px;padding-bottom:40px;transition:transform 180ms ease-out">${secs}</div>
         <div style="position:absolute;left:0;right:0;bottom:0;height:60px;background:linear-gradient(to bottom,rgba(243,242,242,0),#f3f2f2)"></div></div>
-      <div style="display:flex;justify-content:flex-end;gap:40px">${key('↕', 'Desplazar')}${key(G.gk().back, 'Volver')}</div></div>`;
+      <div style="display:flex;justify-content:flex-end;gap:40px">${key('↕', 'Desplazar')}${key(G.gkHtml('back'), 'Volver')}</div></div>`;
     u.cont = u.box.querySelector('#g-cred');
     u.y = 0; creditsScroll(0);
   }
@@ -777,7 +802,7 @@ window.GR = (() => {
       <div style="display:flex;flex-direction:column;gap:12px"><div style="font-size:120px;font-weight:300;line-height:.9;letter-spacing:-0.045em">¿Cuántas canciones?</div><div style="font-size:36px;color:#4a4646">El estribillo de cada una, seguidas y sin parar. Sin repetir artista.</div></div>
       <div style="display:flex;border:2px solid ${ink};background:#fff">${tiles}</div>
       <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px 32px;flex:1;align-content:start">${cards}</div>
-      <div style="display:flex;justify-content:flex-end;gap:40px">${key('↔', 'Cuántas')}${key(G.gk().y, 'Otra lista')}${key(G.gk().back, 'Volver')}${key(G.gk().ok, 'Empezar', true)}</div></div>`;
+      <div style="display:flex;justify-content:flex-end;gap:40px">${key('↔', 'Cuántas')}${key(G.gkHtml('y'), 'Otra lista')}${key(G.gkHtml('back'), 'Volver')}${key(G.gkHtml('ok'), 'Empezar', true)}</div></div>`;
   }
   function megaLayout(c) {
     if (!megaUI) return;
@@ -1804,6 +1829,7 @@ window.GR = (() => {
     // que el aviso se vea y se pueda cerrar; al cerrarlo vuelve
     for (const u of [megaUI, credUI]) if (u) { const v = c.state.err ? 'hidden' : ''; if (u.el.style.visibility !== v) u.el.style.visibility = v; }
     if (credUI) creditsLayout(c);
+    dotsWatch();
     if (!c.__lanes) {
       c.__lanes = true;
       c.drawLaneC = function (cx, L, part, ks) { return G.pageLane.call(c, cx, L, part, ks, false); };
