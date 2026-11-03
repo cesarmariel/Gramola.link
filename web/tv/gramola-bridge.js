@@ -660,8 +660,12 @@ window.GR = (() => {
     if (!list.length) return { tiles: [], tags: [], abc: [], tx: 0 };
     const p = L.pos[Math.min(sf, list.length - 1)] || { c: 0, r: 0 };
     const fx = L.cols[p.c].x;
-    // Desplazamiento: el foco se queda en el tercio izquierdo; sin pasarse de los bordes
-    const tx = -Math.max(0, Math.min(fx - 560, L.width - GRID.VIEW));
+    // Desplazamiento: el foco se queda en el tercio izquierdo; sin pasarse de los bordes. Si la ficha se eligió con el
+    // ratón (clic), la lista NO se mueve: solo el mando y el teclado la desplazan
+    const want = -Math.max(0, Math.min(fx - 560, L.width - GRID.VIEW));
+    const maxTx = Math.max(0, L.width - GRID.VIEW);
+    const tx = G.gridMouse && G.gridTx != null && -G.gridTx <= maxTx ? G.gridTx : want;
+    G.gridTx = tx;
     const lo = -tx - 400, hi = -tx + GRID.VIEW + 400;
     const tiles = [];
     L.cols.forEach((col, ci) => {
@@ -672,7 +676,7 @@ window.GR = (() => {
           bg: S.cv[0], blk: S.cv[1], fg: S.cv[2], ini: (S.title || '').split(' ').filter(w => w).slice(0, 2).map(w => w[0]).join('').toUpperCase(), fs: Math.round(GRID.W * 0.24),
           title: S.title, artist: S.artist, nw: S.isNew ? 'block' : 'none', tbg: on ? '#ec3013' : '#fff', c1: on ? '#fff' : '#201e1d', c2: on ? 'rgba(255,255,255,.85)' : '#6b6767',
           sh: on ? '0 14px 34px rgba(32,30,29,.28)' : '0 1px 0 rgba(32,30,29,.08)', t: on ? 'scale(1.06)' : 'scale(1)', z: on ? 5 : 1,
-          click: () => { if (on) c.startSetup(); else c.setState({ songF: i, zone: 'grid' }); } });
+          click: () => { if (on) c.startSetup(); else { G.gridMouse = true; c.setState({ songF: i, zone: 'grid' }); } } });
       });
     });
     const curTag = L.tags.filter(t => t.col <= p.c).pop();
@@ -1609,6 +1613,7 @@ window.GR = (() => {
   const FOCO = s => JSON.stringify([s.screen, s.menuF, s.songF, s.zone, s.filterF, s.ord, s.lng, s.dec, s.gen, s.setupF, s.setup,
     s.pauseF, s.paF, s.resF, s.setF, s.settings, s.recTab, s.search && s.search.f, s.party, s.calib && s.calib.f]);
   G.navBefore = (c, a) => {
+    G.gridMouse = false;   // (cualquier tecla o botón del mando: la lista vuelve a seguir al foco)
     if (!'udlr'.includes(a) || a.length !== 1) return;
     const antes = FOCO(c.state);
     requestAnimationFrame(() => requestAnimationFrame(() => { const s = c.state; if (s.screen === 'sing' && !s.paused) return; if (FOCO(s) !== antes) zup(); }));

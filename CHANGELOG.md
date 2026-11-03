@@ -2,6 +2,9 @@
 
 Versiones con el esquema `1.AA.MMDD.HHMM` (fecha y hora del despliegue).
 
+## 1.26.1103.1253
+- Rejilla de canciones: con el ratón, pinchar una ficha la elige sin mover la lista; solo el mando y el teclado la desplazan.
+
 ## 1.26.1103.1252
 - Rejilla de canciones: se deja como estaba antes de los cambios del desplazamiento (transición de 260 ms, repetición de teclas y cruceta de siempre, y las fichas se eligen con clic, no al pasar el ratón). Las fichas del menú sí se siguen eligiendo al pasar por encima.
 
