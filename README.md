@@ -11,7 +11,7 @@
 La tele es el escenario (**funciona en el navegador**) y cada móvil es un micrófono:
 escaneas el QR, eliges tu color y cantas. Gramola escucha el tono de cada voz y puntúa lo afinado que vas.
 
-![Versión](https://img.shields.io/badge/versi%C3%B3n-1.26.1103.1109-ec3013)
+![Versión](https://img.shields.io/badge/versi%C3%B3n-1.26.1103.1135-ec3013)
 ![Navegador](https://img.shields.io/badge/navegador-Edge%20%C2%B7%20Chrome%20%C2%B7%20Safari-1f6feb)
 ![PWA](https://img.shields.io/badge/micro-web%20%2B%20PWA-ec3013)
 ![Node.js 22+](https://img.shields.io/badge/Node.js-22%2B-5fa04e?logo=nodedotjs&logoColor=white)
@@ -66,7 +66,7 @@ escaneas el QR, eliges tu color y cantas. Gramola escucha el tono de cada voz y 
 | 🎲 **Pásalo** | Equipos, ruleta de 8 retos (*sin ver la letra, canta más agudo, susurrando…*), turnos, marcador y campeones. |
 | 📺 **Jukebox** | La letra en grande y sin puntos, para cantar todos; cola automática de canciones. |
 | 🏆 **Récords** | Salón de la fama por canción, cantantes con más canciones, rachas y rangos. |
-| ⚙️ **Ajustes** | Dificultad, **calibración del retraso del micro cantando**, volúmenes, estela, tamaño de letra y gestión de la sala. |
+| ⚙️ **Ajustes** | Dificultad, **calibración del retraso del micro cantando**, volúmenes, estela, tamaño de letra, gestión de la sala y **Créditos** (qué es Gramola, licencias de todo lo que usa y contacto para retirar contenidos; también con △ en la bienvenida). |
 
 ## 🌟 Detalles
 

@@ -2,6 +2,9 @@
 
 Versiones con el esquema `1.AA.MMDD.HHMM` (fecha y hora del despliegue).
 
+## 1.26.1103.1135
+- **Créditos** (Ajustes → Créditos, y △ en la bienvenida): qué es Gramola (software libre con licencia MIT, sin ánimo de lucro, sin pagos ni publicidad, hecho con respeto a los artistas; retirada de contenidos en soporte@gramola.link), y todo lo que usa con su autor y su licencia: tipografía, librerías de la tele y el móvil, servidor, herramientas de creación de canciones, servicios consultados e infraestructura. Música del menú creada con SUNO.AI; diseño original de NUVOLACAT.
+
 ## 1.26.1103.1109
 - Pendientes menores del repaso: el selector del Megamix se esconde mientras hay un aviso (antes lo tapaba); `tools/version.py` pone la versión en todos los sitios de una vez, incluidos el `?v=` del móvil y el nombre de la caché de su service worker (así el móvil siempre baja el código nuevo tras un despliegue), y `deploy.sh` no despliega si no coinciden; el admin puede «Recargar móviles» de una sala (tras un despliegue del micro); la pantalla de resultados ya no calcula el carrusel de portadas que no se usa; las portadas de la bienvenida se guardan reducidas (90 imágenes grandes quedaban en memoria para siempre).
 

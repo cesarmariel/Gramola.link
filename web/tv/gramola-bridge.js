@@ -649,6 +649,99 @@ window.GR = (() => {
     return nc.items[Math.min(p.r, nc.items.length - 1)];
   };
 
+  // ------------------------------------------------------------------ Créditos (Ajustes → Créditos, △ en la bienvenida)
+  // Qué es Gramola y de quién es cada pieza que usa. Texto fijo; se pinta con el mismo estilo del diseño (1920×1080
+  // escalado) y se recorre con la cruceta.
+  const CREDITOS = [
+    ['Un proyecto libre y sin ánimo de lucro', [
+      'Gramola es software libre, publicado con licencia MIT en github.com/nuvolacat/Gramola.link. No tiene ningún fin comercial: no se cobra, no se cobrará y no existe ningún beneficio económico, directo ni indirecto, por su uso. No hay publicidad, ni suscripciones, ni recogida de datos con fines comerciales.',
+      'Es una aplicación hecha por y para los amantes del karaoke, con todo el respeto hacia los artistas, autores, intérpretes y discográficas de las canciones. Gramola no tiene relación alguna con ellos ni con sus representantes, y no reclama ningún derecho sobre las obras.',
+      'Si eres titular de derechos y quieres que se retire cualquier contenido, escribe a soporte@gramola.link y se atenderá la petición.',
+      'Gramola es un proyecto de NUVOLACAT, con diseño original de NUVOLACAT. © NUVOLACAT.',
+    ]],
+    ['Tipografía', [
+      'Archivo, de Omnibus-Type · Licencia SIL Open Font License 1.1 · servida a través de Google Fonts.',
+    ]],
+    ['En la tele y en el móvil', [
+      'React 18.3.1 · Meta Platforms, Inc. · Licencia MIT.',
+      'Babel Standalone 7.29 · Licencia MIT.',
+      'qrcode.js · Kazuhiko Arase · Licencia MIT (el código QR de la sala).',
+      'jsQR · Cosmo Wolfe · Licencia Apache 2.0 (lectura del QR con la cámara del móvil).',
+      'Detección de tono: implementación propia del algoritmo YIN (de Cheveigné y Kawahara, 2002).',
+      'Efectos de sonido y aplausos: sintetizados por el propio proyecto.',
+      'Música del menú: creada con SUNO.AI.',
+    ]],
+    ['Servidor', [
+      'Node.js · ws (WebSocket) · Licencia MIT.',
+      'SimpleWebAuthn · Licencia MIT (acceso a la administración con Touch ID y llaves de acceso).',
+    ]],
+    ['Creación de canciones (herramientas de administración)', [
+      'FFmpeg · Licencias LGPL y GPL.',
+      'PyTorch y torchaudio · Licencia BSD.',
+      'Demucs (separación de la voz) · Meta · Licencia MIT.',
+      'MMS, alineador forzado de Meta AI (encaje de la letra con la voz) · modelo con licencia CC BY-NC 4.0, uso no comercial.',
+      'torchcrepe (tono de la voz; modelo CREPE de Kim, Salamon, Li y Bello, 2018) · Licencia MIT.',
+      'librosa · Licencia ISC. NumPy y SciPy · Licencia BSD. python-soundfile y libsndfile · Licencias BSD y LGPL.',
+      'Pyphen (separación en sílabas) con los diccionarios de LibreOffice · Licencias GPL, LGPL y MPL.',
+      'Formato de canción UltraStar (.txt), creado por la comunidad de UltraStar y UltraStar Deluxe.',
+    ]],
+    ['Servicios de terceros consultados', [
+      'LRCLIB, base de datos abierta de letras sincronizadas.',
+      'Genius y SongLyrics, para letras que no están en LRCLIB.',
+      'iTunes Search API (Apple) y Deezer API, para las carátulas.',
+      'Las carátulas, letras y grabaciones pertenecen a sus titulares y se usan únicamente para identificar y reproducir cada canción en el karaoke.',
+    ]],
+    ['Infraestructura', [
+      'Alojado en Ubuntu con Apache y Plesk, detrás de Cloudflare, con certificados de Let’s Encrypt.',
+    ]],
+  ];
+  let credUI = null;   // { el, box, cont, y, max }
+  function creditsRender(c) {
+    const u = credUI; if (!u) return;
+    const ink = '#201e1d', red = '#ec3013';
+    const secs = CREDITOS.map(([t, ps]) => `<div style="display:flex;flex-direction:column;gap:14px"><div style="font-size:30px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:${red}">${esc(t)}</div>${ps.map(p => `<div style="font-size:30px;line-height:1.35;font-weight:400;color:${ink}">${esc(p)}</div>`).join('')}</div>`).join('');
+    const key = (k, l) => `<div style="display:flex;align-items:center;gap:12px"><div style="min-width:48px;height:48px;padding:0 8px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;border:2px solid ${ink};border-radius:24px">${esc(k)}</div><span style="font-size:26px;font-weight:600">${esc(l)}</span></div>`;
+    u.box.innerHTML = `<div style="position:absolute;inset:0;padding:54px 96px;box-sizing:border-box;display:flex;flex-direction:column;gap:28px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid ${ink};padding-bottom:20px"><span style="font-size:28px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:${red}">Créditos</span><span style="font-size:28px;font-weight:600;color:#4a4646">Gramola ${esc(((document.querySelector('script[src*="gramola-bridge.js"]') || {}).src || '').split('?v=')[1] || '')}</span></div>
+      <div style="position:relative;flex:1;overflow:hidden"><div id="g-cred" style="position:absolute;left:0;right:0;top:0;display:flex;flex-direction:column;gap:40px;padding-bottom:40px;transition:transform 180ms ease-out">${secs}</div>
+        <div style="position:absolute;left:0;right:0;bottom:0;height:60px;background:linear-gradient(to bottom,rgba(243,242,242,0),#f3f2f2)"></div></div>
+      <div style="display:flex;justify-content:flex-end;gap:40px">${key('↕', 'Desplazar')}${key(G.gk().back, 'Volver')}</div></div>`;
+    u.cont = u.box.querySelector('#g-cred');
+    u.y = 0; creditsScroll(0);
+  }
+  function creditsScroll(d) {
+    const u = credUI; if (!u || !u.cont) return;
+    const vis = u.cont.parentElement.clientHeight, max = Math.max(0, u.cont.scrollHeight - vis + 40);
+    u.y = Math.max(0, Math.min(max, u.y + d));
+    u.cont.style.transform = `translateY(${-u.y}px)`;
+  }
+  function creditsLayout(c) {
+    if (!credUI) return;
+    const sc = (c && c.state.scale) || Math.min(innerWidth / 1920, innerHeight / 1080);
+    credUI.box.style.transform = `translate(-50%,-50%) scale(${sc})`;
+  }
+  function creditsClose() { if (credUI) { credUI.el.remove(); credUI = null; } }
+  G.creditsOpen = c => {
+    if (credUI) return;
+    const el = document.createElement('div');
+    el.style.cssText = 'position:fixed;inset:0;z-index:40;background:#0e0f0f';
+    const box = document.createElement('div');
+    box.style.cssText = 'position:absolute;left:50%;top:50%;width:1920px;height:1080px;background:#f3f2f2;color:#201e1d;font-family:Archivo,sans-serif;overflow:hidden';
+    el.appendChild(box); document.body.appendChild(el);
+    credUI = { el, box, cont: null, y: 0, screen: c.state.screen };
+    creditsLayout(c); creditsRender(c); whoosh();
+  };
+  G.creditsKey = (c, a) => {
+    if (!credUI) return false;
+    if (c.state.screen !== credUI.screen) { creditsClose(); return false; }
+    if (a === 'd') creditsScroll(160);
+    else if (a === 'u') creditsScroll(-160);
+    else if (a === 'r') creditsScroll(720);
+    else if (a === 'l') creditsScroll(-720);
+    else if (a === 'back' || a === 'ok' || a === 'menu') { creditsClose(); whoosh(); }
+    return true;
+  };
+
   // ------------------------------------------------------------------ Megamix
   // Estribillos seguidos de 4, 6 u 8 canciones (solo las que traen el estribillo marcado: megamix.mp3 recortado
   // por tools/megamix.py). Una sola partitura con los tramos encadenados; el audio va por Web Audio (la tele LG
@@ -1709,7 +1802,8 @@ window.GR = (() => {
     timeMethods(c);
     // El selector del Megamix va por encima del diseño: mientras haya un aviso (sala llena, micro…) se esconde para
     // que el aviso se vea y se pueda cerrar; al cerrarlo vuelve
-    if (megaUI) { const esc = c.state.err ? 'hidden' : ''; if (megaUI.el.style.visibility !== esc) megaUI.el.style.visibility = esc; }
+    for (const u of [megaUI, credUI]) if (u) { const v = c.state.err ? 'hidden' : ''; if (u.el.style.visibility !== v) u.el.style.visibility = v; }
+    if (credUI) creditsLayout(c);
     if (!c.__lanes) {
       c.__lanes = true;
       c.drawLaneC = function (cx, L, part, ks) { return G.pageLane.call(c, cx, L, part, ks, false); };

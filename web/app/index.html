@@ -8,7 +8,7 @@
 <link rel="apple-touch-icon" href="/assets/iconos/favicon-180.png">
 <style>html,body{margin:0;background:#0e0f0f;overflow:hidden;cursor:none}</style>
 <script src="/vendor/qrcode.js"></script>
-<script src="/tv/gramola-bridge.js?v=1.26.1103.1109"></script>
+<script src="/tv/gramola-bridge.js?v=1.26.1103.1135"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="./support.js"></script>
@@ -60,7 +60,7 @@ a{color:var(--color-accent-700)}a:hover{color:var(--color-accent-600)}
   <div style="display:flex;justify-content:space-between;align-items:center;border-top:2px solid var(--color-text);padding-top:20px;font-size:28px;font-weight:600">
     <img src="assets/nuvola/nuvola-tinta.png" alt="nuvola" style="display:block;height:44px;width:auto;position:relative;top:-7px">
     
-    <span style="color:var(--color-neutral-700)">Versión 1.26.1103.1109</span>
+    <span style="color:var(--color-neutral-700)">Versión 1.26.1103.1135</span>
   </div>
 </div>
 </sc-if>
@@ -613,7 +613,7 @@ const CHALL=[['Solo el estribillo','Puntúa solo la parte más pegadiza.'],['Sin
 const RANGE=['Menos de 3.000','3.000 – 4.999','5.000 – 6.499','6.500 – 7.999','8.000 – 9.199','9.200 o más'];
 const REC2=GR.REC2;
 const REC3=GR.REC3;
-const SET_ROWS=[{k:'diff',label:'Dificultad por defecto',type:'seg',opts:['Fácil','Normal','Difícil'],help:'La que se propone a cada jugador al preparar la partida. Fácil admite ±4 semitonos; Normal, ±2; Difícil, ±1.'},{k:'delay',label:'Retraso del micro',type:'act',help:'Lo que tarda tu voz en viajar del móvil a la tele. Pulsa OK para medirlo cantando.'},{k:'music',label:'Volumen de la música',type:'bar',help:'Volumen de la canción en la tele.'},{k:'fx',label:'Volumen de los efectos',type:'bar',help:'Pitidos, aplausos y la cuenta atrás.'},{k:'trail',label:'Estela de la voz',type:'seg',opts:['Oculta','Visible'],help:'La línea que dibuja tu tono sobre el carril de notas.'},{k:'lyr',label:'Tamaño de la letra',type:'seg',opts:['Normal','Grande'],help:'Grande aumenta la letra un 12 % para salones amplios o teles pequeñas.'},{k:'kick',label:'Expulsar jugador',type:'act',help:'Saca de la sala al último que entró. Podrá volver con el código.'},{k:'code',label:'Nuevo código de sala',type:'act',help:'Genera un código nuevo. Todos los móviles tendrán que volver a entrar.'}];
+const SET_ROWS=[{k:'diff',label:'Dificultad por defecto',type:'seg',opts:['Fácil','Normal','Difícil'],help:'La que se propone a cada jugador al preparar la partida. Fácil admite ±4 semitonos; Normal, ±2; Difícil, ±1.'},{k:'delay',label:'Retraso del micro',type:'act',help:'Lo que tarda tu voz en viajar del móvil a la tele. Pulsa OK para medirlo cantando.'},{k:'music',label:'Volumen de la música',type:'bar',help:'Volumen de la canción en la tele.'},{k:'fx',label:'Volumen de los efectos',type:'bar',help:'Pitidos, aplausos y la cuenta atrás.'},{k:'trail',label:'Estela de la voz',type:'seg',opts:['Oculta','Visible'],help:'La línea que dibuja tu tono sobre el carril de notas.'},{k:'lyr',label:'Tamaño de la letra',type:'seg',opts:['Normal','Grande'],help:'Grande aumenta la letra un 12 % para salones amplios o teles pequeñas.'},{k:'kick',label:'Expulsar jugador',type:'act',help:'Saca de la sala al último que entró. Podrá volver con el código.'},{k:'code',label:'Nuevo código de sala',type:'act',help:'Genera un código nuevo. Todos los móviles tendrán que volver a entrar.'},{k:'credits',label:'Créditos',type:'act',help:'Qué es Gramola, de quién es cada pieza que usa y cómo contactar.'}];
 const ERRS_D={server:['Sin conexión','No llegamos al servidor','La tele no alcanza el servidor. Revisa la wifi; la partida sigue donde estaba.','Reintentar'],lost:['Reconectando','La tele ha perdido la sala','Buscando la sala {room}… Los móviles volverán a entrar solos.','Reintentar ahora'],song:['Canción','No se puede cargar «El último tren»','El archivo no responde. Elige otra y vuelve a probar más tarde.','Elegir otra'],full:['Sala llena','Ya hay 8 jugadores','Para que entre alguien más, otro tiene que salir desde Ajustes.','Entendido'],mic:['Micro','Nerea ha perdido el micro','Su ficha se queda atenuada. Vuelve sola en cuanto su móvil reconecte.','Seguir']};
 const PAD_MAP={0:'ok',1:'back',2:'x',3:'y',4:'lb',5:'rb',8:'v',9:'menu',12:'u',13:'d',14:'l',15:'r'};
 const DUO_PARTS=[[0],[1],[0],[1],[0,1],[0,1]];
@@ -785,7 +785,7 @@ class Component extends DCLogic {
     else if(r.type==='bar'){if(a==='l')put(r.k,Math.max(0,st[r.k]-1));else if(a==='r')put(r.k,Math.min(10,st[r.k]+1));}
     else if(a==='ok'){if(r.k==='delay')this.go('calib',{calib:{phase:'idle',beat:-1,ms:st.delay,manual:st.delay,f:0,marks:[]}});
       else if(r.k==='kick'){GR.kickLast(this);}
-      else{GR.newCode(this);}}}
+      else if(r.k==='credits'){GR.creditsOpen(this);}else{GR.newCode(this);}}}
   calKey(a){const c=this.state.calib;if(c.phase==='measure'||c.phase==='test'){if(a==='back'){clearInterval(this.bTimer);if(GR.cal)GR.cal.on=false;this.setState({calib:{...c,phase:'idle',beat:-1}});}return;}
     if(a==='u')this.setState({calib:{...c,f:Math.max(0,c.f-1)}});else if(a==='d')this.setState({calib:{...c,f:Math.min(3,c.f+1)}});
     else if((a==='l'||a==='r')&&c.f===1)this.setState({calib:{...c,manual:Math.max(0,Math.min(400,c.manual+(a==='r'?10:-10)))}});
@@ -800,9 +800,9 @@ class Component extends DCLogic {
   setupToggle(i){if(this.isOff(i)){this.toast(PLAYERS[i][0]+' no tiene el micro conectado');return;}const m=this.state.mode;this.setState(s=>({setup:s.setup.map((r,j)=>j!==i?r:m==='sing'?{...r,on:!r.on}:{...r,side:r.side===0?2:r.side===2?1:0})}));}
   setupDiff(i,d){this.setState(s=>({setup:s.setup.map((r,j)=>j===i?{...r,diff:Math.max(0,Math.min(2,r.diff+d))}:r)}));}
   onKey(e){const map={ArrowLeft:'l',ArrowRight:'r',ArrowUp:'u',ArrowDown:'d',Enter:'ok',' ':'ok',Escape:'back',Backspace:'back',p:'menu',P:'menu',m:'menu',M:'menu',v:'v',V:'v',j:'add',J:'add','+':'add','-':'rem',q:'lb',Q:'lb',e:'rb',E:'rb',x:'x',X:'x',y:'y',Y:'y',GamepadA:'ok',GamepadB:'back',GamepadX:'x',GamepadY:'y',GamepadMenu:'menu',GamepadView:'v',GamepadLeftShoulder:'lb',GamepadRightShoulder:'rb',GamepadDPadUp:'u',GamepadDPadDown:'d',GamepadDPadLeft:'l',GamepadDPadRight:'r',GamepadLeftThumbstickUp:'u',GamepadLeftThumbstickDown:'d',GamepadLeftThumbstickLeft:'l',GamepadLeftThumbstickRight:'r'};const a=map[e.key];if(!a)return;e.preventDefault();if(e.key.startsWith('Gamepad'))this.padKeys=true;if(GR.inAct(this,a,'key'))this.act(a);}
-  act(a){const s=this.state;if(!s.err&&GR.megaKey(this,a))return;GR.navBefore(this,a);
+  act(a){const s=this.state;if(!s.err&&(GR.creditsKey(this,a)||GR.megaKey(this,a)))return;GR.navBefore(this,a);
     if(s.err){if(a==='ok'||a==='back')this.errAct();return;}
-    if(s.screen==='splash'||s.screen==='boot')return;if(s.screen==='welcome'){if(a==='ok')this.go('lobby');return;}
+    if(s.screen==='splash'||s.screen==='boot')return;if(s.screen==='welcome'){if(a==='ok')this.go('lobby');else if(a==='y'||a==='x')GR.creditsOpen(this);return;}
     if(s.screen==='lobby'&&a==='y')a='add';
     if(s.screen==='sing'&&a==='x')a='v';
     if(s.screen==='sing'&&s.mode==='jukebox'&&!s.paused&&a==='rb'){this.jukeNext();return;}
@@ -1043,7 +1043,7 @@ class Component extends DCLogic {
     V.paRows=[['Música',stg.music,String(stg.music)],['Efectos',stg.fx,String(stg.fx)],['Retraso del micro',Math.round(stg.delay/40),stg.delay+' ms']].map((r,i)=>{const on=s.paF===i;return {label:r[0],val:r[2],bg:on?C.red:'transparent',fg:on?'#fff':ink,cells:Array.from({length:10},(_,j)=>({c:j<r[1]?(on?'#fff':ink):(on?'rgba(255,255,255,0.35)':C.n3)})),click:()=>this.setState({paF:i})};});
     V.onKeyOk=()=>this.act('ok');V.onKeyBack=()=>this.act('back');V.onKeyX=()=>this.act('x');V.onKeyY=()=>this.act('y');V.onKeyL=()=>this.act('lb');V.onKeyR=()=>this.act('rb');
     V.isBoot=s.screen==='boot';V.videoEl=GR.videoUrl(this)&&s.screen==='sing'?React.createElement('video',{key:'v',src:GR.videoUrl(this),autoPlay:true,muted:true,loop:false,playsInline:true,'data-gramola':'videoclip',style:{position:'absolute',inset:0,width:1920,height:1080,objectFit:'cover'}}):null;V.gk=GR.gk();V.isSplash=s.screen==='splash';V.isWelcome=s.screen==='welcome';V.spOp=s.splashIn&&!s.splashOut?1:0;V.spOpMs=s.splashOut?700:1000;V.bootOp=s.bootIn===false?0:1;V.spClip=s.splashRed?'circle(75% at 50% 50%)':'circle(0% at 50% 50%)';V.spOrigOp=1;V.spWhiteOp=0;V.spTf=s.splashIn?'scale(1)':'scale(0.94)';V.spMsgOp=s.splashMsg&&!s.splashMsgOut?1:0;V.spMsgTf=s.splashMsg&&!s.splashMsgOut?'translateY(0)':'translateY(18px)';
-    if(!this._pressEl||this._pressGk!==GR.gk().ok){this._pressGk=GR.gk().ok;const h=React.createElement;this._pressEl=h('div',{style:{display:'flex',alignItems:'center',gap:20,fontSize:40,fontWeight:800,animation:'gPulse 1.8s ease-in-out infinite'}},h('span',null,'Pulsa'),h('span',{style:{width:60,height:60,borderRadius:'50%',background:C.ink,color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:26,fontWeight:800}},GR.gk().ok),h('span',null,'para continuar'));}V.pressEl=this._pressEl;V.bootW=Math.round(s.bootK*100);V.room=s.room;V.safe=!!this.props.showSafeArea;
+    if(!this._pressEl||this._pressGk!==GR.gk().ok){this._pressGk=GR.gk().ok;const h=React.createElement;this._pressEl=h('div',{style:{display:'flex',alignItems:'center',gap:20,fontSize:40,fontWeight:800,animation:'gPulse 1.8s ease-in-out infinite'}},h('span',null,'Pulsa'),h('span',{style:{width:60,height:60,borderRadius:'50%',background:C.ink,color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:26,fontWeight:800}},GR.gk().ok),h('span',null,'para continuar'),h('span',{style:{marginLeft:48,display:'flex',alignItems:'center',gap:12,fontSize:24,fontWeight:600,opacity:.65}},h('span',{style:{width:40,height:40,borderRadius:'50%',border:'2px solid '+C.ink,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,fontWeight:800}},GR.gk().y),'Créditos'));}V.pressEl=this._pressEl;V.bootW=Math.round(s.bootK*100);V.room=s.room;V.safe=!!this.props.showSafeArea;
     V.isJukebox=s.screen==='sing'&&s.mode==='jukebox';
     V.jq=s.jq.slice(0,4).filter(i=>SONGS[i]&&SONGS[i].id).map(i=>{const so=SONGS[i];return {title:so.title,artist:so.artist,bg:so.cv[0],blk:so.cv[1]};});
     V.isRecords=s.screen==='records';V.recLabel=s.recTab===3?'TV-13 Rangos':'TV-16 Récords';
@@ -1058,7 +1058,7 @@ class Component extends DCLogic {
     V.setRows=SET_ROWS.map((r,i)=>{const on=s.setF===i;const o={label:r.label,bg:on?'#fff':'transparent',bar:on?C.red:'transparent',isSeg:r.type==='seg',isBar:r.type==='bar',isAct:r.type==='act',opts:[],cells:[],val:'',cta:'',click:()=>{if(s.setF===i)this.act('ok');else this.setState({setF:i});}};
       if(r.type==='seg')o.opts=r.opts.map((l,j)=>({label:l,br:j<r.opts.length-1?'2px solid '+ink:'none',bg:st[r.k]===j?(on?C.red:ink):'transparent',fg:st[r.k]===j?'#fff':ink}));
       if(r.type==='bar'){o.cells=Array.from({length:10},(_,j)=>({c:j<st[r.k]?(on?C.red:ink):C.n3}));o.val=String(st[r.k]);}
-      if(r.type==='act'){o.val=r.k==='delay'?st.delay+' ms':r.k==='kick'?(n?PLAYERS[n-1][0]:'Nadie en la sala'):s.room;o.cta=r.k==='delay'?'Calibrar':r.k==='kick'?'Expulsar':'Generar';}
+      if(r.type==='act'){o.val=r.k==='delay'?st.delay+' ms':r.k==='kick'?(n?PLAYERS[n-1][0]:'Nadie en la sala'):r.k==='credits'?'Proyecto libre y sin ánimo de lucro':s.room;o.cta=r.k==='delay'?'Calibrar':r.k==='kick'?'Expulsar':r.k==='credits'?'Ver':'Generar';}
       return o;});
     V.setNum=String(s.setF+1).padStart(2,'0')+' / 0'+SET_ROWS.length;V.setTitle=SET_ROWS[s.setF].label;V.setHelp=SET_ROWS[s.setF].help;
     const cb=s.calib;V.isCalib=s.screen==='calib';V.calSaved=st.delay+' ms';V.calManual=cb.manual+' ms';V.calPct=(cb.manual/400*100).toFixed(1);V.calSlBc=cb.f===1?C.red:ink;

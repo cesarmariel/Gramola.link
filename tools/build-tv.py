@@ -159,7 +159,17 @@ sub("const FILTERS=['Orden','Idioma','Década','Género','Solo dúos'];", "const
 sub(",'Género · '+GENS[s.gen],'Solo dúos'],chipAct=[!!s.query,false,s.lng>0,s.dec>0,s.gen>0,s.duoOnly];", ",'Género · '+GENS[s.gen]],chipAct=[!!s.query,false,s.lng>0,s.dec>0,s.gen>0];", name='sin chip dúos')
 
 # --- Megamix: teclas de su pantalla, ficha «Megamix» en Preparar/Resultados, sin récord por canción
-sub("  act(a){const s=this.state;", "  act(a){const s=this.state;if(!s.err&&GR.megaKey(this,a))return;GR.navBefore(this,a);", name='Megamix y zzzup: teclas')
+sub("  act(a){const s=this.state;", "  act(a){const s=this.state;if(!s.err&&(GR.creditsKey(this,a)||GR.megaKey(this,a)))return;GR.navBefore(this,a);", name='Megamix y zzzup: teclas')
+
+# --- Créditos (Ajustes → Créditos, y △ en la bienvenida): qué es Gramola, licencias y contacto
+sub("{k:'code',label:'Nuevo código de sala',type:'act',help:'Genera un código nuevo. Todos los móviles tendrán que volver a entrar.'}]",
+    "{k:'code',label:'Nuevo código de sala',type:'act',help:'Genera un código nuevo. Todos los móviles tendrán que volver a entrar.'},{k:'credits',label:'Créditos',type:'act',help:'Qué es Gramola, de quién es cada pieza que usa y cómo contactar.'}]", name='créditos: fila de Ajustes')
+sub("else{GR.newCode(this);}}}", "else if(r.k==='credits'){GR.creditsOpen(this);}else{GR.newCode(this);}}}", name='créditos: abrir desde Ajustes')
+sub("o.val=r.k==='delay'?st.delay+' ms':r.k==='kick'?(n?PLAYERS[n-1][0]:'Nadie en la sala'):s.room;o.cta=r.k==='delay'?'Calibrar':r.k==='kick'?'Expulsar':'Generar';",
+    "o.val=r.k==='delay'?st.delay+' ms':r.k==='kick'?(n?PLAYERS[n-1][0]:'Nadie en la sala'):r.k==='credits'?'Proyecto libre y sin ánimo de lucro':s.room;o.cta=r.k==='delay'?'Calibrar':r.k==='kick'?'Expulsar':r.k==='credits'?'Ver':'Generar';", name='créditos: fila')
+sub("if(s.screen==='welcome'){if(a==='ok')this.go('lobby');return;}", "if(s.screen==='welcome'){if(a==='ok')this.go('lobby');else if(a==='y'||a==='x')GR.creditsOpen(this);return;}", name='créditos: △ en la bienvenida')
+sub("h('span',null,'para continuar'));}V.pressEl=this._pressEl;",
+    "h('span',null,'para continuar'),h('span',{style:{marginLeft:48,display:'flex',alignItems:'center',gap:12,fontSize:24,fontWeight:600,opacity:.65}},h('span',{style:{width:40,height:40,borderRadius:'50%',border:'2px solid '+C.ink,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,fontWeight:800}},GR.gk().y),'Créditos'));}V.pressEl=this._pressEl;", name='créditos: ayuda en la bienvenida')
 sub("const recN=parseInt((song.rec.split(' ')[0]||'0').replace('.',''))||0;", "const recN=GR.mega?Infinity:(parseInt((song.rec.split(' ')[0]||'0').replace('.',''))||0);", name='Megamix: sin récord')
 sub("resAct(i){this.conf=[];", "resAct(i){this.conf=[];if(GR.megaRes(this,i))return;", name='Megamix: resultados')
 
