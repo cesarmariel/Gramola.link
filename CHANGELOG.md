@@ -2,6 +2,10 @@
 
 Versiones con el esquema `1.AA.MMDD.HHMM` (fecha y hora del despliegue).
 
+## 1.26.1103.1201
+- Con ratón, las fichas del menú y de la rejilla de canciones se eligen al pasar por encima (clic = entrar).
+- Canciones: al cambiar un filtro (década, idioma, género) o buscar, el avance que suena pasa a ser el de la canción que enseña la ficha (antes seguía sonando la de antes).
+
 ## 1.26.1103.1155
 - Sobre los elementos clicables ya no sale la mano: todo hereda el puntero propio (y nada cuando está escondido).
 

@@ -8,7 +8,7 @@
 <link rel="apple-touch-icon" href="/assets/iconos/favicon-180.png">
 <style>html,body{margin:0;background:#0e0f0f;overflow:hidden;cursor:none}</style>
 <script src="/vendor/qrcode.js"></script>
-<script src="/tv/gramola-bridge.js?v=1.26.1103.1155"></script>
+<script src="/tv/gramola-bridge.js?v=1.26.1103.1201"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="./support.js"></script>
@@ -60,7 +60,7 @@ a{color:var(--color-accent-700)}a:hover{color:var(--color-accent-600)}
   <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;border-top:2px solid var(--color-text);padding-top:20px;font-size:28px;font-weight:600">
     <img src="assets/nuvola/nuvola-tinta.png" alt="nuvola" style="display:block;height:44px;width:auto;position:relative;top:-7px">
     
-    <span style="color:var(--color-neutral-700);font-size:22px;font-weight:500;justify-self:center">1.26.1103.1155</span><span style="justify-self:end;display:flex;align-items:center;gap:12px;font-size:24px;font-weight:600;color:var(--color-neutral-700)"><span style="width:40px;height:40px;border-radius:50%;border:2px solid var(--color-text);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:var(--color-text)">{{ gk.y }}</span>Créditos</span>
+    <span style="color:var(--color-neutral-700);font-size:22px;font-weight:500;justify-self:center">1.26.1103.1201</span><span style="justify-self:end;display:flex;align-items:center;gap:12px;font-size:24px;font-weight:600;color:var(--color-neutral-700)"><span style="width:40px;height:40px;border-radius:50%;border:2px solid var(--color-text);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:var(--color-text)">{{ gk.y }}</span>Créditos</span>
   </div>
 </div>
 </sc-if>
@@ -154,7 +154,7 @@ a{color:var(--color-accent-700)}a:hover{color:var(--color-accent-600)}
   </div>
   <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border:2px solid var(--color-text);background:#fff">
     <sc-for list="{{ tiles }}" as="m" hint-placeholder-count="7">
-      <div onClick="{{ m.click }}" style="height:260px;padding:24px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;position:relative;transition:transform 150ms ease-out,box-shadow 150ms ease-out,background 150ms ease-out;border-right:{{ m.br }};outline:{{ m.ol }};outline-offset:-2px;background:{{ m.bg }};color:{{ m.fg }};transform:{{ m.t }};box-shadow:{{ m.s }};z-index:{{ m.z }}">
+      <div onClick="{{ m.click }}" onMouseEnter="{{ m.hover }}" style="height:260px;padding:24px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;position:relative;transition:transform 150ms ease-out,box-shadow 150ms ease-out,background 150ms ease-out;border-right:{{ m.br }};outline:{{ m.ol }};outline-offset:-2px;background:{{ m.bg }};color:{{ m.fg }};transform:{{ m.t }};box-shadow:{{ m.s }};z-index:{{ m.z }}">
         <span style="font-size:28px;font-weight:800;opacity:.75">{{ m.num }}</span>
         <div style="display:flex;flex-direction:column;gap:4px"><span style="font-size:36px;font-weight:800;line-height:1.05">{{ m.name }}</span><span style="font-size:28px;font-weight:400;line-height:1.1;opacity:.8">{{ m.short }}</span></div>
       </div>
@@ -188,7 +188,7 @@ a{color:var(--color-accent-700)}a:hover{color:var(--color-accent-600)}
           <div style="position:absolute;left:{{ g.x }}px;top:{{ g.y }}px;width:52px;height:52px;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800;color:#fff;background:{{ g.bg }}">{{ g.l }}</div>
         </sc-for>
         <sc-for list="{{ grid.tiles }}" as="s" hint-placeholder-count="10">
-          <div onClick="{{ s.click }}" style="position:absolute;left:{{ s.x }}px;top:{{ s.y }}px;width:{{ s.w }}px;height:{{ s.h }}px;overflow:hidden;cursor:pointer;background:{{ s.tbg }};box-shadow:{{ s.sh }};transform:{{ s.t }};z-index:{{ s.z }}">
+          <div onClick="{{ s.click }}" onMouseEnter="{{ s.hover }}" style="position:absolute;left:{{ s.x}}px;top:{{ s.y }}px;width:{{ s.w }}px;height:{{ s.h }}px;overflow:hidden;cursor:pointer;background:{{ s.tbg }};box-shadow:{{ s.sh }};transform:{{ s.t }};z-index:{{ s.z }}">
             <div style="position:relative;width:100%;height:{{ s.ch }}px;overflow:hidden;background:{{ s.bg }}">
               <div style="position:absolute;right:0;bottom:0;width:58%;height:46%;background:{{ s.blk }}"></div>
               <div style="position:absolute;left:6%;top:3%;font-weight:800;line-height:1;letter-spacing:-0.05em;font-size:{{ s.fs }}px;color:{{ s.fg }}">{{ s.ini }}</div>
@@ -1087,7 +1087,7 @@ class Component extends DCLogic {
   renderVals(){const s=this.state;
     const slots=Array.from({length:8},(_,i)=>{if(i<s.count){const p=PLAYERS[i];return {...GR.photoOf(p[3],p[1]),name:p[0],color:p[1],shape:this.isOff(i)?'⊘':p[2],shapeColor:C.ink,op:this.isOff(i)?0.4:1,bg:s.justJ===i?C.red:'#fff',bc:C.ink,nameColor:s.justJ===i?'#fff':C.ink,shapeColor:s.justJ===i?'#fff':C.ink,t:s.justJ===i?'scale(1.08)':'scale(1)'};}
       return {ph:'none',phw:0,pho:'none',name:'Libre',color:'transparent',shape:'+',shapeColor:C.n5,op:1,bg:'transparent',bc:C.n3,nameColor:C.n5,t:'scale(1)'};});
-    const tiles=MODES.map((m,i)=>{const on=s.menuF===i;return {ol:on?'2px solid '+C.ink:'none',num:String(i+1).padStart(2,'0'),name:m[0],short:m[1],bg:on?C.red:'#fff',fg:on?'#fff':C.ink,t:on?'scale(1.05)':'scale(1)',s:on?'0 18px 40px rgba(32,30,29,0.38), 0 4px 12px rgba(32,30,29,0.22)':'none',z:on?2:1,br:i<6?'2px solid '+C.ink:'none',click:()=>{this.setState({menuF:i});this.menuAct(i);}};});
+    const tiles=MODES.map((m,i)=>{const on=s.menuF===i;return {hover:()=>{if(!on)this.setState({menuF:i});},ol:on?'2px solid '+C.ink:'none',num:String(i+1).padStart(2,'0'),name:m[0],short:m[1],bg:on?C.red:'#fff',fg:on?'#fff':C.ink,t:on?'scale(1.05)':'scale(1)',s:on?'0 18px 40px rgba(32,30,29,0.38), 0 4px 12px rgba(32,30,29,0.22)':'none',z:on?2:1,br:i<6?'2px solid '+C.ink:'none',click:()=>{this.setState({menuF:i});this.menuAct(i);}};});
     const hero={num:String(s.menuF+1).padStart(2,'0'),name:MODES[s.menuF][0],desc:MODES[s.menuF][2]};
     const list=this.songsList();const sf=Math.min(s.songF,Math.max(0,list.length-1));
     const chipLab=['Buscar'+(s.query?' · «'+s.query+'»':''),'Orden · '+ORDERS[s.ord],'Idioma · '+LANGS[s.lng],'Década · '+(s.dec?'Años '+DECS[s.dec]:'Todas'),'Género · '+GENS[s.gen]],chipAct=[!!s.query,false,s.lng>0,s.dec>0,s.gen>0];

@@ -671,7 +671,8 @@ window.GR = (() => {
           bg: S.cv[0], blk: S.cv[1], fg: S.cv[2], ini: (S.title || '').split(' ').filter(w => w).slice(0, 2).map(w => w[0]).join('').toUpperCase(), fs: Math.round(GRID.W * 0.24),
           title: S.title, artist: S.artist, nw: S.isNew ? 'block' : 'none', tbg: on ? '#ec3013' : '#fff', c1: on ? '#fff' : '#201e1d', c2: on ? 'rgba(255,255,255,.85)' : '#6b6767',
           sh: on ? '0 14px 34px rgba(32,30,29,.28)' : '0 1px 0 rgba(32,30,29,.08)', t: on ? 'scale(1.06)' : 'scale(1)', z: on ? 5 : 1,
-          click: () => { if (on) c.startSetup(); else c.setState({ songF: i, zone: 'grid' }); } });
+          click: () => { if (on) c.startSetup(); else c.setState({ songF: i, zone: 'grid' }); },
+          hover: () => { if (!on || s.zone !== 'grid') c.setState({ songF: i, zone: 'grid' }); } });   // (ratón: la ficha se elige al pasar por encima)
       });
     });
     const curTag = L.tags.filter(t => t.col <= p.c).pop();
@@ -1796,6 +1797,7 @@ window.GR = (() => {
     const p = prev; prev = null; release(p);
     trimPreviews(new Set());
   }
+  G.avanceDe = () => prevFor;   // (para las pruebas: qué canción está sonando de avance)
   function previewFor(list, idx) {
     const S = list[idx];
     if (!S || prevFor === S.id) return;
@@ -1882,11 +1884,12 @@ window.GR = (() => {
     menuMusic(MUSIC_SCREENS.includes(s.screen) && !(s.screen === 'party' && s.party && s.party.step === 'turn' && false));
     menuGuard();
     // Avance de la canción enfocada
-    if (s.screen === 'songs' && !s.search.open && s.zone === 'grid' && G.ready) {
+    // El avance sigue siempre a la canción que enseña la ficha: también al cambiar los filtros (década, idioma…) o al
+    // buscar, que cambian la lista aunque el foco se quede en la misma posición (antes seguía sonando la de antes)
+    if (s.screen === 'songs' && G.ready) {
       const l = c.songsList();
-      previewFor(l, Math.min(s.songF, l.length - 1));
-    } else if (s.screen === 'songs' && (s.search.open || s.zone !== 'grid')) {
-      // buscando o con los filtros: sigue sonando el avance que había
+      if (l.length) previewFor(l, Math.min(s.songF, l.length - 1));
+      else if (prev || prevFor) stopPreview();
     } else if (prev || prevFor || pcache.size) stopPreview();
     // Pitidos de la cuenta atrás
     if (s.screen === 'count' && s.countN !== lastCountN) { lastCountN = s.countN; beep(880, 0.08, 0.2); }
