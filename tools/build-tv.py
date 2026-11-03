@@ -335,11 +335,11 @@ sub("  songsList(){const s=this.state;let l=SONGS.filter(x=>x.id);",
     "  songsList(){const s=this.state;const key=[SONGS.length,GR.songsRev||0,s.query||'',s.lng,s.dec,s.gen,s.duoOnly?1:0,s.ord].join('|');if(this._sl&&this._sl.key===key)return this._sl.list;const list=this.songsList0();this._sl={key,list};return list;}\n  songsList0(){const s=this.state;let l=SONGS.filter(x=>x.id);", name='lista de canciones memorizada')
 
 # --- Canciones: dos botones a la derecha de los filtros para pasar página con el ratón (o el puntero de la tele)
-BOTON_PAG = 'style="width:60px;height:60px;box-sizing:border-box;border:2px solid var(--color-text);display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:800;line-height:1;padding-bottom:4px;background:#fff"'
+BOTON_PAG = 'style="width:64px;height:64px;box-sizing:border-box;border:2px solid var(--color-text);display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:800;line-height:1;padding-bottom:4px;background:#fff"'
 sub('<div style="display:flex;margin-top:24px;border:2px solid var(--color-text);align-self:flex-start">\n    <sc-for list="{{ filters }}" as="f" hint-placeholder-count="8">',
-    '<div style="display:flex;margin-top:24px;gap:16px;align-self:flex-start">\n  <div style="display:flex;border:2px solid var(--color-text)">\n    <sc-for list="{{ filters }}" as="f" hint-placeholder-count="8">', name='canciones: fila de filtros con paginación')
+    '<div style="display:flex;margin-top:24px;justify-content:space-between;align-items:flex-start;align-self:stretch">\n  <div style="display:flex;border:2px solid var(--color-text)">\n    <sc-for list="{{ filters }}" as="f" hint-placeholder-count="8">', name='canciones: fila de filtros con paginación')
 sub('">{{ f.label }}</div>\n    </sc-for>\n  </div>',
-    '">{{ f.label }}</div>\n    </sc-for>\n  </div>\n  <div onClick="{{ onPagePrev }}" ' + BOTON_PAG + '>‹</div><div onClick="{{ onPageNext }}" ' + BOTON_PAG + '>›</div>\n  </div>', name='canciones: botones de página')
+    '">{{ f.label }}</div>\n    </sc-for>\n  </div>\n  <div style="display:flex;gap:12px"><div onClick="{{ onPagePrev }}" ' + BOTON_PAG + '>‹</div><div onClick="{{ onPageNext }}" ' + BOTON_PAG + '>›</div></div>\n  </div>', name='canciones: botones de página')
 
 if fails:
     print('ERROR: estos enganches ya no encajan con el diseño nuevo:', *fails, sep='\n  - ')

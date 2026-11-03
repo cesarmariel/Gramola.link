@@ -8,7 +8,7 @@
 <link rel="apple-touch-icon" href="/assets/iconos/favicon-180.png">
 <style>html,body{margin:0;background:#0e0f0f;overflow:hidden;cursor:none}</style>
 <script src="/vendor/qrcode.js"></script>
-<script src="/tv/gramola-bridge.js?v=1.26.1103.1256"></script>
+<script src="/tv/gramola-bridge.js?v=1.26.1103.1257"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="./support.js"></script>
@@ -60,7 +60,7 @@ a{color:var(--color-accent-700)}a:hover{color:var(--color-accent-600)}
   <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;border-top:2px solid var(--color-text);padding-top:20px;font-size:28px;font-weight:600">
     <img src="assets/nuvola/nuvola-tinta.png" alt="nuvola" style="display:block;height:44px;width:auto;position:relative;top:-7px">
     
-    <span style="color:var(--color-neutral-700);font-size:22px;font-weight:500;justify-self:center">1.26.1103.1256</span><span onClick="{{ onCredits }}" style="justify-self:end;display:flex;align-items:center;gap:12px;font-size:24px;font-weight:600;color:var(--color-neutral-700)"><span style="width:40px;height:40px;border-radius:50%;border:2px solid var(--color-text);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:var(--color-text)">{{ gk.y }}</span>Créditos</span>
+    <span style="color:var(--color-neutral-700);font-size:22px;font-weight:500;justify-self:center">1.26.1103.1257</span><span onClick="{{ onCredits }}" style="justify-self:end;display:flex;align-items:center;gap:12px;font-size:24px;font-weight:600;color:var(--color-neutral-700)"><span style="width:40px;height:40px;border-radius:50%;border:2px solid var(--color-text);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:var(--color-text)">{{ gk.y }}</span>Créditos</span>
   </div>
 </div>
 </sc-if>
@@ -176,13 +176,13 @@ a{color:var(--color-accent-700)}a:hover{color:var(--color-accent-600)}
     <div style="font-size:96px;font-weight:300;line-height:.9;letter-spacing:-0.04em">Canciones</div>
     <div style="font-size:28px;font-weight:600;color:var(--color-neutral-700)">{{ songCountText }}</div>
   </div>
-  <div style="display:flex;margin-top:24px;gap:16px;align-self:flex-start">
+  <div style="display:flex;margin-top:24px;justify-content:space-between;align-items:flex-start;align-self:stretch">
   <div style="display:flex;border:2px solid var(--color-text)">
     <sc-for list="{{ filters }}" as="f" hint-placeholder-count="8">
       <div onClick="{{ f.click }}" style="height:60px;padding:0 24px;box-sizing:border-box;display:flex;align-items:center;font-size:28px;font-weight:600;cursor:pointer;white-space:nowrap;border-right:2px solid var(--color-text);transition:background 150ms ease-out;background:{{ f.bg }};color:{{ f.fg }};outline:{{ f.ol }};outline-offset:-6px">{{ f.label }}</div>
     </sc-for>
   </div>
-  <div onClick="{{ onPagePrev }}" style="width:60px;height:60px;box-sizing:border-box;border:2px solid var(--color-text);display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:800;line-height:1;padding-bottom:4px;background:#fff">‹</div><div onClick="{{ onPageNext }}" style="width:60px;height:60px;box-sizing:border-box;border:2px solid var(--color-text);display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:800;line-height:1;padding-bottom:4px;background:#fff">›</div>
+  <div style="display:flex;gap:12px"><div onClick="{{ onPagePrev }}" style="width:64px;height:64px;box-sizing:border-box;border:2px solid var(--color-text);display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:800;line-height:1;padding-bottom:4px;background:#fff">‹</div><div onClick="{{ onPageNext }}" style="width:64px;height:64px;box-sizing:border-box;border:2px solid var(--color-text);display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:800;line-height:1;padding-bottom:4px;background:#fff">›</div></div>
   </div>
   <sc-if value="{{ hasSongs }}" hint-placeholder-val="{{ true }}">
     <div style="position:relative;flex:1;min-height:0;margin:24px -96px 0;overflow:hidden;-webkit-mask-image:linear-gradient(to right,transparent 0,#000 120px,#000 calc(100% - 120px),transparent 100%);mask-image:linear-gradient(to right,transparent 0,#000 120px,#000 calc(100% - 120px),transparent 100%)">

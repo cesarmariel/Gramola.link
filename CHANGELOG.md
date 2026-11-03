@@ -2,8 +2,8 @@
 
 Versiones con el esquema `1.AA.MMDD.HHMM` (fecha y hora del despliegue).
 
-## 1.26.1103.1256
-- Canciones: dos botones ‹ › a la derecha de los filtros para pasar una pantalla de fichas adelante o atrás con el ratón (o el puntero de la tele), con un desplazamiento largo y suave (720 ms); el salto ficha a ficha con el mando sigue igual.
+## 1.26.1103.1257
+- Canciones: dos botones ‹ › en el extremo derecho de la fila de filtros, a su misma altura, para pasar una pantalla de fichas adelante o atrás con el ratón (o el puntero de la tele), con un desplazamiento largo y suave (720 ms); el salto ficha a ficha con el mando sigue igual.
 
 ## 1.26.1103.1253
 - Rejilla de canciones: con el ratón, pinchar una ficha la elige sin mover la lista; solo el mando y el teclado la desplazan.
