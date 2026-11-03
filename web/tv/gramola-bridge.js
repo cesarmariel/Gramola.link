@@ -574,9 +574,13 @@ window.GR = (() => {
   G.gk = () => GLYPHS[padKind] || GLYPHS.tele;
   // Ratón (escritorio): la página esconde el puntero (en la tele no hay ratón); al moverlo se enseña y a los 2,5 s
   // quieto se vuelve a esconder, como en cualquier app de salón
+  // El puntero es propio: la flecha plana del logo de bages.link, en rojo con contorno de tinta, a 72 px (el punto
+  // activo es la punta)
+  const CURSOR_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="1.5 1 24 24"><path d="M4 3l16 7.5-6.6 2.1L10.6 21z" fill="#ec3013" stroke="#201e1d" stroke-width="1.4" stroke-linejoin="round" paint-order="stroke"/></svg>';
+  const CURSOR = `url('data:image/svg+xml;utf8,${encodeURIComponent(CURSOR_SVG)}') 8 6, auto`;
   let mouseT = 0;
   addEventListener('mousemove', () => {
-    document.documentElement.style.cursor = 'default'; document.body.style.cursor = 'default';
+    document.documentElement.style.cursor = CURSOR; document.body.style.cursor = CURSOR;
     clearTimeout(mouseT);
     mouseT = setTimeout(() => { document.documentElement.style.cursor = ''; document.body.style.cursor = ''; }, 2500);
   }, { passive: true });

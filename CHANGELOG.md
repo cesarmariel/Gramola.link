@@ -2,6 +2,9 @@
 
 Versiones con el esquema `1.AA.MMDD.HHMM` (fecha y hora del despliegue).
 
+## 1.26.1103.1153
+- Puntero propio en escritorio: la flecha plana en rojo con contorno de tinta, grande (72 px); se esconde a los 2,5 s quieto.
+
 ## 1.26.1103.1150
 - En escritorio, el puntero del ratón aparece al moverlo y se esconde a los 2,5 s quieto (antes estaba siempre oculto, pensado solo para la tele).
 
