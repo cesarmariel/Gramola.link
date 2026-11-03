@@ -8,7 +8,7 @@
 <link rel="apple-touch-icon" href="/assets/iconos/favicon-180.png">
 <style>html,body{margin:0;background:#0e0f0f;overflow:hidden;cursor:none}</style>
 <script src="/vendor/qrcode.js"></script>
-<script src="/tv/gramola-bridge.js?v=1.26.1103.1253"></script>
+<script src="/tv/gramola-bridge.js?v=1.26.1103.1256"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="./support.js"></script>
@@ -60,7 +60,7 @@ a{color:var(--color-accent-700)}a:hover{color:var(--color-accent-600)}
   <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;border-top:2px solid var(--color-text);padding-top:20px;font-size:28px;font-weight:600">
     <img src="assets/nuvola/nuvola-tinta.png" alt="nuvola" style="display:block;height:44px;width:auto;position:relative;top:-7px">
     
-    <span style="color:var(--color-neutral-700);font-size:22px;font-weight:500;justify-self:center">1.26.1103.1253</span><span onClick="{{ onCredits }}" style="justify-self:end;display:flex;align-items:center;gap:12px;font-size:24px;font-weight:600;color:var(--color-neutral-700)"><span style="width:40px;height:40px;border-radius:50%;border:2px solid var(--color-text);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:var(--color-text)">{{ gk.y }}</span>Créditos</span>
+    <span style="color:var(--color-neutral-700);font-size:22px;font-weight:500;justify-self:center">1.26.1103.1256</span><span onClick="{{ onCredits }}" style="justify-self:end;display:flex;align-items:center;gap:12px;font-size:24px;font-weight:600;color:var(--color-neutral-700)"><span style="width:40px;height:40px;border-radius:50%;border:2px solid var(--color-text);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:var(--color-text)">{{ gk.y }}</span>Créditos</span>
   </div>
 </div>
 </sc-if>
@@ -176,14 +176,17 @@ a{color:var(--color-accent-700)}a:hover{color:var(--color-accent-600)}
     <div style="font-size:96px;font-weight:300;line-height:.9;letter-spacing:-0.04em">Canciones</div>
     <div style="font-size:28px;font-weight:600;color:var(--color-neutral-700)">{{ songCountText }}</div>
   </div>
-  <div style="display:flex;margin-top:24px;border:2px solid var(--color-text);align-self:flex-start">
+  <div style="display:flex;margin-top:24px;gap:16px;align-self:flex-start">
+  <div style="display:flex;border:2px solid var(--color-text)">
     <sc-for list="{{ filters }}" as="f" hint-placeholder-count="8">
       <div onClick="{{ f.click }}" style="height:60px;padding:0 24px;box-sizing:border-box;display:flex;align-items:center;font-size:28px;font-weight:600;cursor:pointer;white-space:nowrap;border-right:2px solid var(--color-text);transition:background 150ms ease-out;background:{{ f.bg }};color:{{ f.fg }};outline:{{ f.ol }};outline-offset:-6px">{{ f.label }}</div>
     </sc-for>
   </div>
+  <div onClick="{{ onPagePrev }}" style="width:60px;height:60px;box-sizing:border-box;border:2px solid var(--color-text);display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:800;line-height:1;padding-bottom:4px;background:#fff">‹</div><div onClick="{{ onPageNext }}" style="width:60px;height:60px;box-sizing:border-box;border:2px solid var(--color-text);display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:800;line-height:1;padding-bottom:4px;background:#fff">›</div>
+  </div>
   <sc-if value="{{ hasSongs }}" hint-placeholder-val="{{ true }}">
     <div style="position:relative;flex:1;min-height:0;margin:24px -96px 0;overflow:hidden;-webkit-mask-image:linear-gradient(to right,transparent 0,#000 120px,#000 calc(100% - 120px),transparent 100%);mask-image:linear-gradient(to right,transparent 0,#000 120px,#000 calc(100% - 120px),transparent 100%)">
-      <div style="position:absolute;left:0;top:0;height:100%;transition:transform 260ms cubic-bezier(.2,.8,.2,1);transform:translateX({{ grid.tx }}px)">
+      <div style="position:absolute;left:0;top:0;height:100%;transition:transform {{ grid.tr }};transform:translateX({{ grid.tx }}px)">
         <sc-for list="{{ grid.tags }}" as="g" hint-placeholder-count="3">
           <div style="position:absolute;left:{{ g.x }}px;top:{{ g.y }}px;width:52px;height:52px;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800;color:#fff;background:{{ g.bg }}">{{ g.l }}</div>
         </sc-for>
@@ -1042,7 +1045,7 @@ class Component extends DCLogic {
     V.isPA=!!s.pauseAudio;V.notPA=!s.pauseAudio;V.pauseTitle=s.pauseAudio?'Audio':'Pausa';const stg=s.settings;
     V.paRows=[['Música',stg.music,String(stg.music)],['Efectos',stg.fx,String(stg.fx)],['Retraso del micro',Math.round(stg.delay/40),stg.delay+' ms']].map((r,i)=>{const on=s.paF===i;return {label:r[0],val:r[2],bg:on?C.red:'transparent',fg:on?'#fff':ink,cells:Array.from({length:10},(_,j)=>({c:j<r[1]?(on?'#fff':ink):(on?'rgba(255,255,255,0.35)':C.n3)})),click:()=>this.setState({paF:i})};});
     V.onKeyOk=()=>this.act('ok');V.onKeyBack=()=>this.act('back');V.onKeyX=()=>this.act('x');V.onKeyY=()=>this.act('y');V.onKeyL=()=>this.act('lb');V.onKeyR=()=>this.act('rb');
-    V.isBoot=s.screen==='boot';V.videoEl=GR.videoUrl(this)&&s.screen==='sing'?React.createElement('video',{key:'v',src:GR.videoUrl(this),autoPlay:true,muted:true,loop:false,playsInline:true,'data-gramola':'videoclip',style:{position:'absolute',inset:0,width:1920,height:1080,objectFit:'cover'}}):null;V.gk=GR.gk();V.onCredits=e=>{if(e&&e.stopPropagation)e.stopPropagation();GR.creditsOpen(this);};V.isSplash=s.screen==='splash';V.isWelcome=s.screen==='welcome';V.spOp=s.splashIn&&!s.splashOut?1:0;V.spOpMs=s.splashOut?700:1000;V.bootOp=s.bootIn===false?0:1;V.spClip=s.splashRed?'circle(75% at 50% 50%)':'circle(0% at 50% 50%)';V.spOrigOp=1;V.spWhiteOp=0;V.spTf=s.splashIn?'scale(1)':'scale(0.94)';V.spMsgOp=s.splashMsg&&!s.splashMsgOut?1:0;V.spMsgTf=s.splashMsg&&!s.splashMsgOut?'translateY(0)':'translateY(18px)';
+    V.isBoot=s.screen==='boot';V.videoEl=GR.videoUrl(this)&&s.screen==='sing'?React.createElement('video',{key:'v',src:GR.videoUrl(this),autoPlay:true,muted:true,loop:false,playsInline:true,'data-gramola':'videoclip',style:{position:'absolute',inset:0,width:1920,height:1080,objectFit:'cover'}}):null;V.gk=GR.gk();V.onCredits=e=>{if(e&&e.stopPropagation)e.stopPropagation();GR.creditsOpen(this);};V.onPagePrev=()=>GR.gridPage(this,-1);V.onPageNext=()=>GR.gridPage(this,1);V.isSplash=s.screen==='splash';V.isWelcome=s.screen==='welcome';V.spOp=s.splashIn&&!s.splashOut?1:0;V.spOpMs=s.splashOut?700:1000;V.bootOp=s.bootIn===false?0:1;V.spClip=s.splashRed?'circle(75% at 50% 50%)':'circle(0% at 50% 50%)';V.spOrigOp=1;V.spWhiteOp=0;V.spTf=s.splashIn?'scale(1)':'scale(0.94)';V.spMsgOp=s.splashMsg&&!s.splashMsgOut?1:0;V.spMsgTf=s.splashMsg&&!s.splashMsgOut?'translateY(0)':'translateY(18px)';
     if(!this._pressEl||this._pressGk!==GR.gk().ok){this._pressGk=GR.gk().ok;const h=React.createElement;this._pressEl=h('div',{style:{display:'flex',alignItems:'center',gap:20,fontSize:40,fontWeight:800,animation:'gPulse 1.8s ease-in-out infinite'}},h('span',null,'Pulsa'),h('span',{style:{width:60,height:60,borderRadius:'50%',background:C.ink,color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:26,fontWeight:800}},GR.gk().ok),h('span',null,'para continuar'));}V.pressEl=this._pressEl;V.bootW=Math.round(s.bootK*100);V.room=s.room;V.safe=!!this.props.showSafeArea;
     V.isJukebox=s.screen==='sing'&&s.mode==='jukebox';
     V.jq=s.jq.slice(0,4).filter(i=>SONGS[i]&&SONGS[i].id).map(i=>{const so=SONGS[i];return {title:so.title,artist:so.artist,bg:so.cv[0],blk:so.cv[1]};});

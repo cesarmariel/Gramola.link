@@ -179,7 +179,7 @@ sub("Pasa el micro", "Pásalo", count=0, name='Pásalo')
 
 # --- lista de canciones en rejilla de dos filas (sin transiciones en las fichas: se reutilizan al desplazarse y
 #     una animación de color hacía parpadear en rojo la ficha que antes estaba seleccionada) (en lugar del carrusel de una en una); el resto de la pantalla igual
-GRID_HTML = """      <div style="position:absolute;left:0;top:0;height:100%;transition:transform 260ms cubic-bezier(.2,.8,.2,1);transform:translateX({{ grid.tx }}px)">
+GRID_HTML = """      <div style="position:absolute;left:0;top:0;height:100%;transition:transform {{ grid.tr }};transform:translateX({{ grid.tx }}px)">
         <sc-for list="{{ grid.tags }}" as="g" hint-placeholder-count="3">
           <div style="position:absolute;left:{{ g.x }}px;top:{{ g.y }}px;width:52px;height:52px;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800;color:#fff;background:{{ g.bg }}">{{ g.l }}</div>
         </sc-for>
@@ -237,7 +237,7 @@ sub(r'(<img src="assets/nuvola/nuvola-blanco\.png"[^\n]*\n    </div>\n  </div>\n
 # --- ayudas de botones según el mando conectado (PlayStation ✕○□△, Xbox ABXY, o las del diseño)
 GK = {'OK': 'ok', '←': 'back', 'X': 'x', 'Y': 'y', 'L': 'l', 'R': 'r', 'L R': 'lr', '≡': 'menu'}
 sub(r'((?:min-width|width):4[48]px;height:4[48]px;[^>]*>)(OK|←|X|Y|L|R|L R|≡)(</div>)', lambda m: m.group(1) + '{{ gk.' + GK[m.group(2)] + ' }}' + m.group(3), regex=True, count=0, name='ayudas: símbolos')
-sub("V.isSplash=s.screen==='splash';", "V.gk=GR.gk();V.onCredits=e=>{if(e&&e.stopPropagation)e.stopPropagation();GR.creditsOpen(this);};V.isSplash=s.screen==='splash';", name='ayudas: datos')
+sub("V.isSplash=s.screen==='splash';", "V.gk=GR.gk();V.onCredits=e=>{if(e&&e.stopPropagation)e.stopPropagation();GR.creditsOpen(this);};V.onPagePrev=()=>GR.gridPage(this,-1);V.onPageNext=()=>GR.gridPage(this,1);V.isSplash=s.screen==='splash';", name='ayudas: datos')
 sub("if(!this._pressEl){const h=React.createElement;this._pressEl=", "if(!this._pressEl||this._pressGk!==GR.gk().ok){this._pressGk=GR.gk().ok;const h=React.createElement;this._pressEl=", name='ayudas: pulsa')
 sub("fontSize:26,fontWeight:800}},'OK'),h('span',null,'para continuar')", "fontSize:26,fontWeight:800}},GR.gk().ok),h('span',null,'para continuar')", name='ayudas: pulsa OK')
 
@@ -333,6 +333,13 @@ sub("const covers=list.map((so,i)=>{", "const covers=[],_coversNo=((so,i)=>{", n
 # La lista de canciones filtrada y ordenada se calcula solo cuando cambia algo (antes, en cada render, también cantando)
 sub("  songsList(){const s=this.state;let l=SONGS.filter(x=>x.id);",
     "  songsList(){const s=this.state;const key=[SONGS.length,GR.songsRev||0,s.query||'',s.lng,s.dec,s.gen,s.duoOnly?1:0,s.ord].join('|');if(this._sl&&this._sl.key===key)return this._sl.list;const list=this.songsList0();this._sl={key,list};return list;}\n  songsList0(){const s=this.state;let l=SONGS.filter(x=>x.id);", name='lista de canciones memorizada')
+
+# --- Canciones: dos botones a la derecha de los filtros para pasar página con el ratón (o el puntero de la tele)
+BOTON_PAG = 'style="width:60px;height:60px;box-sizing:border-box;border:2px solid var(--color-text);display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:800;line-height:1;padding-bottom:4px;background:#fff"'
+sub('<div style="display:flex;margin-top:24px;border:2px solid var(--color-text);align-self:flex-start">\n    <sc-for list="{{ filters }}" as="f" hint-placeholder-count="8">',
+    '<div style="display:flex;margin-top:24px;gap:16px;align-self:flex-start">\n  <div style="display:flex;border:2px solid var(--color-text)">\n    <sc-for list="{{ filters }}" as="f" hint-placeholder-count="8">', name='canciones: fila de filtros con paginación')
+sub('">{{ f.label }}</div>\n    </sc-for>\n  </div>',
+    '">{{ f.label }}</div>\n    </sc-for>\n  </div>\n  <div onClick="{{ onPagePrev }}" ' + BOTON_PAG + '>‹</div><div onClick="{{ onPageNext }}" ' + BOTON_PAG + '>›</div>\n  </div>', name='canciones: botones de página')
 
 if fails:
     print('ERROR: estos enganches ya no encajan con el diseño nuevo:', *fails, sep='\n  - ')

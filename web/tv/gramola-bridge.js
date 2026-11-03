@@ -657,7 +657,7 @@ window.GR = (() => {
   }
   G.songGrid = (c, list, sf) => {
     const s = c.state, L = gridLayout(list, s.ord), gz = s.zone === 'grid';
-    if (!list.length) return { tiles: [], tags: [], abc: [], tx: 0 };
+    if (!list.length) return { tiles: [], tags: [], abc: [], tx: 0, tr: '260ms' };
     const p = L.pos[Math.min(sf, list.length - 1)] || { c: 0, r: 0 };
     const fx = L.cols[p.c].x;
     // Desplazamiento: el foco se queda en el tercio izquierdo; sin pasarse de los bordes. Si la ficha se eligió con el
@@ -666,6 +666,8 @@ window.GR = (() => {
     const maxTx = Math.max(0, L.width - GRID.VIEW);
     const tx = G.gridMouse && G.gridTx != null && -G.gridTx <= maxTx ? G.gridTx : want;
     G.gridTx = tx;
+    // Paso de página con los botones: desplazamiento más largo y suave que el salto de ficha en ficha
+    const tr = performance.now() < (G.gridSmoothUntil || 0) ? '720ms cubic-bezier(.25,.8,.25,1)' : '260ms cubic-bezier(.2,.8,.2,1)';
     const lo = -tx - 400, hi = -tx + GRID.VIEW + 400;
     const tiles = [];
     L.cols.forEach((col, ci) => {
@@ -682,9 +684,23 @@ window.GR = (() => {
     const curTag = L.tags.filter(t => t.col <= p.c).pop();
     const tags = L.tags.filter(t => t.x > lo - 100 && t.x < hi).map(t => ({ l: t.l, x: t.x, y: 8, bg: curTag && t === curTag ? '#ec3013' : '#201e1d' }));
     const abc = L.tags.map(t => ({ l: t.l, bg: curTag && t === curTag ? '#ec3013' : 'transparent', fg: curTag && t === curTag ? '#fff' : '#9b9797' }));
-    return { tiles, tags, abc, tx };
+    return { tiles, tags, abc, tx, tr };
   };
   // Movimiento del foco en la rejilla; null = no lo gestiona (↑ desde la fila de arriba → filtros)
+  // Botones ‹ › junto a los filtros: una pantalla de fichas adelante o atrás (la lista se desplaza suave)
+  G.gridPage = (c, dir) => {
+    const s = c.state, list = c.songsList();
+    if (!list.length) return;
+    const L = gridLayout(list, s.ord), sf = Math.min(s.songF, list.length - 1), p = L.pos[sf] || { c: 0, r: 0 };
+    const paso = GRID.VIEW - GRID.LEFT - 96;   // lo que cabe en pantalla
+    const x0 = L.cols[p.c].x + dir * paso;
+    let ci = 0, best = Infinity;
+    L.cols.forEach((col, i) => { const d = Math.abs(col.x - x0); if (d < best) { best = d; ci = i; } });
+    if (ci === p.c) ci = Math.max(0, Math.min(L.cols.length - 1, p.c + dir));
+    const col = L.cols[ci], i = col.items[Math.min(p.r, col.items.length - 1)];
+    G.gridMouse = false; G.gridSmoothUntil = performance.now() + 800;
+    c.setState({ songF: i, zone: 'grid' });
+  };
   G.gridMove = (c, list, sf, a) => {
     if (!list.length || !'lrud'.includes(a)) return null;
     const L = gridLayout(list, c.state.ord), p = L.pos[Math.min(sf, list.length - 1)];
