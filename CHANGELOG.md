@@ -2,6 +2,9 @@
 
 Versiones con el esquema `1.AA.MMDD.HHMM` (fecha y hora del despliegue).
 
+## 1.26.1103.1347
+- Editor: el trozo de voz de una frase (cuando no empieza en un silencio) se afina con la curva de tono: empieza en el primer instante en que la voz tiene tono y acaba en el último. El reconocimiento adelanta cada palabra al hueco anterior (en «Dance The Night» unos 0,4 s) y marcaba en ámbar frases que estaban bien.
+
 ## 1.26.1103.1339
 - **Editor por frases sobre la voz** (modo sencillo): al elegir una frase solo se ve ella con su trozo de voz (banda «VOZ» con las palabras que dice, reconocidas por el trabajador) y se escribe en qué **segundo empieza y acaba** (Enter aplica; ↑ ↓ ±0,05 s). Al mover el inicio la frase se desplaza; al mover el fin sus sílabas se estiran o encogen; con «lo que viene detrás se mueve igual» (por defecto) todas las frases posteriores se desplazan lo mismo. «◉ Usar la voz» la pone donde la voz. Lista de frases con un punto verde (empieza donde la voz), ámbar (la voz empieza en otro sitio) o hueco (sin voz cerca). «▶ Escuchar» reproduce la frase con su trozo de voz.
 - **Trabajador**: con la voz separada parte la canción en tramos por los silencios y reconoce qué dice cada uno palabra a palabra (faster-whisper «small», ~50 s por canción) → `voz-tramos.json`. Al crear o volver a encajar, cada línea de la letra se busca solo en la zona donde la voz la dice (palabras reconocidas emparejadas con la letra en orden, coincidencias largas primero: cada estribillo repetido va al suyo; la letra sincronizada queda de reserva), y la primera sílaba de cada frase se lleva a donde arranca la voz de su tramo. En «José José - Volcán» (prueba contra la versión corregida a mano): la primera frase, que salía 4 s tarde, ya sale en su sitio; mediana de 26 ms de desvío por línea.

@@ -188,7 +188,7 @@
     const vivo = () => view.contains(cv);
     peaksOf(data.audio).then(r => { if (!vivo()) return; peaks = r.p; durMs = r.dur; draw(); }).catch(() => {});
     if (data.vocals) peaksOf(data.vocals).then(r => { if (!vivo()) return; vpeaks = r.p; if (!tramos) { tramos = tramosDe(r.r); tramosOrigen = 'voz'; refresh(); } draw(); }).catch(() => {});
-    if (data.pitch) fetch(data.pitch).then(r => r.json()).then(j => { if (!vivo()) return; pitchCurve = j; draw(); }).catch(() => {});
+    if (data.pitch) fetch(data.pitch).then(r => r.json()).then(j => { if (!vivo()) return; pitchCurve = j; vozCur = null; refresh(); }).catch(() => {});
     // Tramos de voz y lo que dice (reconocimiento hecho por el trabajador); si no hay fichero, los tramos salen de la voz sola
     let tramos = null, tramosOrigen = null, asrW = null;
     if (data.tramos) fetch(data.tramos).then(r => r.json()).then(j => {
@@ -762,13 +762,27 @@
         while (hi < asrW.length - 1 && !usadas.has(hi + 1) && t1 && asrW[hi + 1].b <= t1.b + 60) hi++;
         let a = asrW[lo].a, b = asrW[hi].b;
         if (t0 && asrW.findIndex(w => w.a >= t0.a - 60) === lo) a = t0.a;
+        else a = conTono(Math.max(a, k > 0 ? b2ms(ph[k - 1].end) - 300 : 0), 1, 900);   // whisper adelanta la palabra al hueco anterior: el primer instante con tono
         if (t1 && asrW.length - 1 - asrW.slice().reverse().findIndex(w => w.b <= t1.b + 60) === hi) b = t1.b;
+        else b = Math.max(a + 100, conTono(b, -1, 900));
         return { a, b, txt: asrW.slice(lo, hi + 1).map(w => w.w).join(' '), pct: ks.length / Math.max(1, palabrasDe(p).length), reconocida: true };
       }
       const sol = tramos.map(t => ({ t, s: Math.min(fin, t.b) - Math.max(ini, t.a) })).sort((x, y) => y.s - x.s)[0];
       const cerca = tramos.slice().sort((x, y) => Math.abs(x.a - ini) - Math.abs(y.a - ini))[0];
       const el = sol && sol.s > 0 ? sol.t : cerca && Math.abs(cerca.a - ini) < 2000 ? cerca : null;
       return el ? { a: el.a, b: el.b, txt: el.txt, pct: 0, reconocida: false } : null;
+    }
+    // Desde «ms», hacia delante (dir 1) o hacia atrás (−1), el primer instante en que la voz tiene tono dos lecturas
+    // seguidas (hasta «tope» ms); sin curva de tono o sin tono en ese tramo, el mismo «ms»
+    function conTono(ms, dir, tope) {
+      if (!pitchCurve || !pitchCurve.length) return ms;
+      const paso = pitchCurve.length > 1 ? pitchCurve[1][0] - pitchCurve[0][0] : 10, n = pitchCurve.length;
+      let i = clamp(Math.round(ms / paso), 0, n - 1);
+      for (let k = 0; k * paso <= tope && i >= 0 && i < n; k++, i += dir) {
+        const j = i + dir;
+        if (pitchCurve[i][1] != null && j >= 0 && j < n && pitchCurve[j][1] != null) return pitchCurve[i][0] + (dir < 0 ? paso : 0);
+      }
+      return ms;
     }
     const vozAct = () => { if (!sencillo()) return null; if (!vozCur || vozCur.k !== cur) vozCur = { k: cur, v: vozDe(cur) }; return vozCur.v; };
     const seg = ms => (ms / 1000).toFixed(2).replace('.', ',');

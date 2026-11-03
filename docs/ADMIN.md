@@ -55,7 +55,8 @@ calculan en el navegador y a cada frase le toca el tramo que más se solapa con 
   frases y cortes posteriores se desplazan lo mismo, así se va corrigiendo la canción de principio a fin y cada frase
   solo necesita su propio retoque; sin marcar, la frase no puede pisar a la siguiente.
 - **◉ Usar la voz**: pone «Empieza» y «Acaba» donde la voz (el inicio del trozo es donde arranca la voz detectada; si la
-  frase va seguida de otra sin silencio, donde empieza su primera palabra reconocida). Debajo, «La voz dice: «…»» con
+  frase va seguida de otra sin silencio, donde empieza su primera palabra reconocida, afinado al primer instante en que
+  la voz tiene tono, porque el reconocimiento suele adelantar la palabra al hueco anterior). Debajo, «La voz dice: «…»» con
   lo reconocido, si coincide con la letra y cuánto se desvía la frase.
 - «▶ Escuchar» reproduce la frase con su trozo de voz (con «Repetir frase», en bucle);
 - arriba, las **palabras de la frase como botones**: un clic elige sus sílabas; **★ Dorada** las marca (dan más puntos)
