@@ -81,6 +81,8 @@ window.GR = (() => {
       if (k && c) c.act(k);
     } else if (m.type === 'full-attempt') { if (c) c.setState({ err: 'full' }); }
     else if (m.type === 'replaced') { if (c) c.toast('Esta sala se ha abierto en otra pantalla'); }
+    // El servidor no admite más salas ahora mismo: se avisa y se vuelve a pedir una al cabo de medio minuto
+    else if (m.type === 'error' && m.code === 'busy') { if (c) c.toast(String(m.msg || 'El servidor está lleno; se vuelve a intentar enseguida').slice(0, 140)); setTimeout(() => { if (!G.room && G.net) G.net.send({ type: 'host' }); }, 30000); }
     // Órdenes desde la administración: un aviso en pantalla o recargar la app
     else if (m.type === 'admin') {
       if (m.action === 'reload') setTimeout(() => location.reload(), 300);

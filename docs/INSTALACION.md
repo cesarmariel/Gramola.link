@@ -12,6 +12,7 @@
 cd server
 npm install
 npm start                 # http://localhost:8877
+npm test                  # pruebas del servidor (arranca uno aparte con datos temporales)
 ```
 
 Variables de entorno:

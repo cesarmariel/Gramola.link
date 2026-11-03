@@ -2,6 +2,18 @@
 
 Versiones con el esquema `1.AA.MMDD.HHMM` (fecha y hora del despliegue).
 
+## 1.26.1103.0941
+- **Servidor más robusto** (revisión de seguridad; parte de los fallos los señaló un fork de la comunidad):
+  - Una cookie mal codificada (`gtv=%`) o un cuerpo JSON que no fuera un objeto (`null`) tumbaban el proceso entero y se caían todas las salas hasta que systemd lo levantaba. Ahora dan 400 o se ignoran, y cualquier error no previsto en una petición responde 500 sin parar el servidor.
+  - La ruta se descodifica y normaliza una sola vez antes de mirar permisos: `/%73ongs/…`, `//songs/…` o `/app/../songs/…` ya no se saltan el pase de tele (en producción Cloudflare y Apache ya lo paraban; ahora también lo para Node).
+  - Tope de 500 salas abiertas a la vez: al agotarse los 6.390 códigos el servidor se quedaba colgado para siempre buscando uno libre. Si se llega al tope, la tele recibe `error busy`, avisa y vuelve a pedir sala a los 30 s.
+  - Récords: solo canciones que existen en la biblioteca y solo jugadores bien formados (un `players:[null]` también tumbaba el servidor).
+  - Telemetría de la tele: solo la manda una tele con sala y solo la ve el admin (antes era pública).
+  - Al cerrar una sala con «Nuevo código», los cierres de los móviles ya no mandan listas de jugadores de la sala vieja a la tele.
+  - Admin: el .txt del editor con JSON mal formado responde 400 (no 500); rangos de audio fuera de fichero en Creación responden 416.
+  - Creación desde Spotify: la letra se busca en segundo plano al instalar el borrador, así el trabajador no da por fallida una descarga buena porque LRCLIB, Genius o songlyrics tarden.
+- **Pruebas del servidor** (`cd server && npm test`): peticiones raras, pase de tele con rutas codificadas, telemetría, partida completa (sala, jugador, canciones, récord), tope de salas y «Nuevo código».
+
 ## 1.26.1102.1646
 - **Editor · frases**: con palabras elegidas, «✂ Separar en otra frase», «⤒ Pasar a la frase anterior» y «⤓ Pasar a la frase siguiente»; «Unir con la siguiente» junta dos frases.
 - **Editor · trozo sin cantar**: se marca arrastrando (botón «⌇ Marcar trozo sin cantar» o sobre la forma de onda), se puede escuchar y «Dejar sin cantar» aparta las sílabas que caían dentro (antes o después del trozo) y deja un corte de frase en el hueco.

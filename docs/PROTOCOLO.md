@@ -32,6 +32,7 @@ Una conexión WebSocket en `/ws` por dispositivo; mensajes JSON con `type`.
 | `{type:"join", code, name, slot, token?}` | móvil → servidor | Entrar con el color `slot`. Con `token` se recupera el mismo jugador. |
 | `{type:"joined", id, slot, token, name, color, code, hostOnline}` | servidor → móvil | Dentro. |
 | `{type:"error", code, msg}` | servidor → móvil | `no-room`, `full`, `color-taken` (con `taken`). |
+| `{type:"error", code:"busy", msg}` | servidor → tele | No caben más salas (tope de 500 a la vez); la tele avisa y vuelve a pedir sala al cabo de 30 s. |
 | `{type:"pitch", n, v, lat}` · `{type:"input", key}` · `{type:"leave"}` | móvil → servidor | Voz (25/s), mando, salir. |
 | `{type:"photo", data}` | móvil → servidor | Foto del jugador (cámara frontal, ≤48 KB). Solo se guarda en memoria mientras dura la sala. |
 | `{type:"roster", players}` · `{type:"host", online}` · `{type:"kicked"}` · `{type:"closed"}` | servidor → móvil | Lista de la sala, tele conectada o no, expulsado, sala cerrada. |
@@ -40,7 +41,12 @@ Una conexión WebSocket en `/ws` por dispositivo; mensajes JSON con `type`.
 ## Límites
 
 Máximo 8 jugadores; mensajes de 16 KB; códigos consonante-vocal-consonante-vocal (tipo «MOKA», sin palabras feas);
-la sala dura 15 min sin tele; ping de WebSocket cada 25 s.
+la sala dura 15 min sin tele; ping de WebSocket cada 25 s; como mucho 500 salas abiertas a la vez (hay 6.390 códigos;
+con el tope nunca se agotan y el servidor no se puede quedar colgado buscando uno libre).
+
+Las rutas se descodifican y normalizan una sola vez antes de mirar permisos: `/%73ongs/…`, `//songs/…` o
+`/app/../songs/…` son `/songs/…` y piden el pase de tele igual. Cualquier error no previsto en una petición responde
+500 sin tumbar el servidor (una cookie mal codificada o un cuerpo JSON que no sea un objeto dan 400 o se ignoran).
 
 ## HTTP
 
@@ -48,7 +54,8 @@ la sala dura 15 min sin tele; ping de WebSocket cada 25 s.
 |---|---|
 | `GET /api/songs` | Canciones: id, título, artista, año, idioma, género, duración, dificultad 1–3, dúo, rutas. |
 | `GET /api/records` | `{songs:{id:{score,name,date,title,artist}}, singers:{nombre:{songs,best,streak}}, plays:{id:n}}`. |
-| `POST /api/records` | `{code, token, song, title, artist, players:[{name,score,streak,bot}]}`. Solo con el token de una sala abierta. |
+| `POST /api/records` | `{code, token, song, title, artist, players:[{name,score,streak,bot}]}`. Solo con el token de una sala abierta, `players` objetos y `song` una canción de la biblioteca. |
 | `GET /api/health` | Estado. |
+| `POST /api/telemetry` | Rendimiento de la tele (fps, memoria…), en memoria (últimas 300). Solo con pase de tele; `GET` solo con sesión de admin. |
 | `/api/admin/*` | Solo en el subdominio `admin.` y con sesión de Touch ID. Ver [ADMIN.md](ADMIN.md). |
 | `/api/worker/*` | Solo en `admin.`, con la clave del trabajador (`Authorization: Bearer`): `next`, `jobs/<id>/input`, `progress`, `result/<fichero>`, `done`. Ver [ADMIN.md](ADMIN.md). |

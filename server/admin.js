@@ -87,7 +87,7 @@ module.exports = function admin(ctx) {
   };
   function cookie(req, name) {
     const m = (req.headers.cookie || '').match(new RegExp('(?:^|; )' + name + '=([^;]+)'));
-    return m ? decodeURIComponent(m[1]) : null;
+    try { return m ? decodeURIComponent(m[1]) : null; } catch { return null; }   // una cookie mal codificada no tumba nada
   }
   const secure = req => originOf(req).startsWith('https') ? '; Secure' : '';
   function sessionOf(req) {
@@ -520,8 +520,9 @@ module.exports = function admin(ctx) {
   });
   on('PUT', '/songs/([^/]+)/chart', async (req, res, m) => {
     const id = decodeURIComponent(m[1]), dir = songDir(id), f = chartFile(dir);
-    const b = JSON.parse((await readRaw(req, 2 * 1024 * 1024)).toString('utf8') || '{}');
-    const text = String(b.text || '');
+    let b;
+    try { b = JSON.parse((await readRaw(req, 2 * 1024 * 1024)).toString('utf8') || '{}'); } catch { throw httpErr(400, 'JSON no válido'); }
+    const text = String((b && b.text) || '');
     if (!/^#TITLE:/m.test(text) || !/^#BPM:/m.test(text) || !/^[:*FRG]\s*-?\d+\s+\d+\s+-?\d+/m.test(text)) throw httpErr(400, 'El .txt no es válido (falta TITLE, BPM o notas)');
     const vd = verDir(id);
     fs.mkdirSync(vd, { recursive: true });
@@ -635,6 +636,7 @@ module.exports = function admin(ctx) {
     const rg = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
     if (rg && m[2] === 'audio' && (rg[1] || rg[2])) {
       const a = rg[1] ? +rg[1] : st.size - +rg[2], e = rg[1] && rg[2] ? Math.min(+rg[2], st.size - 1) : st.size - 1;
+      if (!(a >= 0 && a <= e && a < st.size)) { res.writeHead(416, { 'content-range': `bytes */${st.size}` }); return res.end(); }
       res.writeHead(206, { 'content-type': type, 'accept-ranges': 'bytes', 'content-range': `bytes ${a}-${e}/${st.size}`, 'content-length': e - a + 1, 'cache-control': 'no-store' });
       return fs.createReadStream(f, { start: a, end: e }).pipe(res);
     }
@@ -1009,12 +1011,19 @@ module.exports = function admin(ctx) {
       const k = normKey(j.artista) + '|' + normKey(j.titulo);
       const same = ctx.scanSongs(true).find(s => normKey(s.artist) + '|' + normKey(s.title) === k);
       j.dup = same ? same.id : null;
-      try {
-        const l = await buscarLetra(j.artista, j.titulo, j.duracion);
-        if (l) { fs.writeFileSync(src('letra.txt'), l.texto); if (l.lrc) fs.writeFileSync(src('letra.lrc'), l.lrc); j.letraFuente = l.fuente + (l.sincronizada ? ' (sincronizada)' : ''); }
-      } catch {}
       j.state = 'borrador';
       ev('songs', `Descargada de Spotify: «${j.artista} - ${j.titulo}» (borrador)${j.dup ? ' · ya existe en la biblioteca' : ''}`);
+      // La letra se busca en segundo plano (LRCLIB, Genius, songlyrics pueden tardar más de un minuto entre reintentos):
+      // el trabajador recibe su respuesta enseguida y no da por fallida la descarga por un tiempo de espera agotado
+      (async () => {
+        try {
+          const l = await buscarLetra(j.artista, j.titulo, j.duracion);
+          if (!l || j.state !== 'borrador') return;
+          fs.writeFileSync(src('letra.txt'), l.texto); if (l.lrc) fs.writeFileSync(src('letra.lrc'), l.lrc);
+          j.letraFuente = l.fuente + (l.sincronizada ? ' (sincronizada)' : '');
+          jobPut(j);
+        } catch {}
+      })();
       return;
     }
     if (j.kind === 'analizar') {
