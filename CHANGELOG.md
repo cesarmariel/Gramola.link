@@ -2,6 +2,9 @@
 
 Versiones con el esquema `1.AA.MMDD.HHMM` (fecha y hora del despliegue).
 
+## 1.26.1103.1259
+- Una sala cuya tele lleva 3 minutos desconectada se cierra sola (antes 15 minutos): los móviles reciben el aviso de sala cerrada y la tele, si vuelve después, abre una sala nueva.
+
 ## 1.26.1103.1257
 - Canciones: dos botones ‹ › en el extremo derecho de la fila de filtros, a su misma altura, para pasar una pantalla de fichas adelante o atrás con el ratón (o el puntero de la tele), con un desplazamiento largo y suave (720 ms); el salto ficha a ficha con el mando sigue igual.
 

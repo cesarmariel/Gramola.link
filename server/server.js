@@ -21,7 +21,7 @@ const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const SERVE_STATIC = process.env.SERVE_STATIC !== '0';
 const MAX_PLAYERS = 8;
 const MAX_ROOMS = Number(process.env.MAX_ROOMS || 500);   // tope de salas a la vez (hay 6.390 códigos; sin tope, al agotarse el servidor se quedaría colgado)
-const ROOM_TTL_MS = 15 * 60 * 1000; // la sala aguanta 15 min sin tele conectada
+const ROOM_TTL_MS = 3 * 60 * 1000;  // la sala se cierra sola a los 3 min sin tele conectada (orden del usuario, 03-nov)
 // Un color por micro: J1..J8
 const COLORS = ['#ff4fa3', '#3fd0ff', '#ffd23f', '#7cff6b', '#b38cff', '#ff8a3d', '#4fffd8', '#ff5a5a'];
 
@@ -260,7 +260,7 @@ setInterval(() => {
     if (cambio) announce(room);
   }
   for (const [ip, f] of fallos) if (now - f.at > 60e3) fallos.delete(ip);
-}, 60 * 1000).unref();
+}, 30 * 1000).unref();   // (cada 30 s: el cierre a los 3 min sin tele llega con poco retraso)
 
 // Adivinar códigos de sala: 6.390 posibles con hasta 500 abiertas → sin freno, 1 acierto cada 13 intentos.
 // Más de 10 intentos fallidos por minuto y dirección → «espera un minuto»

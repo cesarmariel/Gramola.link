@@ -57,8 +57,8 @@ window.GR = (() => {
       if (st === 'open') { G.lostAt = 0; const c = g(); if (c && (c.state.err === 'server' || c.state.err === 'lost')) c.setState({ err: null, errBusy: false }); }
       else if (!G.lostAt) G.lostAt = performance.now();
     });
-    // La sala se recuerda en la pestaña (recarga) y, durante 14 min, en el aparato (reinicio de la app de la tele)
-    const recordada = () => { const s = LS.get('g-sala', null); return s && s.code && s.token && Date.now() - (+s.at || 0) < 14 * 60e3 ? s : null; };
+    // La sala se recuerda en la pestaña (recarga) y, durante 3 min, en el aparato (reinicio de la app de la tele)
+    const recordada = () => { const s = LS.get('g-sala', null); return s && s.code && s.token && Date.now() - (+s.at || 0) < 3 * 60e3 ? s : null; };
     G.net.connect(() => { const r = recordada(); return { type: 'host', code: SS.get('g-room') || (r && r.code), token: SS.get('g-token') || (r && r.token) }; });
   }
 

@@ -45,10 +45,10 @@ Una conexión WebSocket en `/ws` por dispositivo; mensajes JSON con `type`.
 ## Límites
 
 Máximo 8 jugadores; mensajes de 16 KB; códigos consonante-vocal-consonante-vocal (tipo «MOKA», sin palabras feas);
-la sala dura 15 min sin tele; ping de WebSocket cada 25 s; como mucho 500 salas abiertas a la vez (hay 6.390 códigos;
+la sala se cierra sola a los 3 min sin tele; ping de WebSocket cada 25 s; como mucho 500 salas abiertas a la vez (hay 6.390 códigos;
 con el tope nunca se agotan y el servidor no se puede quedar colgado buscando uno libre). Un jugador sin conexión 10 min
 (cerró la app sin «Salir») deja su color libre. Al parar el servidor (despliegue) las salas se guardan en
-`data/salas.json` y se restauran al arrancar (si no han pasado 15 min): la tele recupera la suya con `recovered` y los
+`data/salas.json` y se restauran al arrancar (si no han pasado 3 min): la tele recupera la suya con `recovered` y los
 móviles con su token; solo se pierde la cuenta de la canción en curso, que no da récord.
 
 El WebSocket solo se acepta desde la propia web (`Origin` del mismo dominio, con `micro.`/`admin.`/`www.`, o
