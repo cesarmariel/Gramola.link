@@ -2,6 +2,13 @@
 
 Versiones con el esquema `1.AA.MMDD.HHMM` (fecha y hora del despliegue).
 
+## 1.26.1103.1339
+- **Editor por frases sobre la voz** (modo sencillo): al elegir una frase solo se ve ella con su trozo de voz (banda «VOZ» con las palabras que dice, reconocidas por el trabajador) y se escribe en qué **segundo empieza y acaba** (Enter aplica; ↑ ↓ ±0,05 s). Al mover el inicio la frase se desplaza; al mover el fin sus sílabas se estiran o encogen; con «lo que viene detrás se mueve igual» (por defecto) todas las frases posteriores se desplazan lo mismo. «◉ Usar la voz» la pone donde la voz. Lista de frases con un punto verde (empieza donde la voz), ámbar (la voz empieza en otro sitio) o hueco (sin voz cerca). «▶ Escuchar» reproduce la frase con su trozo de voz.
+- **Trabajador**: con la voz separada parte la canción en tramos por los silencios y reconoce qué dice cada uno palabra a palabra (faster-whisper «small», ~50 s por canción) → `voz-tramos.json`. Al crear o volver a encajar, cada línea de la letra se busca solo en la zona donde la voz la dice (palabras reconocidas emparejadas con la letra en orden, coincidencias largas primero: cada estribillo repetido va al suyo; la letra sincronizada queda de reserva), y la primera sílaba de cada frase se lleva a donde arranca la voz de su tramo. En «José José - Volcán» (prueba contra la versión corregida a mano): la primera frase, que salía 4 s tarde, ya sale en su sitio; mediana de 26 ms de desvío por línea.
+- «Analizar la voz» guarda también los tramos y lo reconocido (idioma de la cabecera); las canciones analizadas antes solo tienen la voz y el tono: el editor calcula los tramos en el navegador y «Volver a analizar la voz» añade el reconocimiento.
+- El idioma de la letra se detecta por sus palabras (en el admin, al crear, y en el trabajador, que avisa si no es el pedido); frases largas partidas donde el cantante respira; notas largas que no se comen las pausas en mezclas densas.
+- Servidor mann: swap de 4 GB y lanzador con tope de memoria para el banco de pruebas del trabajador (el 03-nov dos procesos de torch a la vez dejaron la máquina sin memoria).
+
 ## 1.26.1103.1259
 - Una sala cuya tele lleva 3 minutos desconectada se cierra sola (antes 15 minutos): los móviles reciben el aviso de sala cerrada y la tele, si vuelve después, abre una sala nueva.
 

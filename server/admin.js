@@ -538,6 +538,7 @@ module.exports = function admin(ctx) {
       audio: (h.MP3 || h.AUDIO) ? base + encodeURIComponent(h.MP3 || h.AUDIO) : null,
       vocals: has('voz.mp3') ? base + 'voz.mp3?v=' + Math.round(fs.statSync(path.join(dir, 'voz.mp3')).mtimeMs) : null,
       pitch: has('voz-tono.json') ? base + 'voz-tono.json?v=' + Math.round(fs.statSync(path.join(dir, 'voz-tono.json')).mtimeMs) : null,
+      tramos: has('voz-tramos.json') ? base + 'voz-tramos.json?v=' + Math.round(fs.statSync(path.join(dir, 'voz-tramos.json')).mtimeMs) : null,
       megamix: readJson(path.join(dir, 'megamix.json'), null),
       draft: has('borrador.json'),
     });
@@ -575,6 +576,8 @@ module.exports = function admin(ctx) {
   // como BORRADOR (no sale en la tele hasta «Publicar»).
   const JOBS = path.join(DATA_DIR, 'trabajos');
   const WORKER_FILE = path.join(DATA_DIR, 'trabajador.json');
+  // Lo que deja el trabajador junto a la canción: la voz sola, su tono y los tramos de voz con lo que dice (reconocimiento)
+  const VOZ_FILES = ['voz.mp3', 'voz-tono.json', 'voz-tramos.json'];
   let worker = { seen: 0, host: '', job: null };
   const jobPath = (id, f = 'job.json') => path.join(JOBS, safeName(id), f);
   const jobGet = id => { const j = readJson(jobPath(id), null); if (!j) throw httpErr(404, 'No existe ese trabajo'); return j; };
@@ -600,7 +603,9 @@ module.exports = function admin(ctx) {
       j = { id, kind: 'spotify', trackId: m[1], url: 'https://open.spotify.com/track/' + m[1], titulo: 'Canción de Spotify', artista: '', state: 'pendiente', created: Date.now() };
     } else if (b.kind === 'analizar') {
       const sid = String(b.song || ''); songDir(sid);
-      j = { id, kind: 'analizar', song: sid, titulo: headerOf(songDir(sid)).TITLE || sid, artista: headerOf(songDir(sid)).ARTIST || '', state: 'pendiente', created: Date.now() };
+      const hh = headerOf(songDir(sid));
+      const IDIOMA = { spanish: 'es', english: 'en', catalan: 'ca', french: 'fr', italian: 'it', portuguese: 'pt', german: 'de', galician: 'gl', basque: 'eu' };
+      j = { id, kind: 'analizar', song: sid, titulo: hh.TITLE || sid, artista: hh.ARTIST || '', idioma: IDIOMA[String(hh.LANGUAGE || '').trim().toLowerCase()] || null, state: 'pendiente', created: Date.now() };
     } else {
       const titulo = String(b.titulo || '').trim().slice(0, 120), artista = String(b.artista || '').trim().slice(0, 120), letra = String(b.letra || '').slice(0, 30000);
       if (!titulo || !artista) throw httpErr(400, 'Faltan el título o el artista');
@@ -1060,7 +1065,7 @@ module.exports = function admin(ctx) {
     }
     if (j.kind === 'analizar') {
       const dir = songDir(j.song);
-      for (const f of ['voz.mp3', 'voz-tono.json']) if (fs.existsSync(src(f))) fs.copyFileSync(src(f), path.join(dir, f));
+      for (const f of VOZ_FILES) if (fs.existsSync(src(f))) fs.copyFileSync(src(f), path.join(dir, f));
       ev('songs', `Voz analizada: «${j.song}»`);
       return;
     }
@@ -1074,7 +1079,7 @@ module.exports = function admin(ctx) {
       const cab = viejo.split(/\r?\n/).filter(l => /^#/.test(l) && !/^#(GAP|BPM|RELATIVE):/i.test(l));
       const de = nuevo.split(/\r?\n/), cuerpo = de.filter(l => !/^#/.test(l)), gb = de.filter(l => /^#(GAP|BPM):/i.test(l));
       writeAtomic(path.join(dir, f), [...cab, ...gb, ...cuerpo].join('\r\n'));
-      for (const x of ['voz.mp3', 'voz-tono.json']) if (fs.existsSync(src(x))) copyAtomic(src(x), path.join(dir, x));
+      for (const x of VOZ_FILES) if (fs.existsSync(src(x))) copyAtomic(src(x), path.join(dir, x));
       j.reencajar = false;
       ctx.songsChanged();
       ev('songs', `Vuelta a encajar: «${j.song}» (la versión anterior está en Versiones)`);
@@ -1086,7 +1091,7 @@ module.exports = function admin(ctx) {
     fs.mkdirSync(dir, { recursive: true });
     copyAtomic(src('entrada.mp3'), path.join(dir, j.audioName));
     copyAtomic(src('cancion.txt'), path.join(dir, folder + '.txt'));
-    for (const f of ['voz.mp3', 'voz-tono.json']) if (fs.existsSync(src(f))) copyAtomic(src(f), path.join(dir, f));
+    for (const f of VOZ_FILES) if (fs.existsSync(src(f))) copyAtomic(src(f), path.join(dir, f));
     writeJson(path.join(dir, 'borrador.json'), { trabajo: j.id, creada: Date.now() });
     j.song = folder;
     ctx.songsChanged();
@@ -1170,7 +1175,7 @@ module.exports = function admin(ctx) {
   });
   won('PUT', '/jobs/([^/]+)/result/([^/]+)', async (req, res, m) => {
     const j = jobGet(m[1]), name = decodeURIComponent(m[2]);
-    if (!['cancion.txt', 'voz.mp3', 'voz-tono.json', 'entrada.mp3', 'portada.jpg', 'meta.json'].includes(name)) throw httpErr(400, 'Fichero no admitido');
+    if (!['cancion.txt', ...VOZ_FILES, 'entrada.mp3', 'portada.jpg', 'meta.json'].includes(name)) throw httpErr(400, 'Fichero no admitido');
     fs.writeFileSync(jobPath(j.id, name), await readRaw(req, 40 * 1024 * 1024));
     json(res, 200, { ok: true });
   });

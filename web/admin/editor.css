@@ -66,4 +66,13 @@
 .ed-w.sel { outline: 3px solid var(--red); outline-offset: 1px; }
 .ed-sb { border: 2px solid var(--ink); border-top: 0; background: var(--paper); padding: 10px 12px; min-height: 52px; }
 .ed-sb .row { gap: 6px; }
+/* Tiempos de la frase (empieza / acaba en segundos) y lo que dice la voz */
+.ed-tiempos { gap: 12px; align-items: center; margin: 2px 0 8px; flex-wrap: wrap; }
+.ed-tiempos label { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 14px; }
+.ed-tiempos input.inp { width: 92px; text-align: right; font-size: 16px; padding: 4px 6px; }
+.ed-voz { color: var(--n7); margin: 0 0 10px; min-height: 18px; line-height: 1.45; } .ed-voz b { color: var(--ink); }
+.ed-voz .ok { color: #1f9d55; font-weight: 700; } .ed-voz .warn { color: #c77700; font-weight: 700; }
+.ed-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: var(--n3); vertical-align: 0; box-sizing: border-box; }
+.ed-dot.ok { background: #1f9d55; } .ed-dot.warn { background: #e8a900; } .ed-dot.no { background: transparent; border: 1px solid #9b9797; }
+.ed-sp.on .ed-dot.no { border-color: #bbb; }
 @media (max-width: 1100px) { .ed.sencillo .ed-main { grid-template-columns: 1fr; } .ed-sl { max-height: 220px; } }

@@ -120,15 +120,16 @@ def atender(j):
         audio = os.path.join(tmp, 'audio.mp3')
         open(audio, 'wb').write(pedir('GET', f'/jobs/{j["id"]}/input', timeout=300))
         if j['kind'] == 'analizar':
-            crear.analizar(audio, out, progreso)
-            nombres = ['voz.mp3', 'voz-tono.json']
+            crear.analizar(audio, out, progreso, j.get('idioma'))
+            nombres = ['voz.mp3', 'voz-tono.json', 'voz-tramos.json']
             msg = 'Voz analizada'
         else:
             txt = crear.crear(audio, j['letra'], out, j['titulo'], j['artista'], j.get('idioma') or 'es', j.get('anio') or None, j['audioName'], progreso, j.get('lrc'))
-            nombres = ['cancion.txt', 'voz.mp3', 'voz-tono.json']
+            nombres = ['cancion.txt', 'voz.mp3', 'voz-tono.json', 'voz-tramos.json']
             msg = f'{sum(1 for l in txt.splitlines() if l[:1] in ":*FRG")} notas'
         for n in nombres:
-            pedir('PUT', f'/jobs/{j["id"]}/result/{n}', raw=open(os.path.join(out, n), 'rb').read(), timeout=300)
+            if os.path.exists(os.path.join(out, n)):
+                pedir('PUT', f'/jobs/{j["id"]}/result/{n}', raw=open(os.path.join(out, n), 'rb').read(), timeout=300)
         pedir('POST', f'/jobs/{j["id"]}/done', {'ok': True, 'msg': msg})
         crear.log('✓ Hecho:', j.get('artista'), '-', j.get('titulo'))
     except BaseException as e:

@@ -1,6 +1,9 @@
 // Gramola · Editor de canciones (UltraStar) dentro del admin.
 // Línea de tiempo con las notas a la altura de su tono, forma de onda (de la voz sola si existe), curva de la voz
 // real, reproducción (también lenta) con tono guía, prueba cantando con el micro y guardado con versiones.
+// Modo sencillo = por frases: cada frase se ve sola sobre su trozo de voz (tramos por los silencios de la voz separada
+// y, si el trabajador la reconoció, lo que dice la voz palabra a palabra); se escribe en qué segundo empieza y acaba
+// y lo que viene detrás se mueve igual.
 (() => {
   'use strict';
   const RED = '#ec3013', INK = '#201e1d', GOLD = '#e8a900', BLUE = '#2c6fd6', GREEN = '#1f9d55';
@@ -177,15 +180,37 @@
     async function peaksOf(url) {
       const buf = await (await fetch(url)).arrayBuffer();
       const ab = await actx.decodeAudioData(buf);
-      const ch = ab.getChannelData(0), per = Math.max(1, Math.floor(ab.sampleRate / 100)), n = Math.floor(ch.length / per), p = new Float32Array(n);
-      for (let i = 0; i < n; i++) { let mxv = 0; for (let j = i * per, e = j + per; j < e; j++) { const v = Math.abs(ch[j]); if (v > mxv) mxv = v; } p[i] = mxv; }
-      return { p, dur: ab.duration * 1000 };
+      const ch = ab.getChannelData(0), per = Math.max(1, Math.floor(ab.sampleRate / 100)), n = Math.floor(ch.length / per), p = new Float32Array(n), r = new Float32Array(n);
+      for (let i = 0; i < n; i++) { let mxv = 0, ss = 0; for (let j = i * per, e = j + per; j < e; j++) { const v = Math.abs(ch[j]); ss += v * v; if (v > mxv) mxv = v; } p[i] = mxv; r[i] = Math.sqrt(ss / per); }
+      return { p, r, dur: ab.duration * 1000 };
     }
     // (si el editor ya se ha cerrado cuando acaba la descarga, no se dibuja nada)
     const vivo = () => view.contains(cv);
     peaksOf(data.audio).then(r => { if (!vivo()) return; peaks = r.p; durMs = r.dur; draw(); }).catch(() => {});
-    if (data.vocals) peaksOf(data.vocals).then(r => { if (!vivo()) return; vpeaks = r.p; draw(); }).catch(() => {});
+    if (data.vocals) peaksOf(data.vocals).then(r => { if (!vivo()) return; vpeaks = r.p; if (!tramos) { tramos = tramosDe(r.r); tramosOrigen = 'voz'; refresh(); } draw(); }).catch(() => {});
     if (data.pitch) fetch(data.pitch).then(r => r.json()).then(j => { if (!vivo()) return; pitchCurve = j; draw(); }).catch(() => {});
+    // Tramos de voz y lo que dice (reconocimiento hecho por el trabajador); si no hay fichero, los tramos salen de la voz sola
+    let tramos = null, tramosOrigen = null, asrW = null;
+    if (data.tramos) fetch(data.tramos).then(r => r.json()).then(j => {
+      if (!vivo()) return;
+      tramos = (j.tramos || []).map(([a, b, txt]) => ({ a: a * 1000, b: b * 1000, txt: txt || '' })); tramosOrigen = 'servidor';
+      asrW = (j.palabras || []).map(([a, b, w]) => ({ a: a * 1000, b: b * 1000, w, n: normW(w) }));
+      parejas = null; refresh();
+    }).catch(() => {});
+    // Tramos de voz por los silencios de la voz separada (lo mismo que hace el trabajador): energía cada 10 ms, umbral
+    // con histéresis, huecos de menos de 120 ms no cortan, silencios de menos de 350 ms no separan, tramos de 300 ms o más
+    function tramosDe(r) {
+      const n = r.length, db = new Float32Array(n);
+      for (let i = 0; i < n; i++) db[i] = 20 * Math.log10(r[i] + 1e-6);
+      const ref = Float32Array.from(db).sort()[Math.floor(n * 0.95)] || 0, on = Math.max(-48, ref - 26), off = Math.max(-52, ref - 32);
+      const act = new Uint8Array(n); let st = false;
+      for (let i = 0; i < n; i++) { st = !st ? db[i] > on : db[i] > off; act[i] = st ? 1 : 0; }
+      for (let i = 0; i < n;) { if (act[i]) { i++; continue; } let j = i; while (j < n && !act[j]) j++; if (i > 0 && j < n && j - i < 12) act.fill(1, i, j); i = j; }
+      const out = [];
+      for (let i = 0; i < n;) { if (!act[i]) { i++; continue; } let j = i; while (j < n && act[j]) j++; const a = i * 10, b = j * 10; if (out.length && a - out[out.length - 1].b < 350) out[out.length - 1].b = b; else out.push({ a, b, txt: '' }); i = j; }
+      return out.filter(t => t.b - t.a >= 300);
+    }
+    const normW = w => String(w).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ñ/g, 'n').replace(/ç/g, 'c').replace(/[^a-z']/g, '');
     audio.addEventListener('loadedmetadata', () => { if (!vivo()) return; if (!durMs) durMs = audio.duration * 1000; draw(); });
 
     // ---------------- vista
@@ -240,8 +265,9 @@
       // Modo sencillo: la frase elegida ocupa el lienzo (tiempo y tonos de sus notas)
       const ph = frases(); if (!ph.length) return;
       cur = clamp(cur, 0, ph.length - 1);
-      const p = ph[cur], a = b2ms(p.start) - 700;
-      let b = b2ms(p.end) + 700;
+      const p = ph[cur], v = vozAct();
+      const a = Math.min(b2ms(p.start), v ? v.a : Infinity) - 500;
+      let b = Math.max(b2ms(p.end), v ? v.b : -Infinity) + 500;
       if (marcando || hueco) { const nx = ph[cur + 1]; b = Math.max(b, Math.min(nx ? b2ms(nx.start) + 1500 : durMs || b, b2ms(p.end) + 30000)); if (hueco) b = Math.max(b, hueco.b + 700); }
       pxPerMs = W / Math.max(1000, b - a); viewMs = a;
       const ps = p.notes.map(n => n.p);
@@ -285,6 +311,19 @@
           let m = 0; for (let i = a; i < b && i < wp.length; i++) if (i >= 0 && wp[i] > m) m = wp[i];
           const h = Math.min(1, m * 1.4) * (WAVE - 10); cx.fillRect(x, wy + WAVE / 2 - h / 2, 1, Math.max(1, h));
         }
+      }
+      // modo sencillo: tramos de voz (banda clara sobre la onda), el trozo de voz de la frase elegida y lo que dice
+      if (sencillo() && tramos) {
+        cx.fillStyle = 'rgba(44,111,214,.12)';
+        for (const t of tramos) { const x0 = xOf(t.a), x1 = xOf(t.b); if (x1 < 0 || x0 > W) continue; cx.fillRect(x0, wy + 1, x1 - x0, WAVE - 1); }
+        const v = vozAct();
+        if (v) {
+          const x0 = xOf(v.a), x1 = xOf(v.b);
+          cx.fillStyle = 'rgba(44,111,214,.07)'; cx.fillRect(x0, RULER, x1 - x0, H - RULER);
+          cx.fillStyle = BLUE; cx.fillRect(x0, RULER, 2, H - RULER); cx.fillRect(x1 - 2, RULER, 2, H - RULER);
+          cx.font = '800 11px Archivo, sans-serif'; cx.fillText('VOZ', x0 + 6, RULER + 14);
+        }
+        if (asrW) { cx.font = '600 11px Archivo, sans-serif'; cx.fillStyle = BLUE; for (const w of asrW) { const x = xOf(w.a); if (x < -60 || x > W) continue; cx.fillText(w.w, x + 2, wy + WAVE - 5); } }
       }
       // otras pistas (dúo), en gris
       doc.tracks.forEach((t, k) => { if (k !== ti) for (const n of t.notes) box(n, false, true); });
@@ -668,7 +707,7 @@
       const p = phrasesOf(T())[+d.dataset.i]; sel = new Set(p.notes);
       viewMs = b2ms(p.start) - 1500; audio.currentTime = Math.max(0, (b2ms(p.start) - 1000) / 1000); refresh();
     };
-    function refresh() { doc.tracks.forEach(sanear); $('#ed-gap').value = Math.round(gap); $('#ed-bpm').textContent = bpm; info(); phrasesPanel(); if (sencillo()) panelSencillo(); draw(); }
+    function refresh() { doc.tracks.forEach(sanear); vozCur = null; $('#ed-gap').value = Math.round(gap); $('#ed-bpm').textContent = bpm; info(); phrasesPanel(); if (sencillo()) panelSencillo(); draw(); }
 
     // ---------------- modo sencillo: frases a la izquierda, la frase grande con sus palabras y botones
     const esOro = n => n.t === '*' || n.t === 'G';
@@ -680,15 +719,130 @@
       }
       return out.map(w => ({ ...w, txt: w.txt.trim() || '…', oro: w.notas.every(esOro) }));
     }
+    // ---- la voz de cada frase: las palabras de la letra se emparejan con las reconocidas, en orden y coincidencias
+    // largas primero (como difflib), así cada estribillo repetido va al suyo. Caché mientras no cambie la letra.
+    let parejas = null, vozCur = null;
+    function emparejar() {
+      const ph = frases(), A = [], de = [];
+      ph.forEach((p, k) => palabrasDe(p).forEach(w => { A.push(normW(w.txt)); de.push(k); }));
+      const clave = A.join(' ') + '|' + ph.length;
+      if (parejas && parejas.clave === clave) return parejas.porFrase;
+      const porFrase = ph.map(() => []);
+      if (asrW && asrW.length) {
+        bloques(A, 0, A.length, asrW.map(w => w.n), 0, asrW.length, (i, j, len) => { for (let k = 0; k < len; k++) porFrase[de[i + k]].push(j + k); });
+        porFrase.forEach(l => l.sort((x, y) => x - y));
+      }
+      parejas = { clave, porFrase, usadas: new Set(porFrase.flat()) };
+      return porFrase;
+    }
+    function bloques(A, alo, ahi, B, blo, bhi, out) {   // el bloque común más largo y, a cada lado, lo mismo
+      if (alo >= ahi || blo >= bhi) return;
+      let best = 0, bi = alo, bj = blo, prev = new Uint16Array(bhi - blo + 1), cur2 = new Uint16Array(bhi - blo + 1);
+      for (let i = alo; i < ahi; i++) {
+        cur2.fill(0);
+        for (let j = blo; j < bhi; j++) if (A[i] && A[i] === B[j]) { const v = prev[j - blo] + 1; cur2[j - blo + 1] = v; if (v > best) { best = v; bi = i - v + 1; bj = j - v + 1; } }
+        [prev, cur2] = [cur2, prev];
+      }
+      if (!best) return;
+      bloques(A, alo, bi, B, blo, bj, out); out(bi, bj, best); bloques(A, bi + best, ahi, B, bj + best, bhi, out);
+    }
+    // El trozo de voz de la frase k: {a, b, txt, pct, reconocida}. Con reconocimiento, de la primera palabra reconocida
+    // a la última; si es la primera (última) palabra de su tramo, el trozo empieza (acaba) donde arranca (calla) la voz.
+    // Sin reconocimiento, el tramo de voz que más se solapa con la frase (o el que empieza más cerca, a menos de 2 s).
+    function vozDe(k) {
+      const ph = frases(), p = ph[k]; if (!p || !tramos) return null;
+      const ks = emparejar()[k], ini = b2ms(p.start), fin = b2ms(p.end);
+      if (ks && ks.length) {
+        // Las palabras reconocidas pegadas a la frase que no son de ninguna otra (mal oídas: «Besadas» por «Besabas»)
+        // también son suyas, mientras estén en el mismo tramo de voz
+        const usadas = parejas.usadas;
+        let lo = ks[0], hi = ks[ks.length - 1];
+        const t0 = tramos.find(t => asrW[lo].a >= t.a - 60 && asrW[lo].a <= t.b), t1 = tramos.find(t => asrW[hi].b >= t.a && asrW[hi].b <= t.b + 60);
+        while (lo > 0 && !usadas.has(lo - 1) && t0 && asrW[lo - 1].a >= t0.a - 60) lo--;
+        while (hi < asrW.length - 1 && !usadas.has(hi + 1) && t1 && asrW[hi + 1].b <= t1.b + 60) hi++;
+        let a = asrW[lo].a, b = asrW[hi].b;
+        if (t0 && asrW.findIndex(w => w.a >= t0.a - 60) === lo) a = t0.a;
+        if (t1 && asrW.length - 1 - asrW.slice().reverse().findIndex(w => w.b <= t1.b + 60) === hi) b = t1.b;
+        return { a, b, txt: asrW.slice(lo, hi + 1).map(w => w.w).join(' '), pct: ks.length / Math.max(1, palabrasDe(p).length), reconocida: true };
+      }
+      const sol = tramos.map(t => ({ t, s: Math.min(fin, t.b) - Math.max(ini, t.a) })).sort((x, y) => y.s - x.s)[0];
+      const cerca = tramos.slice().sort((x, y) => Math.abs(x.a - ini) - Math.abs(y.a - ini))[0];
+      const el = sol && sol.s > 0 ? sol.t : cerca && Math.abs(cerca.a - ini) < 2000 ? cerca : null;
+      return el ? { a: el.a, b: el.b, txt: el.txt, pct: 0, reconocida: false } : null;
+    }
+    const vozAct = () => { if (!sencillo()) return null; if (!vozCur || vozCur.k !== cur) vozCur = { k: cur, v: vozDe(cur) }; return vozCur.v; };
+    const seg = ms => (ms / 1000).toFixed(2).replace('.', ',');
+    const parseSeg = v => { v = String(v).trim().replace(',', '.'); const m = v.match(/^(\d+):(\d+(?:\.\d+)?)$/); const s = m ? +m[1] * 60 + +m[2] : parseFloat(v); return Number.isFinite(s) ? s * 1000 : null; };
+    let ripple = (() => { try { return localStorage.getItem('ed-rip') !== '0'; } catch { return true; } })();
+    // ---- «Empieza» en ms: la frase entera se desplaza (y, con ripple, todo lo que viene detrás, cortes incluidos)
+    function ponerInicio(k, ms, rip, sinPush) {
+      const ph = frases(), p = ph[k]; if (!p) return false;
+      let d = Math.round(ms2b(ms)) - p.start; if (!d) return false;
+      const pv = ph[k - 1], prevB = pv ? pv.notes[pv.notes.length - 1].b : -1e9, prevEnd = pv ? pv.end : -1e9, nextStart = ph[k + 1] ? ph[k + 1].start : 1e9, lastB = p.notes[p.notes.length - 1].b;
+      d = Math.max(d, prevEnd + 1 - p.start);
+      if (!rip) d = Math.min(d, nextStart - 1 - p.end);
+      if (!d) return false;
+      if (!sinPush) push();
+      for (const n of T().notes) if (rip ? n.b >= p.start : p.notes.includes(n)) n.b += d;
+      T().breaks = T().breaks.map(x => {
+        if (x <= prevB) return x;
+        if (rip) return Math.max(x + d, prevEnd + 1);
+        if (x <= lastB) return Math.min(x + d, nextStart);   // el corte de antes va con la frase
+        if (x <= nextStart) return Math.max(x, p.end + d);    // el de después no puede quedar dentro
+        return x;
+      });
+      T().notes.sort((a, b) => a.b - b.b);
+      return true;
+    }
+    // ---- «Acaba» en ms: las sílabas se estiran o encogen proporcionalmente (la última acaba justo ahí); con ripple,
+    // lo de detrás se mueve lo mismo que se ha movido el fin
+    function ponerFin(k, ms, rip, sinPush) {
+      const ph = frases(), p = ph[k]; if (!p) return false;
+      const E = p.end, nextStart = ph[k + 1] ? ph[k + 1].start : 1e9, lastB = p.notes[p.notes.length - 1].b;
+      let E2 = Math.max(p.start + p.notes.length, Math.round(ms2b(ms)));
+      if (!rip) E2 = Math.min(E2, nextStart - 1);
+      if (E2 === E) return false;
+      if (!sinPush) push();
+      const kf = (E2 - p.start) / (E - p.start), d = E2 - E;
+      for (const n of p.notes) { const e = n.b + n.l; n.b = p.start + Math.round((n.b - p.start) * kf); n.l = Math.max(1, p.start + Math.round((e - p.start) * kf) - n.b); }
+      const u = p.notes[p.notes.length - 1]; u.l = Math.max(1, E2 - u.b);
+      if (rip) for (const n of T().notes) if (n.b > lastB && !p.notes.includes(n)) n.b += d;
+      T().breaks = T().breaks.map(x => (x > lastB ? (rip ? x + d : Math.max(x, E2)) : x));
+      T().notes.sort((a, b) => a.b - b.b);
+      return true;
+    }
+    function aplicarTiempo(cual, valor) {
+      const ms = parseSeg(valor);
+      if (ms == null) return panelSencillo();
+      const ok = cual === 'ed-t0' ? ponerInicio(cur, ms, ripple) : ponerFin(cur, ms, ripple);
+      if (ok) { range(); refresh(); } else panelSencillo();
+      const i = $('#' + cual); if (i) { i.focus(); i.select(); }
+    }
+    function vozTexto(v, p) {
+      if (!tramos) return data.vocals ? 'Buscando los tramos de voz…' : 'Sin voz separada: «Analizar la voz» en la ficha saca la voz sola, sus tramos y lo que dice.';
+      if (!v) return 'No se detecta voz cerca de esta frase.';
+      const dif = b2ms(p.start) - v.a, donde = Math.abs(dif) < 50 ? 'empieza donde la voz' : dif > 0 ? `empieza ${seg(dif)} s después que la voz` : `empieza ${seg(-dif)} s antes que la voz`;
+      if (v.reconocida) return `La voz dice: <b>«${esc(v.txt)}»</b> · ${seg(v.a)} – ${seg(v.b)} s · ${v.pct >= 0.6 ? '<span class="ok">✓ coincide con la letra</span>' : '<span class="warn">⚠ solo coincide en parte con la letra</span>'} · la frase ${donde}.`;
+      return `Tramo de voz ${seg(v.a)} – ${seg(v.b)} s${v.txt ? ` (la voz dice: «${esc(v.txt)}»)` : ''} · la frase ${donde}. ${tramosOrigen === 'servidor' && asrW ? 'Ninguna palabra reconocida coincide con esta frase.' : 'Sin reconocimiento de la voz: «Volver a analizar la voz» en la ficha lo añade.'}`;
+    }
     function panelSencillo() {
       const ph = frases(); if (!ph.length) return;
       cur = clamp(cur, 0, ph.length - 1);
-      const p = ph[cur];
-      $('#ed-sl').innerHTML = ph.map((q, i) => `<div class="ed-sp ${i === cur ? 'on' : ''}" data-f="${i}"><span class="mono">${fmt(b2ms(q.start)).replace(/\.\d+$/, '')}</span>${esc(q.notes.map(n => n.s).join('').replace(/~/g, '').trim() || '—')}${q.notes.some(esOro) ? ' <span class="ed-star">★</span>' : ''}</div>`).join('');
+      const p = ph[cur], v = vozAct();
+      $('#ed-sl').innerHTML = ph.map((q, i) => {
+        const w = tramos ? vozDe(i) : null, dif = w ? b2ms(q.start) - w.a : null;
+        const dot = !tramos ? '' : !w ? '<span class="ed-dot no" title="Sin voz detectada cerca"></span>' : Math.abs(dif) <= 250 ? `<span class="ed-dot ok" title="Empieza donde la voz (${seg(w.a)} s)"></span>` : `<span class="ed-dot warn" title="La voz empieza en ${seg(w.a)} s (${dif > 0 ? '+' : '−'}${seg(Math.abs(dif))} s)"></span>`;
+        return `<div class="ed-sp ${i === cur ? 'on' : ''}" data-f="${i}"><span class="mono">${dot}${fmt(b2ms(q.start)).replace(/\.\d+$/, '')}</span>${esc(q.notes.map(n => n.s).join('').replace(/~/g, '').trim() || '—')}${q.notes.some(esOro) ? ' <span class="ed-star">★</span>' : ''}</div>`;
+      }).join('');
       const on = $('#ed-sl .on'); if (on && !panelSencillo.noScroll) on.scrollIntoView({ block: 'nearest' });
       $('#ed-sh').innerHTML = `<div class="row"><span class="kicker">Frase ${cur + 1} de ${ph.length}</span><span class="small muted mono">${fmt(b2ms(p.start))} – ${fmt(b2ms(p.end))}</span><span class="grow"></span>
-          <button class="btn sm" data-s="prev">◀ Anterior</button><button class="btn sm dark" data-s="play">▶ Escuchar la frase</button><button class="btn sm" data-s="next">Siguiente ▶</button></div>
+          <button class="btn sm" data-s="prev">◀ Anterior</button><button class="btn sm dark" data-s="play">▶ Escuchar</button><button class="btn sm" data-s="next">Siguiente ▶</button></div>
         <div class="ed-words">${palabrasDe(p).map((w, i) => `<button class="ed-w ${w.oro ? 'oro' : ''} ${w.notas.every(n => sel.has(n)) ? 'sel' : ''}" data-w="${i}" title="Elegir la palabra">${esc(w.txt)}</button>`).join('')}</div>
+        <div class="row ed-tiempos"><label>Empieza <input class="inp sm mono" id="ed-t0" value="${seg(b2ms(p.start))}" title="Segundo en que empieza la frase · Enter aplica · ↑ ↓ ±0,05 s (con ⇧ ±0,5 s)"> s</label>
+          <label>Acaba <input class="inp sm mono" id="ed-t1" value="${seg(b2ms(p.end))}" title="Segundo en que acaba la frase · Enter aplica · ↑ ↓ ±0,05 s (con ⇧ ±0,5 s)"> s</label>
+          <label class="ed-ck" title="Al cambiar el inicio o el fin, las frases de después se desplazan lo mismo"><input type="checkbox" id="ed-rip" ${ripple ? 'checked' : ''}> lo que viene detrás se mueve igual</label>
+          <span class="grow"></span>${v ? `<button class="btn sm dark" data-s="voz" title="La frase empieza y acaba donde la voz">◉ Usar la voz (${seg(v.a)} – ${seg(v.b)})</button>` : ''}</div>
+        <div class="ed-voz small">${vozTexto(v, p)}</div>
         <div class="row small"><span class="muted">Toda la frase:</span><button class="btn sm" data-s="antes">⟵ Antes</button><button class="btn sm" data-s="despues">Después ⟶</button>
           <button class="btn sm" data-s="corta">Más corta</button><button class="btn sm" data-s="larga">Más larga</button><button class="btn sm dark" data-s="juego">▶ Ver en el juego desde aquí</button>
           <span class="grow"></span>${cur < ph.length - 1 ? '<button class="btn sm" data-s="unir" title="Junta esta frase y la siguiente en una sola">Unir con la siguiente</button>' : ''}
@@ -716,8 +870,9 @@
     async function escucharFrase() {
       const p = frases()[cur]; if (!p) return;
       await actx.resume();
-      const ini = Math.max(0, b2ms(p.start) - 600);
-      finFrase = { ini, fin: b2ms(p.end) + 500 };
+      const v = vozAct();
+      const ini = Math.max(0, Math.min(b2ms(p.start), v ? v.a : Infinity) - 500);
+      finFrase = { ini, fin: Math.max(b2ms(p.end), v ? v.b : -Infinity) + 400 };
       audio.currentTime = ini / 1000; audio.playbackRate = +$('#ed-rate').value;
       await audio.play(); $('#ed-play').textContent = '❚❚'; draw();
     }
@@ -821,6 +976,7 @@
       if (a === 'prev' || a === 'next') return irFrase(cur + (a === 'prev' ? -1 : 1));
       if (a === 'play') return audio.paused ? escucharFrase() : (audio.pause(), (finFrase = null));
       if (a === 'juego') return verEnJuego(b2ms(p.start));
+      if (a === 'voz') { const v = vozAct(); if (!v) return; return cambiar(() => { ponerInicio(cur, v.a, ripple, true); ponerFin(cur, v.b, ripple, true); range(); }); }
       if (a === 'hueco') { marcando = !marcando; hueco = null; barraHueco(); return refresh(); }
       if (a === 'unir') return cambiar(() => { const ns = notasOrden(), i = ns.indexOf(p.notes[p.notes.length - 1]); quitaCortes(ns, i + 1); });
       const d = paso();
@@ -829,6 +985,17 @@
         const k = a === 'larga' ? 1.05 : 0.95, a0 = p.start;
         for (const n of p.notes) { const e2 = n.b + n.l; n.b = a0 + Math.round((n.b - a0) * k); n.l = Math.max(1, Math.round(a0 + (e2 - a0) * k) - n.b); }
       });
+    };
+    $('#ed-sh').onchange = e => {
+      if (e.target.id === 'ed-rip') { ripple = e.target.checked; try { localStorage.setItem('ed-rip', ripple ? '1' : '0'); } catch {} return; }
+      if (e.target.id === 'ed-t0' || e.target.id === 'ed-t1') aplicarTiempo(e.target.id, e.target.value);
+    };
+    $('#ed-sh').onkeydown = e => {
+      const t = e.target; if (!t || (t.id !== 'ed-t0' && t.id !== 'ed-t1')) return;
+      e.stopPropagation();
+      if (e.key === 'Enter') { e.preventDefault(); aplicarTiempo(t.id, t.value); }
+      else if (e.key === 'Escape') { e.preventDefault(); panelSencillo(); }
+      else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); const ms = parseSeg(t.value); if (ms == null) return; aplicarTiempo(t.id, seg(ms + (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 500 : 50))); }
     };
     $('#ed-sb').onclick = e => {
       const b = e.target.closest('[data-n]'); if (!b) return;

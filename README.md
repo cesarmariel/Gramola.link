@@ -11,7 +11,7 @@
 La tele es el escenario (**funciona en el navegador**) y cada móvil es un micrófono:
 escaneas el QR, eliges tu color y cantas. Gramola escucha el tono de cada voz y puntúa lo afinado que vas.
 
-![Versión](https://img.shields.io/badge/versi%C3%B3n-1.26.1103.1259-ec3013)
+![Versión](https://img.shields.io/badge/versi%C3%B3n-1.26.1103.1339-ec3013)
 ![Navegador](https://img.shields.io/badge/navegador-Edge%20%C2%B7%20Chrome%20%C2%B7%20Safari-1f6feb)
 ![PWA](https://img.shields.io/badge/micro-web%20%2B%20PWA-ec3013)
 ![Node.js 22+](https://img.shields.io/badge/Node.js-22%2B-5fa04e?logo=nodedotjs&logoColor=white)
@@ -150,7 +150,7 @@ un fragmento de *Sound Effects – Applause after a concert*, grabación de domi
 
 Portal propio en el subdominio `admin.`, con entrada **solo por Touch ID** (passkeys): salas y jugadores en directo
 (mensajes, echar, cerrar, recargar la tele), canciones (**Novedades**, que en la tele salen primero, carátulas de iTunes y Deezer, Megamix, volumen, cabecera,
-ficheros, subir canciones nuevas, retirar), un **editor de canciones** tipo DAW (notas, frases, tono guía, prueba con micro, versiones),
+ficheros, subir canciones nuevas, retirar), un **editor de canciones** por frases sobre la voz (cada frase sola con su trozo de voz y lo que dice, segundo de inicio y fin a mano, tono guía, prueba con micro, versiones; modo avanzado tipo DAW),
 **creación de canciones** a partir del audio (o importando una canción de Spotify) y la letra (con búsqueda automática en LRCLIB y Genius) (separación de voz, alineación y tono en un servicio del propio servidor), récords, actividad, estadísticas por día y estado del servidor.
 Detalles en **[docs/ADMIN.md](docs/ADMIN.md)**.
 
