@@ -2,6 +2,9 @@
 
 Versiones con el esquema `1.AA.MMDD.HHMM` (fecha y hora del despliegue).
 
+## 1.26.1103.1154
+- El puntero no aparece durante el arranque (logo, aviso y carga); solo a partir de la bienvenida.
+
 ## 1.26.1103.1153
 - Puntero propio en escritorio: la flecha plana en rojo con contorno de tinta, grande (72 px); se esconde a los 2,5 s quieto.
 

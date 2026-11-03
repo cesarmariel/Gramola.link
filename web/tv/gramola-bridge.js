@@ -580,6 +580,9 @@ window.GR = (() => {
   const CURSOR = `url('data:image/svg+xml;utf8,${encodeURIComponent(CURSOR_SVG)}') 8 6, auto`;
   let mouseT = 0;
   addEventListener('mousemove', () => {
+    // Durante el arranque (logo, aviso y carga) no se enseña: a partir de la bienvenida
+    const c = g();
+    if (!c || ['splash', 'boot'].includes(c.state.screen)) return;
     document.documentElement.style.cursor = CURSOR; document.body.style.cursor = CURSOR;
     clearTimeout(mouseT);
     mouseT = setTimeout(() => { document.documentElement.style.cursor = ''; document.body.style.cursor = ''; }, 2500);
