@@ -33,7 +33,12 @@ window.GR = (() => {
   const g = () => G.g || window.__g;
 
   // ------------------------------------------------------------------ ajustes guardados
-  G.loadSettings = def => ({ ...def, ...LS.get('gramola-ajustes', {}) });
+  // Ajustes guardados: cada valor dentro de su rango (un localStorage tocado a mano no deja la pantalla en blanco)
+  G.loadSettings = def => {
+    const s = { ...def, ...LS.get('gramola-ajustes', {}) }, R = { diff: [0, 2], delay: [0, 400], music: [0, 10], fx: [0, 10], trail: [0, 1], lyr: [0, 1], lang: [0, 1] };
+    for (const k in R) { const v = Number(s[k]); s[k] = Number.isFinite(v) ? Math.max(R[k][0], Math.min(R[k][1], Math.round(v))) : def[k]; }
+    return s;
+  };
   let lastSettings = '';
   function persistSettings(st) {
     const j = JSON.stringify(st);
@@ -52,18 +57,32 @@ window.GR = (() => {
       if (st === 'open') { G.lostAt = 0; const c = g(); if (c && (c.state.err === 'server' || c.state.err === 'lost')) c.setState({ err: null, errBusy: false }); }
       else if (!G.lostAt) G.lostAt = performance.now();
     });
-    G.net.connect(() => ({ type: 'host', code: SS.get('g-room'), token: SS.get('g-token') }));
+    // La sala se recuerda en la pestaña (recarga) y, durante 3 min, en el aparato (reinicio de la app de la tele)
+    const recordada = () => { const s = LS.get('g-sala', null); return s && s.code && s.token && Date.now() - (+s.at || 0) < 3 * 60e3 ? s : null; };
+    G.net.connect(() => { const r = recordada(); return { type: 'host', code: SS.get('g-room') || (r && r.code), token: SS.get('g-token') || (r && r.token) }; });
   }
 
+  function olvidarSala() {
+    G.room = null; G.token = null;
+    try { sessionStorage.removeItem('g-room'); sessionStorage.removeItem('g-token'); localStorage.removeItem('g-sala'); } catch {}
+  }
   function onMessage(m) {
     const c = g();
     if (m.type === 'room') {
-      const lost = G.room && G.room !== m.code && !m.recovered;
+      // «Sala perdida» solo si el código cambia sin haberlo pedido (Ajustes → Nuevo código lo pide a propósito)
+      const lost = (G.room && G.room !== m.code && !m.recovered && !G.expectNew) || !!G.cerradaDesdeAdmin;
+      if (lost) G.lostFrom = G.room || G.lostFrom || null;
+      const tokenCambiado = !!G.token && G.token !== m.token;   // (con «Nuevo código» las direcciones de audio llevan ?k= nuevo)
+      G.expectNew = false; G.cerradaDesdeAdmin = false;
       G.room = m.code; G.token = m.token;
       SS.set('g-room', m.code); SS.set('g-token', m.token);
-      // Pase de tele (cookie) para poder leer las canciones; después, cargarlas
-      fetch('/api/tv-pass', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: m.code, token: m.token }) })
-        .then(r => { if (r.ok && (!G.ready || lost)) loadSongs(); }).catch(() => {});
+      LS.set('g-sala', { code: m.code, token: m.token, at: Date.now() });   // (si la app de la tele se reinicia, no solo se recarga)
+      // Pase de tele (cookie) para poder leer las canciones; después, cargarlas. Si la petición falla (red a medias al
+      // arrancar) se reintenta con espera creciente: si no, la tele se quedaba en «Cargando… 95 %» para siempre
+      const pase = (wait = 1000) => fetch('/api/tv-pass', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: m.code, token: m.token }) })
+        .then(r => { if (r.ok) { if (!G.ready || lost || tokenCambiado) loadSongs(); } else if (r.status !== 403) throw new Error(); })
+        .catch(() => { if (G.room === m.code) setTimeout(() => pase(Math.min(8000, wait * 2)), wait); });
+      pase();
       setPlayers(m.players, true);
       if (c) c.setState({ room: m.code });
       if (lost && c) c.setState({ err: 'lost' });
@@ -78,9 +97,19 @@ window.GR = (() => {
     }
     else if (m.type === 'input') {
       const k = { up: 'u', down: 'd', left: 'l', right: 'r', ok: 'ok', back: 'back', y: 'y', x: 'x' }[m.key];
-      if (k && c) c.act(k);
-    } else if (m.type === 'full-attempt') { if (c) c.setState({ err: 'full' }); }
-    else if (m.type === 'replaced') { if (c) c.toast('Esta sala se ha abierto en otra pantalla'); }
+      // En la sala, Y añade un simulado y X echa al último: eso solo desde el mando de la tele, no desde un móvil
+      if (k && c && !(c.state.screen === 'lobby' && (k === 'y' || k === 'x'))) c.act(k);
+    } else if (m.type === 'full-attempt') { if (c) { if (c.state.screen === 'sing') c.toast(`${String(m.name || 'Alguien').slice(0, 16)} ha intentado entrar: la sala está llena`); else c.setState({ err: 'full' }); } }
+    // La sala se ha cerrado desde la administración: se pide otra (la pantalla avisa de que se ha perdido la sala)
+    else if (m.type === 'closed') { olvidarSala(); G.cerradaDesdeAdmin = true; if (G.net) G.net.send({ type: 'host' }); }
+    else if (m.type === 'replaced') {
+      // Otra pantalla ha abierto esta misma sala (pestaña duplicada): esta deja de reclamarla, si no se la robarían
+      // la una a la otra sin parar; al reconectar pedirá una sala nueva
+      olvidarSala();
+      if (c) c.toast('Esta sala se ha abierto en otra pantalla');
+    }
+    // El servidor no admite más salas ahora mismo: se avisa y se vuelve a pedir una al cabo de medio minuto
+    else if (m.type === 'error' && m.code === 'busy') { olvidarSala(); if (c) c.toast(String(m.msg || 'El servidor está lleno; se vuelve a intentar enseguida').slice(0, 140)); setTimeout(() => { if (!G.room && G.net) G.net.send({ type: 'host' }); }, 30000); }
     // Órdenes desde la administración: un aviso en pantalla o recargar la app
     else if (m.type === 'admin') {
       if (m.action === 'reload') setTimeout(() => location.reload(), 300);
@@ -92,6 +121,7 @@ window.GR = (() => {
   function setPlayers(list, silent) {
     const c = g();
     const before = new Map(G.players.map(p => [p.id, p]));
+    const idxAntes = new Map(G.players.map((p, i) => [p.id, i]));
     const order = G.players.map(p => p.id).filter(id => list.some(p => p.id === id));
     for (const p of list) if (!order.includes(p.id)) order.push(p.id);
     G.players = order.map(id => list.find(p => p.id === id));
@@ -101,6 +131,13 @@ window.GR = (() => {
     for (let i = G.players.length; i < 8; i++) PLAYERS[i] = ['', COLORS[i], SHAPES[i], null, false, false];
     if (!c) return;
     const upd = { count: G.players.length };
+    // Equipos de Pásalo y filas de Preparar van por posición: si alguien se va, cada jugador conserva lo suyo
+    const movido = G.players.some((p, i) => idxAntes.get(p.id) !== i);
+    if (movido) {
+      const re = (arr, def) => { const out = arr.slice(); G.players.forEach((p, i) => { const oi = idxAntes.get(p.id); out[i] = oi != null && arr[oi] !== undefined ? arr[oi] : def(i); }); return out; };
+      if (c.state.party && Array.isArray(c.state.party.tOf)) upd.party = { ...c.state.party, tOf: re(c.state.party.tOf, i => i % (c.state.party.nT || 2)) };
+      if (Array.isArray(c.state.setup) && c.state.setup.length) upd.setup = re(c.state.setup, i => c.state.setup[i] || { on: true, diff: c.state.settings.diff, side: i % 2 === 0 ? 0 : 2 });
+    }
     G.players.forEach((p, i) => {
       const b = before.get(p.id);
       if (!b && !silent) { upd.justJ = i; c.toast(p.name + ' se ha unido'); clearTimeout(c.jT); c.jT = setTimeout(() => c.setState({ justJ: null }), 650); }
@@ -123,7 +160,7 @@ window.GR = (() => {
     if (!p) return c.toast('No hay nadie en la sala');
     G.net.send({ type: 'kick', p: p.id });
   };
-  G.newCode = c => { G.net.send({ type: 'new-code' }); G.players = []; c.setState({ count: 0 }); c.toast('Sala nueva: los móviles deben volver a entrar'); };
+  G.newCode = c => { G.expectNew = true; G.net.send({ type: 'new-code' }); G.players = []; c.setState({ count: 0 }); c.toast('Sala nueva: los móviles deben volver a entrar'); };
 
   // Direcciones públicas: salen del dominio donde está la tele (no van escritas en el código).
   // El micro vive en el subdominio micro.; en pruebas locales (IP o localhost), en /m/index.html.
@@ -138,7 +175,8 @@ window.GR = (() => {
   G.qr = el => { if (el) qrEl = el; drawQR(); return true; };
   function drawQR() {
     // Se recuerda por lienzo: el diseño crea un lienzo nuevo cada vez que se entra en la sala
-    if (!qrEl || !G.room || !window.qrcode || (qrEl._qrFor === G.room && qrEl.isConnected)) return;
+    // (fuera de la sala el lienzo ya no está en la página: no se regenera el QR a cada fotograma)
+    if (!qrEl || !qrEl.isConnected || !G.room || !window.qrcode || qrEl._qrFor === G.room) return;
     qrEl._qrFor = qrFor = G.room;
     const q = window.qrcode(0, 'H');   // corrección máxima: aguanta la «o» del logo en el centro
     q.addData(G.microUrl() + '?s=' + G.room);
@@ -273,6 +311,7 @@ window.GR = (() => {
     return l || '';
   }
   function refreshRecords() {
+    G.songsRev = (G.songsRev || 0) + 1;   // (la lista de canciones del diseño se recalcula solo cuando cambia algo: biblioteca, récords o filtros)
     const R = G.records || { songs: {}, singers: {}, plays: {} };
     SONGS.forEach(s => {
       const r = R.songs[s.id];
@@ -312,8 +351,9 @@ window.GR = (() => {
     const song = S.song, K = skills.length;
     const duet = song.tracks.length > 1;
     const tracks = duo && duet ? [[song.tracks[0], [0]], [song.tracks[1], [1]]] : [[song.tracks[0], null]];
-    const all = song.tracks[0].flatMap(l => l.notes).concat(duet && duo ? song.tracks[1].flatMap(l => l.notes) : []).filter(n => n.weight);
-    const lo = Math.min(...all.map(n => n.midi)), hi = Math.max(...all.map(n => n.midi));
+    // (las notas anteriores a #START no se cantan: fuera del carril y de la cuenta, que si no salían «Fallo» en ráfaga)
+    const all = song.tracks[0].flatMap(l => l.notes).concat(duet && duo ? song.tracks[1].flatMap(l => l.notes) : []).filter(n => n.weight && !(song.start && n.end <= song.start));
+    const lo = all.length ? Math.min(...all.map(n => n.midi)) : 60, hi = all.length ? Math.max(...all.map(n => n.midi)) : 72;
     const range = Math.max(12, hi - lo);
     const notes = [], phrases = [];
     for (const [lines, fixed] of tracks) {
@@ -322,6 +362,7 @@ window.GR = (() => {
         const parts = fixed || (duo ? [li % 2] : [0, 1]);
         const p = { notes: [], start: l.start / 1000, end: l.end / 1000, parts };
         for (const u of l.notes) {
+          if (song.start && u.end <= song.start) continue;
           const type = u.type === 'golden' ? 'gold' : u.type === 'free' ? 'free' : u.type === 'rap' || u.type === 'rapgolden' ? 'rap' : 'n';
           const dur = Math.max(0.06, (u.end - u.start) / 1000);
           const n = { s: u.text.replace(/~/g, ''),   // «~» = la sílaba anterior se alarga (marca de UltraStar, no se canta)
@@ -337,7 +378,9 @@ window.GR = (() => {
     phrases.sort((a, b) => a.start - b.start);
     const unitP = [0, 1].map(q => { let tot = 0; notes.forEach(n => { if (n.sl && n.parts.includes(q)) tot += Math.max(1, Math.ceil(n.dur / SL)) * (n.type === 'gold' ? 2 : 1); }); return tot ? 10000 / tot : 0; });
     const last = notes.length ? Math.max(...notes.map(n => n.start + n.dur)) : 10;
-    const chart = { notes, phrases, duration: last + 2.5, unitP, range, lo, song, songIdx: c.state.songSel };
+    // #END (ms): la canción acaba ahí aunque el audio siga
+    const endMs = parseFloat(String((song.head && song.head.END) || '0').replace(',', '.')) || 0;
+    const chart = { notes, phrases, duration: endMs > 0 ? Math.min(last + 2.5, endMs / 1000) : last + 2.5, end: endMs > 0 ? endMs / 1000 : 0, unitP, range, lo, song, songIdx: c.state.songSel };
     startAudio(chart, S);
     return chart;
   };
@@ -378,7 +421,11 @@ window.GR = (() => {
         // Versión borrosa con desenfoque de verdad (no una miniatura ampliada, que se ve pixelada)
         const bl = document.createElement('canvas'); bl.width = bl.height = 160; const bx = bl.getContext('2d');
         bx.filter = 'blur(7px)'; bx.drawImage(img, -16, -16, 192, 192); bx.filter = 'none';
-        bv.covers.push({ img, bl });
+        // Se guarda una copia a 320 px (como mucho se dibuja a ese tamaño), no la imagen entera: 90 portadas de
+        // 600-1000 px descodificadas eran decenas de MB vivos para siempre en la tele
+        const sm = document.createElement('canvas'); sm.width = sm.height = 320; sm.getContext('2d').drawImage(img, 0, 0, 320, 320);
+        img.src = '';
+        bv.covers.push({ img: sm, bl });
       };
       img.src = u;
     });
@@ -492,8 +539,11 @@ window.GR = (() => {
   // ------------------------------------------------------------------ símbolos de los botones según el mando
   // Con un mando de PlayStation conectado, las ayudas muestran ✕ ○ □ △ L1 R1; con uno de Xbox, A B X Y LB RB;
   // sin mando (mando de la tele, teclado), los del diseño. Cambian solas al conectar o desconectar el mando.
+  // Sin mando a la vista, las ayudas son las del mando a distancia de la tele: OK, Atrás y los botones de colores
+  // (rojo=Y, verde=X, amarillo=L, azul=R). Los colores van como marcas de uso privado que se convierten en puntos de
+  // color al pintarse (dotsWatch y gkHtml); las letras no servían porque el mando de la tele no las tiene.
   const GLYPHS = {
-    tele: { ok: 'OK', back: '←', x: 'X', y: 'Y', l: 'L', r: 'R', lr: 'L R', menu: '≡' },
+    tele: { ok: 'OK', back: '←', x: '', y: '', l: '', r: '', lr: '', menu: '≡' },
     ps: { ok: '✕', back: '○', x: '□', y: '△', l: 'L1', r: 'R1', lr: 'L1 R1', menu: '≡' },
     xbox: { ok: 'A', back: 'B', x: 'X', y: 'Y', l: 'LB', r: 'RB', lr: 'LB RB', menu: '≡' },
   };
@@ -521,8 +571,49 @@ window.GR = (() => {
     c._lastIn = { a, t, src };
     return true;
   };
-  G.gk = () => GLYPHS.ps;   // por decisión del usuario: siempre los botones del mando de PlayStation
+  // Con mando conectado (PlayStation o Xbox, según se detecte al pulsar un botón), sus símbolos; sin mando, los del
+  // mando a distancia de la tele
+  G.gk = () => GLYPHS[padKind] || GLYPHS.tele;
+  // Ratón (escritorio): la página esconde el puntero (en la tele no hay ratón); al moverlo se enseña y a los 2,5 s
+  // quieto se vuelve a esconder, como en cualquier app de salón
+  // El puntero es propio: la flecha plana del logo de bages.link, en rojo con contorno de tinta, a 72 px (el punto
+  // activo es la punta)
+  const CURSOR_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="1.5 1 24 24"><path d="M4 3l16 7.5-6.6 2.1L10.6 21z" fill="#ec3013" stroke="#201e1d" stroke-width="1.4" stroke-linejoin="round" paint-order="stroke"/></svg>';
+  const CURSOR = `url('data:image/svg+xml;utf8,${encodeURIComponent(CURSOR_SVG)}') 8 6, auto`;
+  // Los elementos clicables del diseño llevan «cursor:pointer» (la mano): todo hereda el puntero del cuerpo, así se ve
+  // siempre la flecha propia (y nada cuando está escondida)
+  { const st = document.createElement('style'); st.textContent = 'body * { cursor: inherit !important; }'; document.head.appendChild(st); }
+  let mouseT = 0;
+  addEventListener('mousemove', () => {
+    G.mouseAt = performance.now();
+    // Durante el arranque (logo, aviso y carga) no se enseña: a partir de la bienvenida
+    const c = g();
+    if (!c || ['splash', 'boot'].includes(c.state.screen)) return;
+    document.documentElement.style.cursor = CURSOR; document.body.style.cursor = CURSOR;
+    clearTimeout(mouseT);
+    mouseT = setTimeout(() => { document.documentElement.style.cursor = ''; document.body.style.cursor = ''; }, 2500);
+  }, { passive: true });
   G.padKind = () => padKind;
+  const DOT = { '': '#e4262c', '': '#2eaa4a', '': '#f2c230', '': '#2f7de1' };
+  const DOT_KEY = { '': 'y', '': 'x', '': 'l', '': 'r', '': 'lr' };
+  const dotHtml = ch => `<span style="display:inline-block;width:18px;height:18px;border-radius:50%;background:${DOT[ch]};margin:0 2px;vertical-align:middle"></span>`;
+  const htmlEsc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  // Ayuda de un botón como HTML (para los paneles que se pintan con innerHTML: Megamix, Créditos)
+  G.gkHtml = k => [...(G.gk()[k] || '')].map(ch => DOT[ch] ? dotHtml(ch) : htmlEsc(ch)).join('');
+  // Las ayudas del diseño salen como texto ({{ gk.y }}): cuando el texto es una marca de color se cambia por puntos,
+  // y cuando vuelve a haber mando se restaura el símbolo del mando
+  let dotsAt = 0;
+  function dotsWatch() {
+    const now = performance.now();
+    if (now - dotsAt < 300) return;
+    dotsAt = now;
+    for (const el of document.querySelectorAll('span.sc-interp')) {
+      const t = el.textContent, key = el.dataset.gKey;
+      if (DOT_KEY[t]) { el.dataset.gKey = DOT_KEY[t]; el.innerHTML = [...t].map(dotHtml).join(''); }
+      else if (key && padKind !== 'tele' && t !== G.gk()[key]) el.textContent = G.gk()[key];
+      else if (key && padKind === 'tele' && !t) { /* ya son puntos */ }
+    }
+  }
   function padWatch(c) {
     const now = performance.now();
     if (now - padCheck < 500) return;
@@ -568,11 +659,17 @@ window.GR = (() => {
   }
   G.songGrid = (c, list, sf) => {
     const s = c.state, L = gridLayout(list, s.ord), gz = s.zone === 'grid';
-    if (!list.length) return { tiles: [], tags: [], abc: [], tx: 0 };
+    if (!list.length) return { tiles: [], tags: [], abc: [], tx: 0, tr: '260ms' };
     const p = L.pos[Math.min(sf, list.length - 1)] || { c: 0, r: 0 };
     const fx = L.cols[p.c].x;
-    // Desplazamiento: el foco se queda en el tercio izquierdo; sin pasarse de los bordes
-    const tx = -Math.max(0, Math.min(fx - 560, L.width - GRID.VIEW));
+    // Desplazamiento: el foco se queda en el tercio izquierdo; sin pasarse de los bordes. Si la ficha se eligió con el
+    // ratón (clic), la lista NO se mueve: solo el mando y el teclado la desplazan
+    const want = -Math.max(0, Math.min(fx - 560, L.width - GRID.VIEW));
+    const maxTx = Math.max(0, L.width - GRID.VIEW);
+    const tx = G.gridMouse && G.gridTx != null && -G.gridTx <= maxTx ? G.gridTx : want;
+    G.gridTx = tx;
+    // Paso de página con los botones: desplazamiento más largo y suave que el salto de ficha en ficha
+    const tr = performance.now() < (G.gridSmoothUntil || 0) ? '720ms cubic-bezier(.25,.8,.25,1)' : '260ms cubic-bezier(.2,.8,.2,1)';
     const lo = -tx - 400, hi = -tx + GRID.VIEW + 400;
     const tiles = [];
     L.cols.forEach((col, ci) => {
@@ -583,15 +680,29 @@ window.GR = (() => {
           bg: S.cv[0], blk: S.cv[1], fg: S.cv[2], ini: (S.title || '').split(' ').filter(w => w).slice(0, 2).map(w => w[0]).join('').toUpperCase(), fs: Math.round(GRID.W * 0.24),
           title: S.title, artist: S.artist, nw: S.isNew ? 'block' : 'none', tbg: on ? '#ec3013' : '#fff', c1: on ? '#fff' : '#201e1d', c2: on ? 'rgba(255,255,255,.85)' : '#6b6767',
           sh: on ? '0 14px 34px rgba(32,30,29,.28)' : '0 1px 0 rgba(32,30,29,.08)', t: on ? 'scale(1.06)' : 'scale(1)', z: on ? 5 : 1,
-          click: () => { if (on) c.startSetup(); else c.setState({ songF: i, zone: 'grid' }); } });
+          click: () => { if (on) c.startSetup(); else { G.gridMouse = true; c.setState({ songF: i, zone: 'grid' }); } } });
       });
     });
     const curTag = L.tags.filter(t => t.col <= p.c).pop();
     const tags = L.tags.filter(t => t.x > lo - 100 && t.x < hi).map(t => ({ l: t.l, x: t.x, y: 8, bg: curTag && t === curTag ? '#ec3013' : '#201e1d' }));
     const abc = L.tags.map(t => ({ l: t.l, bg: curTag && t === curTag ? '#ec3013' : 'transparent', fg: curTag && t === curTag ? '#fff' : '#9b9797' }));
-    return { tiles, tags, abc, tx };
+    return { tiles, tags, abc, tx, tr };
   };
   // Movimiento del foco en la rejilla; null = no lo gestiona (↑ desde la fila de arriba → filtros)
+  // Botones ‹ › junto a los filtros: una pantalla de fichas adelante o atrás (la lista se desplaza suave)
+  G.gridPage = (c, dir) => {
+    const s = c.state, list = c.songsList();
+    if (!list.length) return;
+    const L = gridLayout(list, s.ord), sf = Math.min(s.songF, list.length - 1), p = L.pos[sf] || { c: 0, r: 0 };
+    const paso = GRID.VIEW - GRID.LEFT - 96;   // lo que cabe en pantalla
+    const x0 = L.cols[p.c].x + dir * paso;
+    let ci = 0, best = Infinity;
+    L.cols.forEach((col, i) => { const d = Math.abs(col.x - x0); if (d < best) { best = d; ci = i; } });
+    if (ci === p.c) ci = Math.max(0, Math.min(L.cols.length - 1, p.c + dir));
+    const col = L.cols[ci], i = col.items[Math.min(p.r, col.items.length - 1)];
+    G.gridMouse = false; G.gridSmoothUntil = performance.now() + 800;
+    c.setState({ songF: i, zone: 'grid' });
+  };
   G.gridMove = (c, list, sf, a) => {
     if (!list.length || !'lrud'.includes(a)) return null;
     const L = gridLayout(list, c.state.ord), p = L.pos[Math.min(sf, list.length - 1)];
@@ -602,6 +713,102 @@ window.GR = (() => {
     const nc = L.cols[p.c + (a === 'r' ? 1 : -1)];
     if (!nc) return sf;
     return nc.items[Math.min(p.r, nc.items.length - 1)];
+  };
+
+  // ------------------------------------------------------------------ Créditos (Ajustes → Créditos, △ en la bienvenida)
+  // Qué es Gramola y de quién es cada pieza que usa. Texto fijo; se pinta con el mismo estilo del diseño (1920×1080
+  // escalado) y se recorre con la cruceta.
+  const CREDITOS = [
+    ['Un proyecto libre y sin ánimo de lucro', [
+      'Gramola es software libre, publicado con licencia MIT en github.com/nuvolacat/Gramola.link. No tiene ningún fin comercial: no se cobra, no se cobrará y no existe ningún beneficio económico, directo ni indirecto, por su uso. No hay publicidad, ni suscripciones, ni recogida de datos con fines comerciales.',
+      'Es una aplicación hecha por y para los amantes del karaoke, con todo el respeto hacia los artistas, autores, intérpretes y discográficas de las canciones. Gramola no tiene relación alguna con ellos ni con sus representantes, y no reclama ningún derecho sobre las obras.',
+      'Si eres titular de derechos y quieres que se retire cualquier contenido, escribe a soporte@gramola.link y se atenderá la petición.',
+      'Gramola es un proyecto de NUVOLACAT, con diseño original de NUVOLACAT. © NUVOLACAT.',
+    ]],
+    ['Tipografía', [
+      'Archivo, de Omnibus-Type · Licencia SIL Open Font License 1.1 · servida a través de Google Fonts.',
+    ]],
+    ['En la tele y en el móvil', [
+      'React 18.3.1 · Meta Platforms, Inc. · Licencia MIT.',
+      'Babel Standalone 7.29 · Licencia MIT.',
+      'qrcode.js · Kazuhiko Arase · Licencia MIT (el código QR de la sala).',
+      'jsQR · Cosmo Wolfe · Licencia Apache 2.0 (lectura del QR con la cámara del móvil).',
+      'Detección de tono: implementación propia del algoritmo YIN (de Cheveigné y Kawahara, 2002).',
+      'Efectos de sonido y aplausos: sintetizados por el propio proyecto.',
+      'Música del menú: creada con SUNO.AI.',
+    ]],
+    ['Servidor', [
+      'Node.js · ws (WebSocket) · Licencia MIT.',
+      'SimpleWebAuthn · Licencia MIT (acceso a la administración con Touch ID y llaves de acceso).',
+    ]],
+    ['Creación de canciones (herramientas de administración)', [
+      'FFmpeg · Licencias LGPL y GPL.',
+      'PyTorch y torchaudio · Licencia BSD.',
+      'Demucs (separación de la voz) · Meta · Licencia MIT.',
+      'MMS, alineador forzado de Meta AI (encaje de la letra con la voz) · modelo con licencia CC BY-NC 4.0, uso no comercial.',
+      'torchcrepe (tono de la voz; modelo CREPE de Kim, Salamon, Li y Bello, 2018) · Licencia MIT.',
+      'librosa · Licencia ISC. NumPy y SciPy · Licencia BSD. python-soundfile y libsndfile · Licencias BSD y LGPL.',
+      'Pyphen (separación en sílabas) con los diccionarios de LibreOffice · Licencias GPL, LGPL y MPL.',
+      'Formato de canción UltraStar (.txt), creado por la comunidad de UltraStar y UltraStar Deluxe.',
+    ]],
+    ['Servicios de terceros consultados', [
+      'LRCLIB, base de datos abierta de letras sincronizadas.',
+      'Genius y SongLyrics, para letras que no están en LRCLIB.',
+      'iTunes Search API (Apple) y Deezer API, para las carátulas.',
+      'Las carátulas, letras y grabaciones pertenecen a sus titulares y se usan únicamente para identificar y reproducir cada canción en el karaoke.',
+    ]],
+    ['Infraestructura', [
+      'Alojado en Ubuntu con Apache y Plesk, detrás de Cloudflare, con certificados de Let’s Encrypt.',
+    ]],
+  ];
+  let credUI = null;   // { el, box, cont, y, max }
+  function creditsRender(c) {
+    const u = credUI; if (!u) return;
+    const ink = '#201e1d', red = '#ec3013';
+    const secs = CREDITOS.map(([t, ps]) => `<div style="display:flex;flex-direction:column;gap:14px"><div style="font-size:30px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:${red}">${esc(t)}</div>${ps.map(p => `<div style="font-size:30px;line-height:1.35;font-weight:400;color:${ink}">${esc(p)}</div>`).join('')}</div>`).join('');
+    const key = (k, l) => `<div style="display:flex;align-items:center;gap:12px"><div style="min-width:48px;height:48px;padding:0 8px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;border:2px solid ${ink};border-radius:24px">${k}</div><span style="font-size:26px;font-weight:600">${esc(l)}</span></div>`;
+    u.box.innerHTML = `<div style="position:absolute;inset:0;padding:54px 96px;box-sizing:border-box;display:flex;flex-direction:column;gap:28px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid ${ink};padding-bottom:20px"><span style="font-size:28px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:${red}">Créditos</span><span style="font-size:28px;font-weight:600;color:#4a4646">Gramola ${esc(((document.querySelector('script[src*="gramola-bridge.js"]') || {}).src || '').split('?v=')[1] || '')}</span></div>
+      <div style="position:relative;flex:1;overflow:hidden"><div id="g-cred" style="position:absolute;left:0;right:0;top:0;display:flex;flex-direction:column;gap:40px;padding-bottom:40px;transition:transform 180ms ease-out">${secs}</div>
+        <div style="position:absolute;left:0;right:0;bottom:0;height:60px;background:linear-gradient(to bottom,rgba(243,242,242,0),#f3f2f2)"></div></div>
+      <div style="display:flex;justify-content:flex-end;gap:40px">${key('↕', 'Desplazar')}<span id="g-cred-volver">${key(G.gkHtml('back'), 'Volver')}</span></div></div>`;
+    u.cont = u.box.querySelector('#g-cred');
+    u.y = 0; creditsScroll(0);
+    // Ratón: clic en «Volver» cierra; la rueda desplaza el texto
+    u.box.querySelector('#g-cred-volver').onclick = e => { e.stopPropagation(); creditsClose(); whoosh(); };
+    u.box.onwheel = e => { e.preventDefault(); creditsScroll(e.deltaY); };
+  }
+  function creditsScroll(d) {
+    const u = credUI; if (!u || !u.cont) return;
+    const vis = u.cont.parentElement.clientHeight, max = Math.max(0, u.cont.scrollHeight - vis + 40);
+    u.y = Math.max(0, Math.min(max, u.y + d));
+    u.cont.style.transform = `translateY(${-u.y}px)`;
+  }
+  function creditsLayout(c) {
+    if (!credUI) return;
+    const sc = (c && c.state.scale) || Math.min(innerWidth / 1920, innerHeight / 1080);
+    credUI.box.style.transform = `translate(-50%,-50%) scale(${sc})`;
+  }
+  function creditsClose() { if (credUI) { credUI.el.remove(); credUI = null; } }
+  G.creditsOpen = c => {
+    if (credUI) return;
+    const el = document.createElement('div');
+    el.style.cssText = 'position:fixed;inset:0;z-index:40;background:#0e0f0f';
+    const box = document.createElement('div');
+    box.style.cssText = 'position:absolute;left:50%;top:50%;width:1920px;height:1080px;background:#f3f2f2;color:#201e1d;font-family:Archivo,sans-serif;overflow:hidden';
+    el.appendChild(box); document.body.appendChild(el);
+    credUI = { el, box, cont: null, y: 0, screen: c.state.screen };
+    creditsLayout(c); creditsRender(c); whoosh();
+  };
+  G.creditsKey = (c, a) => {
+    if (!credUI) return false;
+    if (c.state.screen !== credUI.screen) { creditsClose(); return false; }
+    if (a === 'd') creditsScroll(160);
+    else if (a === 'u') creditsScroll(-160);
+    else if (a === 'r') creditsScroll(720);
+    else if (a === 'l') creditsScroll(-720);
+    else if (a === 'back' || a === 'ok' || a === 'menu') { creditsClose(); whoosh(); }
+    return true;
   };
 
   // ------------------------------------------------------------------ Megamix
@@ -639,7 +846,7 @@ window.GR = (() => {
       <div style="display:flex;flex-direction:column;gap:12px"><div style="font-size:120px;font-weight:300;line-height:.9;letter-spacing:-0.045em">¿Cuántas canciones?</div><div style="font-size:36px;color:#4a4646">El estribillo de cada una, seguidas y sin parar. Sin repetir artista.</div></div>
       <div style="display:flex;border:2px solid ${ink};background:#fff">${tiles}</div>
       <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px 32px;flex:1;align-content:start">${cards}</div>
-      <div style="display:flex;justify-content:flex-end;gap:40px">${key('↔', 'Cuántas')}${key(G.gk().y, 'Otra lista')}${key(G.gk().back, 'Volver')}${key(G.gk().ok, 'Empezar', true)}</div></div>`;
+      <div style="display:flex;justify-content:flex-end;gap:40px">${key('↔', 'Cuántas')}${key(G.gkHtml('y'), 'Otra lista')}${key(G.gkHtml('back'), 'Volver')}${key(G.gkHtml('ok'), 'Empezar', true)}</div></div>`;
   }
   function megaLayout(c) {
     if (!megaUI) return;
@@ -744,13 +951,19 @@ window.GR = (() => {
   // Audio: un AudioContext propio (se suspende en la pausa y su reloj es el de la partida)
   function megaAudio(chart, segs) {
     stopAudio();
+    G.songEnded = false;   // (si la canción anterior llegó al final, el Megamix no puede «acabar» en su primer fotograma)
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const M = Object.assign(G.mega, { ctx, segs, t0: null, cur: -1, chart, master: ctx.createGain() });
     M.master.gain.value = vol('music'); M.master.connect(ctx.destination);
     const load = k => { const sg = segs[k]; if (!sg || sg.p) return; sg.p = fetch(sg.url).then(r => r.arrayBuffer()).then(ab => new Promise((ok, ko) => { const x = ctx.decodeAudioData(ab, ok, ko); if (x && x.catch) x.catch(ko); })).then(b => (sg.buf = b)).catch(() => (sg.failed = true)); };
     load(0); load(1);
     M.load = load;
-    segs[0].p.then(() => { if (G.mega !== M) return; ctx.resume(); M.t0 = ctx.currentTime + 0.25; megaSchedule(M, 0); });
+    segs[0].p.then(() => {
+      if (G.mega !== M) return;
+      // Sin el primer estribillo (descarga o descodificación fallida) no se arranca mudo: aviso como con una canción
+      if (segs[0].failed) { const c = g(); if (c) { c.chart = null; G.failed = 'Megamix'; c.setState({ err: 'song' }); } return; }
+      ctx.resume(); M.t0 = ctx.currentTime + 0.25; megaSchedule(M, 0);
+    });
     menuMusic(false);
   }
   function megaSchedule(M, k) {
@@ -810,12 +1023,27 @@ window.GR = (() => {
     G.audio = a; G.clock = { at: 0, perf: 0, playing: false };
     G.songEnded = false;
     a.addEventListener('ended', () => (G.songEnded = true));
-    a.addEventListener('error', () => { const c = g(); if (c && c.state.screen === 'sing') { c.chart = null; c.setState({ err: 'song' }); G.failed = S.title; } });
-    a.addEventListener('loadedmetadata', () => { if (isFinite(a.duration)) chart.duration = Math.max(chart.duration, a.duration); }, { once: true });
+    // (si el audio falla mientras aún se ve la cuenta atrás o la transición, también hay que avisar: antes se ignoraba
+    // y la partida se quedaba clavada en 0:00)
+    a.addEventListener('error', () => { const c = g(); if (c && G.audio === a && c.chart === chart) { c.chart = null; c.setState({ err: 'song' }); G.failed = S.title; } });
+    a.addEventListener('loadedmetadata', () => { if (isFinite(a.duration)) chart.duration = chart.end ? Math.min(chart.end, a.duration) : Math.max(chart.duration, a.duration); }, { once: true });
     if (S.song.start) a.currentTime = S.song.start / 1000;
     songGraph(a);
     a.play().catch(() => {});
     menuMusic(false);
+    // El servidor lleva su propia cuenta de la puntuación con la voz que reenvía (docs/PUNTUACION.md): le decimos qué se
+    // canta, con qué margen cada cantante y el ajuste del micro; después, cada segundo, dónde va el reloj (G.update)
+    const c = g();
+    if (G.net && !G.preview && c) {
+      const singers = (c.state.singers || []).filter(s => s.id != null && !s.bot).map(s => ({ id: s.id, part: s.part === 1 ? 1 : 0, tol: (s.tol || 1) / G.PRECISION }));
+      G.net.send({ type: 'sing', song: S.id, duo: c.state.mode === 'duo', delay: (c.state.settings && c.state.settings.delay) || 0, singers });
+      G.clockSent = 0;
+    }
+  }
+  function sendClock(c, pos) {
+    if (!G.net || G.preview || G.mega) return;
+    G.clockSent = performance.now();
+    G.net.send({ type: 'clock', pos, playing: !(c && c.state.paused) && !!G.audio && !G.audio.paused && !G.audio._pausing, lat: Math.round(G.net.halfLatency || 0) });
   }
   // Pausa suave: la canción pasa por Web Audio y, al pausar, se desvanece poco a poco (~0,6 s) en vez de cortarse
   // en seco; luego se vuelve al punto exacto donde se pulsó pausa, para que al seguir no se salte nada.
@@ -849,6 +1077,7 @@ window.GR = (() => {
     a.play().catch(() => {});
   }
   function stopAudio() { megaStop(); if (G.audio) { G.audio.pause(); G.audio.removeAttribute('src'); G.audio.load(); G.audio = null; } }
+  G.stopAudio = stopAudio;   // (el diseño lo llama si se cancela la transición hacia el canto)
   // Retraso de salida del audio de un AudioContext (lo que tarda el sonido en salir por los altavoces de la tele).
   // Cuando la canción suena por Web Audio, el reloj de la letra y las cajas lo descuenta para ir con lo que se oye.
   G.AV_EXTRA = 0;   // ajuste fino manual (s), por si una tele concreta lo necesita
@@ -1112,12 +1341,23 @@ window.GR = (() => {
     const ch = c.chart;
     if (!ch) return;
     megaPause(c.state.paused);
-    if (c.state.paused) { if (G.audio && !G.audio.paused) songPause(G.audio); return; }
-    if (G.audio && G.audio.paused && !G.songEnded) songResume(G.audio);
+    if (c.state.paused) { if (G.audio && !G.audio.paused && !G.audio._pausing) { const at = audioNow(); songPause(G.audio); sendClock(c, at); } return; }
+    if (G.audio && G.audio.paused && !G.songEnded) { songResume(G.audio); G.clockSent = 0; }
     const S = c.state.singers, K = S.length, duel = c.state.mode === 'duel';
     const now = audioNow();
     c.now = now;
-    const actAt = (t, part, m = 0) => { for (const n of ch.notes) { if (t >= n.start - m && t < n.start + n.dur + m && n.parts.includes(part) && n.type !== 'free') return n; } return null; };
+    if (!G.clockSent || performance.now() - G.clockSent > 1000) sendClock(c, now);
+    // La nota activa en t: primero la que lo contiene de verdad; si no hay, la que lo alcanza con el margen (antes, con
+    // dos notas pegadas, el margen de la anterior «robaba» la primera ranura de la siguiente y el 100 % era imposible)
+    const actAt = (t, part, m = 0) => {
+      let near = null;
+      for (const n of ch.notes) {
+        if (n.type === 'free' || !n.parts.includes(part)) continue;
+        if (t >= n.start && t < n.start + n.dur) return n;
+        if (!near && m && t >= n.start - m && t < n.start + n.dur + m) near = n;
+      }
+      return near;
+    };
     for (let k = 0; k < K; k++) {
       const sg = S[k];
       const f = sg.id != null ? G.frames[sg.id] : null;
@@ -1190,7 +1430,8 @@ window.GR = (() => {
           if (n.type === 'gold' && r > 0.6) c.goldHit[k]++;
           // Vibrato bien hecho en una nota bien cantada: la mitad de lo que vale la nota, de propina
           if (n.vibFrom && n.vibFrom[k] != null && r > 0.5) {
-            const bonus = Math.round(G.VIB.BONUS * ch.unitP[S[k].part] * n.sl[k].length * (n.type === 'gold' ? 2 : 1));
+            const bonus = Math.min(Math.round(G.VIB.BONUS * ch.unitP[S[k].part] * n.sl[k].length * (n.type === 'gold' ? 2 : 1)), Math.max(0, 10000 - c.score[k]));   // (nunca por encima de 10.000)
+            if (!bonus) continue;
             c.score[k] += bonus;
             if (!c.vibs) c.vibs = [];
             c.vibs[k] = (c.vibs[k] || 0) + 1;
@@ -1217,7 +1458,7 @@ window.GR = (() => {
     }
     c.parts = c.parts.filter(p => (p.life -= dt) > 0);
     c.parts.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 300 * dt; });
-    if (G.songEnded || now >= ch.duration) { stopAudio(); c.finishSing(); }
+    if (G.songEnded || now >= ch.duration) { G.songEnded = false; stopAudio(); c.finishSing(); }
   };
 
   // ------------------------------------------------------------------ récords
@@ -1225,14 +1466,29 @@ window.GR = (() => {
     const S = SONGS[c.state.songSel];
     if (!S || !G.room || G.mega || c.state.mode === 'jukebox' || c.state.mode === 'party') return;
     const sing = c.state.singers;
+    // El récord lo decide el servidor (comprueba la voz que ha visto): la pantalla de resultados se corrige con su
+    // respuesta: puntos recortados, «¡Récord!» solo si lo es de verdad, o aviso si no se ha podido guardar
+    const ajustar = (ok, j) => {
+      const R = c.state.results; if (!R || R.rows !== rows) return;
+      if (!ok) { c.conf = []; c.setState({ results: { ...R, record: false } }); c.toast(j && j.error === 'sesion' ? 'El servidor no ha visto esta canción: sin récord' : 'No se ha podido guardar el récord'); return; }
+      const por = new Map((j.players || []).map(p => [p.name, p]));
+      let cambio = false;
+      const nuevas = rows.map(r => { const p = por.get(r.name); if (!p) return r; if (p.score !== r.score || p.streak !== r.streak) cambio = true; return { ...r, score: p.score, streak: p.streak }; });
+      nuevas.sort((a, b) => b.score - a.score);
+      if (!j.isNew) c.conf = [];
+      if (cambio || !!j.isNew !== !!R.record) c.setState({ results: { ...R, rows: nuevas, record: !!j.isNew } });
+      if (cambio) c.toast('Puntos ajustados por el servidor');
+    };
     try {
       const r = await fetch('/api/records', {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ code: G.room, token: G.token, song: S.id, title: S.title, artist: S.artist,
-          players: rows.map(r => ({ name: r.name, score: r.score, streak: r.streak, bot: !!(sing.find(s => s.name === r.name) || {}).bot })) }),
+          players: rows.map(r => ({ id: r.id, name: r.name, score: r.score, streak: r.streak, bot: !!(sing.find(s => s.name === r.name) || {}).bot })) }),
       });
+      let j = null; try { j = await r.json(); } catch {}
+      ajustar(r.ok, j);
       if (r.ok) { G.records = await (await fetch('/api/records', { cache: 'no-store' })).json(); refreshRecords(); }
-    } catch {}
+    } catch { ajustar(false, null); }
   };
 
   // ------------------------------------------------------------------ avisos (errores reales)
@@ -1243,7 +1499,7 @@ window.GR = (() => {
       c.setState({ errBusy: true });
       if (G.net) { G.net.retry = 0; G.net.connect(); }
       setTimeout(() => { if (G.netOk) { c.setState({ err: null, errBusy: false }); c.toast('Conexión recuperada'); } else c.setState({ errBusy: false }); }, 1600);
-    } else { c.setState({ err: null }); if (e === 'song') c.go('songs'); }
+    } else { c.setState({ err: null }); if (e === 'song') c.go(c.state.mode === 'party' ? 'party' : c.state.mode === 'jukebox' ? 'menu' : 'songs'); }   // (en Pásalo o Jukebox no se vuelve a Canciones con ese modo)
   };
 
   // ------------------------------------------------------------------ calibración real del retraso
@@ -1375,6 +1631,7 @@ window.GR = (() => {
   const FOCO = s => JSON.stringify([s.screen, s.menuF, s.songF, s.zone, s.filterF, s.ord, s.lng, s.dec, s.gen, s.setupF, s.setup,
     s.pauseF, s.paF, s.resF, s.setF, s.settings, s.recTab, s.search && s.search.f, s.party, s.calib && s.calib.f]);
   G.navBefore = (c, a) => {
+    G.gridMouse = false;   // (cualquier tecla o botón del mando: la lista vuelve a seguir al foco)
     if (!'udlr'.includes(a) || a.length !== 1) return;
     const antes = FOCO(c.state);
     requestAnimationFrame(() => requestAnimationFrame(() => { const s = c.state; if (s.screen === 'sing' && !s.paused) return; if (FOCO(s) !== antes) zup(); }));
@@ -1566,6 +1823,7 @@ window.GR = (() => {
     const p = prev; prev = null; release(p);
     trimPreviews(new Set());
   }
+  G.avanceDe = () => prevFor;   // (para las pruebas: qué canción está sonando de avance)
   function previewFor(list, idx) {
     const S = list[idx];
     if (!S || prevFor === S.id) return;
@@ -1613,6 +1871,11 @@ window.GR = (() => {
   G.tick = (c, ts) => {
     G.g = c;
     timeMethods(c);
+    // El selector del Megamix va por encima del diseño: mientras haya un aviso (sala llena, micro…) se esconde para
+    // que el aviso se vea y se pueda cerrar; al cerrarlo vuelve
+    for (const u of [megaUI, credUI]) if (u) { const v = c.state.err ? 'hidden' : ''; if (u.el.style.visibility !== v) u.el.style.visibility = v; }
+    if (credUI) creditsLayout(c);
+    dotsWatch();
     if (!c.__lanes) {
       c.__lanes = true;
       c.drawLaneC = function (cx, L, part, ks) { return G.pageLane.call(c, cx, L, part, ks, false); };
@@ -1647,11 +1910,12 @@ window.GR = (() => {
     menuMusic(MUSIC_SCREENS.includes(s.screen) && !(s.screen === 'party' && s.party && s.party.step === 'turn' && false));
     menuGuard();
     // Avance de la canción enfocada
-    if (s.screen === 'songs' && !s.search.open && s.zone === 'grid' && G.ready) {
+    // El avance sigue siempre a la canción que enseña la ficha: también al cambiar los filtros (década, idioma…) o al
+    // buscar, que cambian la lista aunque el foco se quede en la misma posición (antes seguía sonando la de antes)
+    if (s.screen === 'songs' && G.ready) {
       const l = c.songsList();
-      previewFor(l, Math.min(s.songF, l.length - 1));
-    } else if (s.screen === 'songs' && (s.search.open || s.zone !== 'grid')) {
-      // buscando o con los filtros: sigue sonando el avance que había
+      if (l.length) previewFor(l, Math.min(s.songF, l.length - 1));
+      else if (prev || prevFor) stopPreview();
     } else if (prev || prevFor || pcache.size) stopPreview();
     // Pitidos de la cuenta atrás
     if (s.screen === 'count' && s.countN !== lastCountN) { lastCountN = s.countN; beep(880, 0.08, 0.2); }
@@ -1662,10 +1926,12 @@ window.GR = (() => {
     if (lastScreen === 'sing' && s.screen !== 'sing') stopAudio();
     if (s.screen !== lastScreen) { if (s.screen === 'results' && s.results && s.results.record) [523, 659, 784, 1047].forEach((f, i) => beep(f, 0.18, 0.16, i * 0.09)); lastScreen = s.screen; }
     // Sin conexión con el servidor durante más de 3 s → aviso del diseño
-    if (!G.netOk && G.lostAt && performance.now() - G.lostAt > 3000 && !s.err && !['splash', 'boot', 'welcome'].includes(s.screen)) c.setState({ err: G.room ? 'lost' : 'server' });
+    // (en el arranque se da más margen, 10 s, pero también se avisa: antes se quedaba en «Cargando… 95 %» sin más)
+    if (!G.netOk && G.lostAt && performance.now() - G.lostAt > (s.screen === 'boot' ? 10000 : 3000) && !s.err && !['splash', 'welcome'].includes(s.screen)) c.setState({ err: G.room ? 'lost' : 'server' });
     // Estado para los móviles
-    const screen = s.screen === 'count' ? 'countdown' : s.screen === 'sing' && s.mode !== 'jukebox' && !s.paused ? 'sing' : s.screen === 'calib' ? 'calibrate' : s.screen === 'setup' ? 'prepare' : s.screen;
-    const st = { type: 'state', screen, singers: (s.singers || []).map(x => x.id).filter(x => x != null) };
+    const screen = s.screen === 'count' ? 'countdown' : s.screen === 'sing' && s.mode !== 'jukebox' && !s.paused ? 'sing' : s.screen === 'sing' && s.paused ? 'pause' : s.screen === 'calib' ? 'calibrate' : s.screen === 'setup' ? 'prepare' : s.screen;
+    // (en la calibración del micro canta quien quiera: todos los móviles mandan voz)
+    const st = { type: 'state', screen, singers: screen === 'calibrate' ? G.players.map(p => p.id) : (s.singers || []).map(x => x.id).filter(x => x != null) };
     if (s.mode === 'party' && s.party && s.singers && s.singers[0]) st.turn = s.singers[0].name;
     // Para la administración: qué se canta y en qué modo
     if (s.mode) st.mode = s.mode;
@@ -1679,7 +1945,11 @@ window.GR = (() => {
   G.errText = (k, t) => {
     if (k === 'song' && G.failed) return t.replace('El último tren', G.failed);
     if (k === 'mic' && G.micLost) return t.replace(/Nerea/g, G.micLost);
-    if (k === 'lost') return t.replace('{room}', G.room || '');
+    if (k === 'lost') {
+      // Lo que ha pasado de verdad: la sala vieja ya no existe, hay una nueva y los móviles tienen que volver a entrar
+      if (G.lostFrom && G.room) return t.replace('Buscando la sala {room}… Los móviles volverán a entrar solos.', `La sala ${G.lostFrom} se ha perdido. La nueva es ${G.room}: los móviles tienen que volver a escanear el QR.`).replace('Reintentar ahora', 'Entendido').replace('{room}', G.room);
+      return t.replace('{room}', G.room || '');
+    }
     return t;
   };
 
@@ -1713,7 +1983,7 @@ window.GR = (() => {
         const note = vinfo + `ms/fotograma: update ${(T.update / n).toFixed(1)}, canto ${(T.sing / n).toFixed(1)}, fondo ${(T.bg / n).toFixed(1)}; React ${T.renders} renders (${T.renders ? (T.renderMs / T.renders).toFixed(1) : 0} ms c/u); reloj ${stp.length ? Math.round(stp[stp.length >> 1] * 1000) : '?'} ms, ${G.stats.resets} corr.; vídeo ${G.stats.seeks} recol.`;
         Object.assign(G.timing, { update: 0, sing: 0, bg: 0, n: 0, renders: 0, renderMs: 0 });
         if (silentMeter && st.screen !== 'sing' && !G.sentCam) { G.sentCam = true; } else if (silentMeter && st.screen !== 'sing') return; // en la tele, solo durante el canto (y un aviso inicial)
-        fetch('/api/telemetry', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ fps, p95, worst, heap, screen: st.screen, singers: (st.singers || []).length, video, note, ua: navigator.userAgent }) }).catch(() => {});
+        fetch(G.withK ? G.withK('/api/telemetry') : '/api/telemetry', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ fps, p95, worst, heap, screen: st.screen, singers: (st.singers || []).length, video, note, ua: navigator.userAgent }) }).catch(() => {});
       }
     }, 500);
   }

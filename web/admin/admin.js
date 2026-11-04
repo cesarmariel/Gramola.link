@@ -156,15 +156,25 @@
     $('view').innerHTML = '';
     window.scrollTo(0, 0);
     // Si se cambia de apartado mientras el anterior aún carga, su error (ya no tiene dónde pintar) se ignora
-    fn(rest.map(decodeURIComponent)).catch(e => { if (gen === viewGen) fail(e); });
+    let args;
+    try { args = rest.map(decodeURIComponent); } catch { location.hash = 'resumen'; return; }   // («#canciones/100%» no deja la pantalla en blanco)
+    fn(args).catch(e => {
+      if (gen !== viewGen) return;
+      fail(e);
+      // Que nunca quede la vista vacía: un botón para volver y el motivo
+      $('view').innerHTML = `<button class="btn ghost sm back" data-go="${['editor', 'canciones', 'preparando'].includes(v) ? 'canciones' : 'resumen'}">← Volver</button><div class="empty">${esc(e.message || 'Error')}</div>`;
+    });
   }
   addEventListener('hashchange', route);
   document.addEventListener('click', e => { const g = e.target.closest('[data-go]'); if (g) location.hash = g.dataset.go; });
+  let tSide = 0, tVigilar = 0;
+  const avisados = new Set();   // trabajos ya avisados (vive entre entradas: al volver a entrar no se repiten los avisos)
   async function start() {
     const st = await api('/auth/status' + (setup ? '?setup=' + enc(setup) : ''));
     if (!st.authenticated || st.setupValid) return showLogin(st);
     $('login').hidden = true; $('app').hidden = false;
     route();
+    clearInterval(tSide); clearInterval(tVigilar);   // (al volver a entrar tras caducar la sesión no se duplican los sondeos)
     // Contadores del menú, siempre al día
     const side = async () => {
       try {
@@ -172,9 +182,9 @@
         const b = $('nav-live'); b.textContent = l.counts.rooms || ''; b.className = l.counts.rooms ? 'live' : '';
       } catch {}
     };
-    side(); setInterval(side, 10000);
+    side(); tSide = setInterval(side, 10000);
     // Aviso al terminar un trabajo de creación (en cualquier apartado): «Abrir en el editor»
-    const desde = Date.now(), avisados = new Set();
+    const desde = Date.now();
     const vigilar = async () => {
       try {
         const d = await api('/jobs');
@@ -186,7 +196,7 @@
         }
       } catch {}
     };
-    setInterval(vigilar, 8000);
+    tVigilar = setInterval(vigilar, 8000);
     api('/server').then(s => ($('ver').textContent = 'v' + s.version)).catch(() => {});
   }
 
@@ -244,7 +254,8 @@
       <div class="rooms" id="d-rooms"></div>`;
     $('d-send').onclick = async () => {
       const text = $('d-msg').value.trim(); if (!text) return;
-      try { const r = await api('/broadcast', { method: 'POST', json: { text, phones: $('d-ph').checked } }); toast(`Enviado a ${r.tvs} teles`); $('d-msg').value = ''; } catch (e) { fail(e); }
+      $('d-msg').value = '';   // (antes de esperar: un doble clic no lo manda dos veces)
+      try { const r = await api('/broadcast', { method: 'POST', json: { text, phones: $('d-ph').checked } }); toast(`Enviado a ${r.tvs} teles`); } catch (e) { $('d-msg').value = text; fail(e); }
     };
     $('d-rooms').onclick = async e => {
       const b = e.target.closest('button[data-a]'); if (!b) return;
@@ -252,6 +263,7 @@
       try {
         if (a === 'close') { if (await ask(`¿Cerrar la sala ${code}?`, 'La tele y todos los móviles salen de la sala.')) { await api(`/rooms/${code}/close`, { method: 'POST', json: {} }); toast('Sala cerrada'); } }
         else if (a === 'reload') { await api(`/rooms/${code}/reload`, { method: 'POST', json: {} }); toast('Recargando la tele'); }
+        else if (a === 'reload-ph') { if (await ask('¿Recargar los móviles de esta sala?', 'Cada móvil vuelve a cargar la app (un par de segundos) y entra solo en la sala.')) { const r = await api(`/rooms/${code}/reload`, { method: 'POST', json: { phones: true } }); toast(`Recargando ${r.phones} móviles`); } }
         else if (a === 'kick') { if (await ask(`¿Echar a ${b.dataset.name}?`, 'Su móvil sale de la sala; puede volver a entrar con el código.')) { await api(`/rooms/${code}/kick`, { method: 'POST', json: { p: +b.dataset.p } }); toast('Fuera'); } }
         else if (a === 'msg') {
           const t = await prompt2(`Mensaje a la sala ${code}`, 'Aparece en la tele (y en los móviles)', '', 'Enviar');
@@ -288,7 +300,7 @@
         ${p.singing ? `<span class="vu" title="Volumen"><i style="width:${Math.min(100, (p.vol || 0) * 250)}%"></i></span>` : ''}
         ${p.photo ? `<button class="btn sm ghost" data-a="photo" data-code="${r.code}" data-p="${p.id}" data-name="${esc(p.name)}">Foto</button>` : ''}
         <button class="btn sm danger" data-a="kick" data-code="${r.code}" data-p="${p.id}" data-name="${esc(p.name)}">Echar</button></div>`).join('') || '<div class="pl muted small">Sin jugadores todavía</div>'}
-      <div class="room-a"><button class="btn sm" data-a="msg" data-code="${r.code}">Mensaje</button><button class="btn sm" data-a="reload" data-code="${r.code}" ${r.hostOnline ? '' : 'disabled'}>Recargar la tele</button><button class="btn sm danger" data-a="close" data-code="${r.code}">Cerrar sala</button></div>
+      <div class="room-a"><button class="btn sm" data-a="msg" data-code="${r.code}">Mensaje</button><button class="btn sm" data-a="reload" data-code="${r.code}" ${r.hostOnline ? '' : 'disabled'}>Recargar la tele</button><button class="btn sm" data-a="reload-ph" data-code="${r.code}" ${r.players.some(p => p.online) ? '' : 'disabled'}>Recargar móviles</button><button class="btn sm danger" data-a="close" data-code="${r.code}">Cerrar sala</button></div>
     </div>`;
   }
 
@@ -451,7 +463,7 @@
     if ($('s-rest')) $('s-rest').onclick = () => act(api(`/songs/${enc(id)}/cover`, { method: 'POST', json: { restore: true } }), 'Portada anterior recuperada');
     if ($('s-p0')) $('s-p0').onclick = async () => { if (await ask('¿Poner a 0 las veces cantada?', esc(s.title))) act(api('/records/plays/' + enc(id), { method: 'DELETE' })); };
     if ($('s-r0')) $('s-r0').onclick = async () => { if (await ask('¿Borrar el récord de esta canción?', esc(s.title))) act(api('/records/song/' + enc(id), { method: 'DELETE' })); };
-    if ($('s-pub')) $('s-pub').onclick = async () => { const nid = await publicar(id); if (nid) { toast('Publicada: ya sale en la tele'); location.hash = 'canciones/' + enc(nid); } };
+    if ($('s-pub')) $('s-pub').onclick = async () => { const b = $('s-pub'); if (b.disabled) return; b.disabled = true; try { const nid = await publicar(id); if (nid) { toast('Publicada: ya sale en la tele'); if (nid === id) reload(); else location.hash = 'canciones/' + enc(nid); } } finally { b.disabled = false; } };
     $('s-voz').onclick = async () => { try { await api('/jobs', { method: 'POST', json: { kind: 'analizar', song: id } }); toast('En la cola de creación'); location.hash = 'creacion'; } catch (e) { fail(e); } };
     $('s-nov').onclick = () => act(api('/novedades', { method: 'POST', json: { ids: [id], on: !s.isNew } }), s.isNew ? 'Quitada de Novedades' : 'Marcada como novedad');
     $('s-ren').onclick = async () => { const to = await prompt2('Renombrar carpeta', 'Nombre nuevo de la carpeta', id); if (to && to !== id) try { const r = await api(`/songs/${enc(id)}/rename`, { method: 'POST', json: { to } }); toast('Renombrada'); location.hash = 'canciones/' + enc(r.id); } catch (e) { fail(e); } };
@@ -460,12 +472,13 @@
     const now = () => { const a = $('s-audio'); return a ? mmss(a.currentTime) : ''; };
     $('mm-ah').onclick = () => ($('mm-a').value = now());
     $('mm-bh').onclick = () => ($('mm-b').value = now());
-    const mmRun = async (json, msg) => { try { toast('Cortando el tramo…'); const r = await api(`/songs/${enc(id)}/megamix`, { method: 'POST', json }); toast(msg || r.result); reload(); } catch (e) { fail(e); } };
+    let mmBusy = false;   // (un doble clic no lanza dos ffmpeg sobre el mismo megamix.mp3)
+    const mmRun = async (json, msg) => { if (mmBusy) return; mmBusy = true; try { toast('Cortando el tramo…'); const r = await api(`/songs/${enc(id)}/megamix`, { method: 'POST', json }); toast(msg || r.result); reload(); } catch (e) { fail(e); } finally { mmBusy = false; } };
     $('mm-set').onclick = () => { const a = parseT($('mm-a').value), b = parseT($('mm-b').value); if (!(a >= 0 && b > a)) return toast('Pon inicio y fin (m:ss)', true); mmRun({ mode: 'manual', start: a, end: b }); };
     $('mm-auto').onclick = () => mmRun({ mode: 'auto' });
     if ($('mm-off')) $('mm-off').onclick = async () => { if (await ask('¿Quitar del Megamix?', esc(s.title))) mmRun({ mode: 'none' }, 'Fuera del Megamix'); };
     $('v-me').onclick = async () => { $('v-out').textContent = 'Midiendo…'; try { const r = await api(`/songs/${enc(id)}/measure`, { method: 'POST', json: {} }); $('v-out').textContent = `${(+r.input_i).toFixed(1)} LUFS · pico ${(+r.input_tp).toFixed(1)} dBTP · rango ${(+r.input_lra).toFixed(1)} LU`; } catch (e) { $('v-out').textContent = ''; fail(e); } };
-    $('v-no').onclick = async () => { $('v-out').textContent = 'Igualando (tarda un poco)…'; try { const r = await api(`/songs/${enc(id)}/normalize`, { method: 'POST', json: {} }); toast(r.result); reload(); } catch (e) { $('v-out').textContent = ''; fail(e); } };
+    $('v-no').onclick = async () => { const b = $('v-no'); if (b.disabled) return; b.disabled = true; $('v-out').textContent = 'Igualando (tarda un poco)…'; try { const r = await api(`/songs/${enc(id)}/normalize`, { method: 'POST', json: {} }); toast(r.result); reload(); } catch (e) { $('v-out').textContent = ''; b.disabled = false; fail(e); } };
     $('t-add').onclick = async () => { const k = await prompt2('Añadir dato', 'Nombre del dato (p. ej. GENRE, EDITION, VIDEO)', ''); if (k) $('s-tags').insertAdjacentHTML('beforeend', tagRow(k.toUpperCase().replace(/[^A-Z0-9]/g, ''), '')); };
     $('s-tags').onclick = e => { const b = e.target.closest('[data-rm]'); if (b) b.previousElementSibling.value = ''; };
     $('t-save').onclick = () => {
@@ -571,7 +584,7 @@
     $('rt').onclick = async e => {
       const r = e.target.closest('[data-r]'), d = e.target.closest('[data-d]');
       try {
-        if (r) { await api(`/retired/${enc(r.dataset.r)}/restore`, { method: 'POST', json: {} }); toast('Restaurada'); }
+        if (r) { if (r.disabled) return; r.disabled = true; await api(`/retired/${enc(r.dataset.r)}/restore`, { method: 'POST', json: {} }); toast('Restaurada'); }
         if (d && await ask('¿Borrar para siempre?', `«${esc(d.dataset.d)}» se borra del servidor. No se puede deshacer.`, 'Borrar')) { await api(`/retired/${enc(d.dataset.d)}`, { method: 'DELETE' }); toast('Borrada'); }
         draw();
       } catch (err) { fail(err); }
@@ -581,6 +594,9 @@
 
   // ------------------------------------------------------------------ Creación de canciones (trabajador en el propio servidor)
   const IDIOMAS = { es: 'Castellano', en: 'Inglés', ca: 'Catalán', fr: 'Francés', it: 'Italiano', pt: 'Portugués', de: 'Alemán', gl: 'Gallego', eu: 'Euskera' };
+  // Idioma que más parece una letra (palabras muy frecuentes); el trabajador hace la misma comprobación
+  const STOP = { es: 'que de no la el y a en un es me te se mi tu por lo con para como yo si más ya sin del al las los una pero', en: 'the you and i to a of in it my me is that on we your this for be all with so like just what but oh got', ca: 'que de no la el i a en un és em et es meu teu per amb com jo si més ja sense del al les els una però hi', fr: 'que de ne la le et à un est je tu me te mon ma pour avec comme si plus sans des les une mais pas dans', it: 'che di non la il e a un è mi ti io tu per con come se più già senza del al le una ma nel sei', pt: 'que de não a o e um é me te eu você por com como se mais já sem do na os as uma mas', de: 'der die und ich du nicht das ist ein es zu mit dich mich wir sie auf für von so wie was' };
+  const idiomaDe = txt => { const w = String(txt || '').toLowerCase().match(/[a-záéíóúàèìòùäëïöüñçœ']+/g) || []; if (w.length < 20) return 'es'; let mejor = 'es', mp = 0; for (const [k, v] of Object.entries(STOP)) { const set = new Set(v.split(' ')); const p = w.filter(x => set.has(x)).length / w.length; if (p > mp) { mp = p; mejor = k; } } return mp >= 0.12 ? mejor : 'es'; };
   // Buscar la letra (LRCLIB y, de reserva, Genius y songlyrics) y ponerla en el cuadro
   async function buscarLetraUI(dur) {
     const a = $('k-art').value.trim(), ti = $('k-tit').value.trim(), box = $('k-letra'), st = $('k-lst');
@@ -625,7 +641,7 @@
         <audio controls preload="none" src="/api/admin/jobs/${j.id}/audio"></audio>
         ${j.dup ? `<p class="small red-t">Ya hay una canción igual en la biblioteca: <a href="#canciones/${enc(j.dup)}">${esc(j.dup)}</a></p>` : ''}</div></div>
       <div class="grid2"><div><label class="lbl">Artista</label><input class="inp" id="k-art" value="${esc(j.artista)}"></div><div><label class="lbl">Título</label><input class="inp" id="k-tit" value="${esc(j.titulo)}"></div></div>
-      <div class="grid2"><div><label class="lbl">Idioma de la letra</label><select class="inp" id="k-lang">${Object.entries(IDIOMAS).map(([k, v]) => `<option value="${k}" ${k === (j.idioma || 'es') ? 'selected' : ''}>${v}</option>`).join('')}</select></div><div><label class="lbl">Año</label><input class="inp" id="k-year" maxlength="4" value="${esc(j.anio || '')}"></div></div>
+      <div class="grid2"><div><label class="lbl">Idioma de la letra</label><select class="inp" id="k-lang">${Object.entries(IDIOMAS).map(([k, v]) => `<option value="${k}" ${k === (j.idioma || idiomaDe(letra)) ? 'selected' : ''}>${v}</option>`).join('')}</select></div><div><label class="lbl">Año</label><input class="inp" id="k-year" maxlength="4" value="${esc(j.anio || '')}"></div></div>
       <div class="row" style="justify-content:space-between;align-items:flex-end"><label class="lbl">Letra · una frase por línea (como se verá en la tele)</label><button class="btn sm" id="k-buscar" type="button">Buscar la letra</button></div><p class="small muted" id="k-lst" style="margin:0 0 6px"></p><textarea class="inp" id="k-letra" rows="12">${esc(letra)}</textarea>
       <p class="small muted" style="margin:10px 0 0">«Editar» no la publica: pasa al editor, que primero coloca la letra sobre la voz y saca las notas (unos 5 minutos) y después te deja retocarla y publicarla.</p>
       <div class="row" style="margin-top:12px"><button class="btn red" id="k-go">Editar</button><button class="btn" id="k-save">Guardar y seguir luego</button><button class="btn ghost" id="k-x">Cerrar</button></div>`);
@@ -668,7 +684,8 @@ Las líneas vacías no cuentan."></textarea>
         await new Promise((res, rej) => {   // con barra de progreso
           const x = new XMLHttpRequest(); x.open('PUT', `/api/admin/jobs/${j.id}/audio`); x.setRequestHeader('x-name', f.name);
           x.upload.onprogress = e => { if (e.lengthComputable) $('k-p').style.width = (e.loaded / e.total * 100) + '%'; };
-          x.onload = () => x.status < 300 ? res() : rej(new Error((JSON.parse(x.responseText || '{}').error) || 'Error ' + x.status)); x.onerror = () => rej(new Error('Sin conexión'));
+          x.onload = () => { if (x.status < 300) return res(); let j = {}; try { j = JSON.parse(x.responseText || '{}'); } catch {} rej(new Error(j.error || 'Error ' + x.status)); };   // (un 413 o 502 en HTML no deja el modal colgado)
+          x.onerror = () => rej(new Error('Sin conexión'));
           x.send(f);
         });
         closeModal(); location.hash = 'preparando/' + j.id;
@@ -765,7 +782,10 @@ Las líneas vacías no cuentan."></textarea>
   // ------------------------------------------------------------------ Editor de canciones
   VIEWS.editor = async ([id, extra]) => {
     if (!id) { location.hash = 'canciones'; return; }
-    editor = await GramolaEditor.open($('view'), id, api, toast, { verAlAbrir: extra === 'ver' });
+    const gen = viewGen;   // si se cambia de apartado mientras carga, el editor no pisa la vista nueva
+    const ed = await GramolaEditor.open($('view'), id, api, toast, { verAlAbrir: extra === 'ver', vivo: () => gen === viewGen });
+    if (!ed) return;
+    editor = ed;
     // Las que están en preparación se editan dentro de Creación
     document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('on', a.dataset.v === (editor.draft ? 'creacion' : 'canciones')));
   };

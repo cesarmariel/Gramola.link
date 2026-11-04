@@ -8,7 +8,7 @@
 <link rel="apple-touch-icon" href="/assets/iconos/favicon-180.png">
 <style>html,body{margin:0;background:#0e0f0f;overflow:hidden;cursor:none}</style>
 <script src="/vendor/qrcode.js"></script>
-<script src="/tv/gramola-bridge.js?v=1.26.1102.1646"></script>
+<script src="/tv/gramola-bridge.js?v=1.26.1103.1347"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="./support.js"></script>
@@ -57,10 +57,10 @@ a{color:var(--color-accent-700)}a:hover{color:var(--color-accent-600)}
     <div style="font-size:280px;font-weight:800;line-height:.8;letter-spacing:-0.05em">gram<svg viewBox="0 0 100 100" style="display:inline-block;width:.66em;height:.66em;margin:0 -.03em 0 .01em;vertical-align:-.06em;color:var(--color-accent)"><circle cx="50" cy="50" r="38" fill="none" stroke="currentColor" stroke-width="14"></circle><path d="M30 38h40M27 50h46M30 62h40" stroke="currentColor" stroke-width="8"></path></svg>la</div>
   </div>
   <div style="display:flex;justify-content:center;padding-bottom:48px">{{ pressEl }}</div>
-  <div style="display:flex;justify-content:space-between;align-items:center;border-top:2px solid var(--color-text);padding-top:20px;font-size:28px;font-weight:600">
+  <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;border-top:2px solid var(--color-text);padding-top:20px;font-size:28px;font-weight:600">
     <img src="assets/nuvola/nuvola-tinta.png" alt="nuvola" style="display:block;height:44px;width:auto;position:relative;top:-7px">
     
-    <span style="color:var(--color-neutral-700)">Versión 1.26.1102.1646</span>
+    <span style="color:var(--color-neutral-700);font-size:22px;font-weight:500;justify-self:center">1.26.1103.1347</span><span onClick="{{ onCredits }}" style="justify-self:end;display:flex;align-items:center;gap:12px;font-size:24px;font-weight:600;color:var(--color-neutral-700)"><span style="width:40px;height:40px;border-radius:50%;border:2px solid var(--color-text);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:var(--color-text)">{{ gk.y }}</span>Créditos</span>
   </div>
 </div>
 </sc-if>
@@ -154,7 +154,7 @@ a{color:var(--color-accent-700)}a:hover{color:var(--color-accent-600)}
   </div>
   <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border:2px solid var(--color-text);background:#fff">
     <sc-for list="{{ tiles }}" as="m" hint-placeholder-count="7">
-      <div onClick="{{ m.click }}" style="height:260px;padding:24px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;position:relative;transition:transform 150ms ease-out,box-shadow 150ms ease-out,background 150ms ease-out;border-right:{{ m.br }};outline:{{ m.ol }};outline-offset:-2px;background:{{ m.bg }};color:{{ m.fg }};transform:{{ m.t }};box-shadow:{{ m.s }};z-index:{{ m.z }}">
+      <div onClick="{{ m.click }}" onMouseEnter="{{ m.hover }}" style="height:260px;padding:24px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;position:relative;transition:transform 150ms ease-out,box-shadow 150ms ease-out,background 150ms ease-out;border-right:{{ m.br }};outline:{{ m.ol }};outline-offset:-2px;background:{{ m.bg }};color:{{ m.fg }};transform:{{ m.t }};box-shadow:{{ m.s }};z-index:{{ m.z }}">
         <span style="font-size:28px;font-weight:800;opacity:.75">{{ m.num }}</span>
         <div style="display:flex;flex-direction:column;gap:4px"><span style="font-size:36px;font-weight:800;line-height:1.05">{{ m.name }}</span><span style="font-size:28px;font-weight:400;line-height:1.1;opacity:.8">{{ m.short }}</span></div>
       </div>
@@ -176,19 +176,22 @@ a{color:var(--color-accent-700)}a:hover{color:var(--color-accent-600)}
     <div style="font-size:96px;font-weight:300;line-height:.9;letter-spacing:-0.04em">Canciones</div>
     <div style="font-size:28px;font-weight:600;color:var(--color-neutral-700)">{{ songCountText }}</div>
   </div>
-  <div style="display:flex;margin-top:24px;border:2px solid var(--color-text);align-self:flex-start">
+  <div style="display:flex;margin-top:24px;justify-content:space-between;align-items:flex-start;align-self:stretch">
+  <div style="display:flex;border:2px solid var(--color-text)">
     <sc-for list="{{ filters }}" as="f" hint-placeholder-count="8">
       <div onClick="{{ f.click }}" style="height:60px;padding:0 24px;box-sizing:border-box;display:flex;align-items:center;font-size:28px;font-weight:600;cursor:pointer;white-space:nowrap;border-right:2px solid var(--color-text);transition:background 150ms ease-out;background:{{ f.bg }};color:{{ f.fg }};outline:{{ f.ol }};outline-offset:-6px">{{ f.label }}</div>
     </sc-for>
   </div>
+  <div style="display:flex;gap:12px"><div onClick="{{ onPagePrev }}" style="width:64px;height:64px;box-sizing:border-box;border:2px solid var(--color-text);display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:800;line-height:1;padding-bottom:4px;background:#fff">‹</div><div onClick="{{ onPageNext }}" style="width:64px;height:64px;box-sizing:border-box;border:2px solid var(--color-text);display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:800;line-height:1;padding-bottom:4px;background:#fff">›</div></div>
+  </div>
   <sc-if value="{{ hasSongs }}" hint-placeholder-val="{{ true }}">
     <div style="position:relative;flex:1;min-height:0;margin:24px -96px 0;overflow:hidden;-webkit-mask-image:linear-gradient(to right,transparent 0,#000 120px,#000 calc(100% - 120px),transparent 100%);mask-image:linear-gradient(to right,transparent 0,#000 120px,#000 calc(100% - 120px),transparent 100%)">
-      <div style="position:absolute;left:0;top:0;height:100%;transition:transform 260ms cubic-bezier(.2,.8,.2,1);transform:translateX({{ grid.tx }}px)">
+      <div style="position:absolute;left:0;top:0;height:100%;transition:transform {{ grid.tr }};transform:translateX({{ grid.tx }}px)">
         <sc-for list="{{ grid.tags }}" as="g" hint-placeholder-count="3">
           <div style="position:absolute;left:{{ g.x }}px;top:{{ g.y }}px;width:52px;height:52px;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800;color:#fff;background:{{ g.bg }}">{{ g.l }}</div>
         </sc-for>
         <sc-for list="{{ grid.tiles }}" as="s" hint-placeholder-count="10">
-          <div onClick="{{ s.click }}" style="position:absolute;left:{{ s.x }}px;top:{{ s.y }}px;width:{{ s.w }}px;height:{{ s.h }}px;overflow:hidden;cursor:pointer;background:{{ s.tbg }};box-shadow:{{ s.sh }};transform:{{ s.t }};z-index:{{ s.z }}">
+          <div onClick="{{ s.click }}" style="position:absolute;left:{{ s.x}}px;top:{{ s.y }}px;width:{{ s.w }}px;height:{{ s.h }}px;overflow:hidden;cursor:pointer;background:{{ s.tbg }};box-shadow:{{ s.sh }};transform:{{ s.t }};z-index:{{ s.z }}">
             <div style="position:relative;width:100%;height:{{ s.ch }}px;overflow:hidden;background:{{ s.bg }}">
               <div style="position:absolute;right:0;bottom:0;width:58%;height:46%;background:{{ s.blk }}"></div>
               <div style="position:absolute;left:6%;top:3%;font-weight:800;line-height:1;letter-spacing:-0.05em;font-size:{{ s.fs }}px;color:{{ s.fg }}">{{ s.ini }}</div>
@@ -613,7 +616,7 @@ const CHALL=[['Solo el estribillo','Puntúa solo la parte más pegadiza.'],['Sin
 const RANGE=['Menos de 3.000','3.000 – 4.999','5.000 – 6.499','6.500 – 7.999','8.000 – 9.199','9.200 o más'];
 const REC2=GR.REC2;
 const REC3=GR.REC3;
-const SET_ROWS=[{k:'diff',label:'Dificultad por defecto',type:'seg',opts:['Fácil','Normal','Difícil'],help:'La que se propone a cada jugador al preparar la partida. Fácil admite ±4 semitonos; Normal, ±2; Difícil, ±1.'},{k:'delay',label:'Retraso del micro',type:'act',help:'Lo que tarda tu voz en viajar del móvil a la tele. Pulsa OK para medirlo cantando.'},{k:'music',label:'Volumen de la música',type:'bar',help:'Volumen de la canción en la tele.'},{k:'fx',label:'Volumen de los efectos',type:'bar',help:'Pitidos, aplausos y la cuenta atrás.'},{k:'trail',label:'Estela de la voz',type:'seg',opts:['Oculta','Visible'],help:'La línea que dibuja tu tono sobre el carril de notas.'},{k:'lyr',label:'Tamaño de la letra',type:'seg',opts:['Normal','Grande'],help:'Grande aumenta la letra un 12 % para salones amplios o teles pequeñas.'},{k:'kick',label:'Expulsar jugador',type:'act',help:'Saca de la sala al último que entró. Podrá volver con el código.'},{k:'code',label:'Nuevo código de sala',type:'act',help:'Genera un código nuevo. Todos los móviles tendrán que volver a entrar.'}];
+const SET_ROWS=[{k:'diff',label:'Dificultad por defecto',type:'seg',opts:['Fácil','Normal','Difícil'],help:'La que se propone a cada jugador al preparar la partida. Fácil admite ±4 semitonos; Normal, ±2; Difícil, ±1.'},{k:'delay',label:'Retraso del micro',type:'act',help:'Lo que tarda tu voz en viajar del móvil a la tele. Pulsa OK para medirlo cantando.'},{k:'music',label:'Volumen de la música',type:'bar',help:'Volumen de la canción en la tele.'},{k:'fx',label:'Volumen de los efectos',type:'bar',help:'Pitidos, aplausos y la cuenta atrás.'},{k:'trail',label:'Estela de la voz',type:'seg',opts:['Oculta','Visible'],help:'La línea que dibuja tu tono sobre el carril de notas.'},{k:'lyr',label:'Tamaño de la letra',type:'seg',opts:['Normal','Grande'],help:'Grande aumenta la letra un 12 % para salones amplios o teles pequeñas.'},{k:'kick',label:'Expulsar jugador',type:'act',help:'Saca de la sala al último que entró. Podrá volver con el código.'},{k:'code',label:'Nuevo código de sala',type:'act',help:'Genera un código nuevo. Todos los móviles tendrán que volver a entrar.'},{k:'credits',label:'Créditos',type:'act',help:'Qué es Gramola, de quién es cada pieza que usa y cómo contactar.'}];
 const ERRS_D={server:['Sin conexión','No llegamos al servidor','La tele no alcanza el servidor. Revisa la wifi; la partida sigue donde estaba.','Reintentar'],lost:['Reconectando','La tele ha perdido la sala','Buscando la sala {room}… Los móviles volverán a entrar solos.','Reintentar ahora'],song:['Canción','No se puede cargar «El último tren»','El archivo no responde. Elige otra y vuelve a probar más tarde.','Elegir otra'],full:['Sala llena','Ya hay 8 jugadores','Para que entre alguien más, otro tiene que salir desde Ajustes.','Entendido'],mic:['Micro','Nerea ha perdido el micro','Su ficha se queda atenuada. Vuelve sola en cuanto su móvil reconecte.','Seguir']};
 const PAD_MAP={0:'ok',1:'back',2:'x',3:'y',4:'lb',5:'rb',8:'v',9:'menu',12:'u',13:'d',14:'l',15:'r'};
 const DUO_PARTS=[[0],[1],[0],[1],[0,1],[0,1]];
@@ -707,7 +710,8 @@ class Component extends DCLogic {
     c.fillStyle='#fff';c.fillRect(0,0,S,S);c.fillStyle=C.ink;const fin=(x,y)=>(x>=0&&x<7&&y>=0&&y<7);
     for(let y=0;y<N;y++)for(let x=0;x<N;x++){const inF=fin(x,y)||fin(x-(N-7),y)||fin(x,y-(N-7));const sep=(x<8&&y<8)||(x>N-9&&y<8)||(x<8&&y>N-9);if(inF){const fx=x>=N-7?x-(N-7):x,fy=y>=N-7?y-(N-7):y;const d=Math.max(Math.abs(fx-3),Math.abs(fy-3));if(d!==2)c.fillRect(x*s,y*s,s+.5,s+.5);}else if(!sep&&rnd()<.5)c.fillRect(x*s,y*s,s+.5,s+.5);}};
   toast(text){const id=Math.random();this.setState(s=>({toasts:[...s.toasts,{id,text}].slice(-3)}));setTimeout(()=>this.setState(s=>({toasts:s.toasts.filter(t=>t.id!==id)})),3000);}
-  songsList(){const s=this.state;let l=SONGS.filter(x=>x.id);const q=norm(s.query||'');if(q)l=l.filter(x=>norm(x.title+' '+x.artist).includes(q));
+  songsList(){const s=this.state;const key=[SONGS.length,GR.songsRev||0,s.query||'',s.lng,s.dec,s.gen,s.duoOnly?1:0,s.ord].join('|');if(this._sl&&this._sl.key===key)return this._sl.list;const list=this.songsList0();this._sl={key,list};return list;}
+  songsList0(){const s=this.state;let l=SONGS.filter(x=>x.id);const q=norm(s.query||'');if(q)l=l.filter(x=>norm(x.title+' '+x.artist).includes(q));
     if(s.lng)l=l.filter(x=>x.lang===LANGS[s.lng]);if(s.dec){const y0=GR.decadeStart(DECS[s.dec]);l=l.filter(x=>x.year>=y0&&x.year<y0+10);}if(s.gen)l=l.filter(x=>x.genre===GENS[s.gen]);if(s.duoOnly)l=l.filter(x=>x.duo);
     const o=ORDERS[s.ord],cmp=(a,b)=>a.localeCompare(b,'es');if(o==='A–Z')l.sort((a,b)=>cmp(a.title,b.title));else if(o==='Artista')l.sort((a,b)=>cmp(a.artist,b.artist));else if(o==='Década')l.sort((a,b)=>a.year-b.year);else l.sort((a,b)=>b.plays-a.plays);return GR.newFirst(l);}
   searchKey(a){const f=this.state.search.f,KN=KB.length;let nf=f;const col=f<KN?f%10:(f===KN?1:f===KN+1?5:8);
@@ -727,7 +731,7 @@ class Component extends DCLogic {
   go(screen,extra,cb){const from=this.state.screen,M=this.pickMode(from,screen);
     const set=(o,c)=>{this._inGo=true;try{super.setState(o,c);}finally{this._inGo=false;}};
     if(M==='Seco'||screen===from||this.trTo===screen){if(this.trTo!==screen)set({screen,...extra,trM:M},cb);return;}
-    if(this.state.tr==='out'){clearTimeout(this.trT);}
+    if(this.state.tr==='out'){clearTimeout(this.trT);if(this.trTo==='count'&&screen!=='count'){clearTimeout(this.cWait);clearInterval(this.cTimer);}if(this.trTo==='sing'&&screen!=='sing'){this.chart=null;GR.stopAudio&&GR.stopAudio();}}clearTimeout(this.trI);
     const O=['splash','boot','welcome','lobby','menu','songs','setup','count','sing','results','party','records','settings','calib'];const dir=O.indexOf(screen)>=O.indexOf(this.state.screen)?1:-1;
     this.trTo=screen;super.setState({tr:'out',trDir:dir,trM:M});clearTimeout(this.trT);this.trT=setTimeout(()=>{this.trTo=null;this.trVia=true;set({screen,...extra,tr:'pre'},()=>{this.enter();cb&&cb();});},TR[M].out);}
   trMode(){return TR[this.state.trM]?this.state.trM:'Zoom';}
@@ -737,7 +741,7 @@ class Component extends DCLogic {
   startSetup(){const l=this.songsList();if(!l.length)return;const song=l[Math.min(this.state.songF,l.length-1)];
     const prev=this.state.setup;const setup=Array.from({length:this.state.count},(_,i)=>prev[i]&&prev.length===this.state.count?prev[i]:{on:!this.isOff(i),diff:this.state.settings.diff,side:i%2===0?0:2});
     this.setState({screen:'setup',songSel:SONGS.indexOf(song),setup,setupF:0});}
-  singersFromSetup(){const m=this.state.mode;return this.state.setup.map((s,i)=>{if(this.isOff(i))return null;if(m==='sing'?!s.on:s.side===1)return null;const side=m==='sing'?0:(s.side===0?0:1);return {id:PLAYERS[i][3],bot:PLAYERS[i][4],name:PLAYERS[i][0],color:PLAYERS[i][1],shape:PLAYERS[i][2],tol:DIFFS[s.diff][1],team:side,part:m==='duo'?side:0};}).filter(Boolean);}
+  singersFromSetup(){const m=this.state.mode;return this.state.setup.map((s,i)=>{if(this.isOff(i)||!PLAYERS[i][0])return null;if(m==='sing'?!s.on:s.side===1)return null;const side=m==='sing'?0:(s.side===0?0:1);return {id:PLAYERS[i][3],bot:PLAYERS[i][4],name:PLAYERS[i][0],color:PLAYERS[i][1],shape:PLAYERS[i][2],tol:DIFFS[s.diff][1],team:side,part:m==='duo'?side:0};}).filter(Boolean);}
   teams(){const S=this.state.singers;return [0,1].map(t=>{const ks=S.map((s,k)=>s.team===t?k:-1).filter(k=>k>=0);const m=ks.map(k=>S[k]);return {ks,color:m[0]?m[0].color:C.n5,name:m.length===1?m[0].name:m.map(x=>x.name).join(' · ')};});}
   teamAvg(arr){if(this.state.mode!=='duel')return [0,0];return this.teams().map(t=>t.ks.length?t.ks.reduce((a,k)=>a+arr[k],0)/t.ks.length:0);}
   startCount(){const singers=this.singersFromSetup(),m=this.state.mode;if(!singers.length){this.toast('Activa al menos a un jugador');return;}if(m!=='sing'&&!(singers.some(s=>s.team===0)&&singers.some(s=>s.team===1))){this.toast(m==='duel'?'Hace falta al menos uno en cada equipo':'Hace falta al menos uno en cada parte');return;}(clearTimeout(this.cWait),clearInterval(this.cTimer));
@@ -748,8 +752,8 @@ class Component extends DCLogic {
     this.combo=new Array(K).fill(0);this.best=new Array(K).fill(0);this.goldHit=new Array(K).fill(0);this.parts=[];this.pops=[];this.lastEnd=null;
     this.setState({screen:'sing',paused:false,scores:new Array(K).fill(0),teamScores:[0,0],pauseF:0});}
   finishSing(){if(this.state.mode==='jukebox'){this.jukeNext();return;}if(this.state.mode==='party'){const pts=Math.round(this.score[0]),p=this.state.party,sc=p.scores.slice();sc[p.turn]+=pts;this.chart=null;this.go('party',{party:{...p,scores:sc,step:'board',last:{name:this.state.singers[0].name,pts,t:p.turn}}});return;}const ch=this.chart,S=this.state.singers;const goldN=ch.notes.filter(n=>n.type==='gold').length;
-    const rows=S.map((s,k)=>{let h=0,t=0;ch.notes.forEach(n=>{if(n.sl){h+=n.sl[k].reduce((a,b)=>a+b,0);t+=n.sl[k].length;}});return {name:s.name,color:s.color,shape:s.shape,score:Math.round(this.score[k]),prec:Math.round(100*h/t),gold:this.goldHit[k]+'/'+goldN,streak:this.best[k],bestPh:Math.round(100*Math.max(0,...ch.phrases.filter(p=>p.parts.includes(s.part)).map(p=>{let a=0,b=0;p.notes.forEach(n=>{if(n.sl){a+=n.sl[k].reduce((x,y)=>x+y,0);b+=n.sl[k].length;}});return b?a/b:0;})))};});
-    rows.sort((a,b)=>b.score-a.score);let head=null;if(this.state.mode==='duel'){const T=this.teams(),av=this.teamAvg(this.score).map(Math.round);head=av[0]===av[1]?'Empate.':'Gana '+T[av[0]>av[1]?0:1].name+'.';}const song=SONGS[this.state.songSel];const recN=GR.mega?Infinity:(parseInt((song.rec.split(' ')[0]||'0').replace('.',''))||0);
+    const rows=S.map((s,k)=>{let h=0,t=0;ch.notes.forEach(n=>{if(n.sl){h+=n.sl[k].reduce((a,b)=>a+b,0);t+=n.sl[k].length;}});return {id:s.id,name:s.name,color:s.color,shape:s.shape,score:Math.round(this.score[k]),prec:t?Math.round(100*h/t):0,gold:this.goldHit[k]+'/'+goldN,streak:this.best[k],bestPh:Math.round(100*Math.max(0,...ch.phrases.filter(p=>p.parts.includes(s.part)).map(p=>{let a=0,b=0;p.notes.forEach(n=>{if(n.sl){a+=n.sl[k].reduce((x,y)=>x+y,0);b+=n.sl[k].length;}});return b?a/b:0;})))};});
+    rows.sort((a,b)=>b.score-a.score);let head=null;if(this.state.mode==='duel'){const T=this.teams(),av=this.teamAvg(this.score).map(Math.round);head=av[0]===av[1]?'Empate.':'Gana '+T[av[0]>av[1]?0:1].name+'.';}const song=SONGS[this.state.songSel]||{rec:'—'};const recN=GR.mega?Infinity:(parseInt((song.rec.split(' ')[0]||'0').replace('.',''))||0);
     GR.saveRecord(this,rows);this.chart=null;this.showResults(rows,rows[0].score>recN,this.state.songSel,head);}
   showResults(rows,record,songSel,head){this.resStart=this.T||performance.now()/1000;
     if(record)this.conf=Array.from({length:140},()=>({x:Math.random()*1920,y:-Math.random()*1080,vy:180+Math.random()*260,vx:-40+Math.random()*80,r:Math.random()*6,vr:-4+Math.random()*8,w:10+Math.random()*14,h:6+Math.random()*8,c:[C.red,C.ink,C.gold,'#fff'][Math.floor(Math.random()*4)]}));else this.conf=[];
@@ -762,17 +766,17 @@ class Component extends DCLogic {
   P(u){this.setState(s=>({party:{...s.party,...u}}));}
   partyNew(){if(this.state.count<2){this.toast('Pásalo necesita al menos 2 jugadores');return;}this.conf=[];this.go('party',{mode:'party',party:{step:'teams',nT:2,tOf:Array.from({length:8},(_,i)=>i%2),pf:0,round:1,rounds:4,scores:[0,0,0,0],turn:0,ch:0,spin:-1,spinning:false,last:null,cf:0}});}
   teamIds(p,t){return [...Array(this.state.count).keys()].filter(i=>p.tOf[i]===t);}
-  turnPlayer(p){const ids=this.teamIds(p,p.turn);return ids[Math.floor((p.round-1)/p.nT)%ids.length];}
+  turnPlayer(p){const ids=this.teamIds(p,p.turn);if(!ids.length)return null;return ids[Math.floor((p.round-1)/p.nT)%ids.length];}
   partyMove(i,d){const p=this.state.party,t=p.tOf.slice();t[i]=(t[i]+(d>0?1:p.nT-1))%p.nT;this.P({tOf:t});}
   spin(){const p=this.state.party,start=p.spin<0?0:p.spin,target=Math.floor(Math.random()*8),S=16+((target-start+8)%8);this.P({spinning:true});let i=0;
     const step=()=>{i++;this.P({spin:(start+i)%8});if(i>=S){this.P({spinning:false,ch:target});this.spT=setTimeout(()=>{if(this.state.screen==='party')this.P({step:'turn'});},900);return;}this.spT=setTimeout(step,40+9*i);};this.spT=setTimeout(step,40);}
-  partyGo(){const p=this.state.party,P0=PLAYERS[this.turnPlayer(p)];this.beginCount({mode:'party',singers:[{id:P0[3],bot:P0[4],name:P0[0],color:P0[1],shape:P0[2],tol:DIFFS[this.state.settings.diff][1],team:0,part:0}],songSel:Math.floor(Math.random()*SONGS.length)});}
+  partyGo(){const p=this.state.party,pi=this.turnPlayer(p);if(pi==null){this.toast('Ese equipo se ha quedado sin jugadores');this.P({step:'teams'});return;}const P0=PLAYERS[pi];this.beginCount({mode:'party',singers:[{id:P0[3],bot:P0[4],name:P0[0],color:P0[1],shape:P0[2],tol:DIFFS[this.state.settings.diff][1],team:0,part:0}],songSel:Math.floor(Math.random()*SONGS.length)});}
   makeConf(){return Array.from({length:140},()=>({x:Math.random()*1920,y:-Math.random()*1080,vy:180+Math.random()*260,vx:-40+Math.random()*80,r:Math.random()*6,vr:-4+Math.random()*8,w:10+Math.random()*14,h:6+Math.random()*8,c:[C.ink,C.gold,'#fff','#fff'][Math.floor(Math.random()*4)]}));}
   partyKey(a){const p=this.state.party,n=this.state.count;
     if(p.step==='teams'){if(a==='u')this.P({pf:Math.max(0,p.pf-1)});else if(a==='d')this.P({pf:Math.min(n-1,p.pf+1)});else if(a==='l'||a==='r')this.partyMove(p.pf,a==='r'?1:-1);
       else if(a==='x'){if(p.nT<4)this.P({nT:p.nT+1});else this.toast('Máximo 4 equipos');}
       else if(a==='y'){if(p.nT>2){const nT=p.nT-1;this.P({nT,tOf:p.tOf.map(t=>t>=nT?nT-1:t)});}else this.toast('Mínimo 2 equipos');}
-      else if(a==='ok'){if(![...Array(p.nT).keys()].every(t=>this.teamIds(p,t).length)){this.toast('Cada equipo necesita al menos un jugador');return;}this.P({step:'roulette'});}else if(a==='back')this.go('menu');}
+      else if(a==='ok'){if(![...Array(p.nT).keys()].every(t=>this.teamIds(p,t).length)){this.toast('Cada equipo necesita al menos un jugador');return;}this.P({step:'roulette',rounds:p.nT*Math.max(...[...Array(p.nT).keys()].map(t=>this.teamIds(p,t).length))});}else if(a==='back')this.go('menu');}
     else if(p.step==='roulette'){if(p.spinning)return;if(a==='ok')this.spin();else if(a==='back')this.P({step:'teams'});}
     else if(p.step==='turn'){if(a==='ok')this.partyGo();else if(a==='back')this.P({step:'roulette'});}
     else if(p.step==='board'){if(a==='ok'){if(p.round>=p.rounds){this.conf=this.makeConf();this.P({step:'champs',cf:0});}else this.P({round:p.round+1,turn:(p.turn+1)%p.nT,step:'roulette'});}}
@@ -784,8 +788,8 @@ class Component extends DCLogic {
     else if(r.type==='bar'){if(a==='l')put(r.k,Math.max(0,st[r.k]-1));else if(a==='r')put(r.k,Math.min(10,st[r.k]+1));}
     else if(a==='ok'){if(r.k==='delay')this.go('calib',{calib:{phase:'idle',beat:-1,ms:st.delay,manual:st.delay,f:0,marks:[]}});
       else if(r.k==='kick'){GR.kickLast(this);}
-      else{GR.newCode(this);}}}
-  calKey(a){const c=this.state.calib;if(c.phase==='measure'||c.phase==='test'){if(a==='back'){clearInterval(this.bTimer);this.setState({calib:{...c,phase:'idle',beat:-1}});}return;}
+      else if(r.k==='credits'){GR.creditsOpen(this);}else{GR.newCode(this);}}}
+  calKey(a){const c=this.state.calib;if(c.phase==='measure'||c.phase==='test'){if(a==='back'){clearInterval(this.bTimer);if(GR.cal)GR.cal.on=false;this.setState({calib:{...c,phase:'idle',beat:-1}});}return;}
     if(a==='u')this.setState({calib:{...c,f:Math.max(0,c.f-1)}});else if(a==='d')this.setState({calib:{...c,f:Math.min(3,c.f+1)}});
     else if((a==='l'||a==='r')&&c.f===1)this.setState({calib:{...c,manual:Math.max(0,Math.min(400,c.manual+(a==='r'?10:-10)))}});
     else if(a==='ok'){if(c.f===0)this.beats('measure');else if(c.f===2)this.beats('test');else if(c.f===3){this.setState({settings:{...this.state.settings,delay:c.manual}});this.toast('Retraso guardado: '+c.manual+' ms');this.go('settings');}}
@@ -799,9 +803,9 @@ class Component extends DCLogic {
   setupToggle(i){if(this.isOff(i)){this.toast(PLAYERS[i][0]+' no tiene el micro conectado');return;}const m=this.state.mode;this.setState(s=>({setup:s.setup.map((r,j)=>j!==i?r:m==='sing'?{...r,on:!r.on}:{...r,side:r.side===0?2:r.side===2?1:0})}));}
   setupDiff(i,d){this.setState(s=>({setup:s.setup.map((r,j)=>j===i?{...r,diff:Math.max(0,Math.min(2,r.diff+d))}:r)}));}
   onKey(e){const map={ArrowLeft:'l',ArrowRight:'r',ArrowUp:'u',ArrowDown:'d',Enter:'ok',' ':'ok',Escape:'back',Backspace:'back',p:'menu',P:'menu',m:'menu',M:'menu',v:'v',V:'v',j:'add',J:'add','+':'add','-':'rem',q:'lb',Q:'lb',e:'rb',E:'rb',x:'x',X:'x',y:'y',Y:'y',GamepadA:'ok',GamepadB:'back',GamepadX:'x',GamepadY:'y',GamepadMenu:'menu',GamepadView:'v',GamepadLeftShoulder:'lb',GamepadRightShoulder:'rb',GamepadDPadUp:'u',GamepadDPadDown:'d',GamepadDPadLeft:'l',GamepadDPadRight:'r',GamepadLeftThumbstickUp:'u',GamepadLeftThumbstickDown:'d',GamepadLeftThumbstickLeft:'l',GamepadLeftThumbstickRight:'r'};const a=map[e.key];if(!a)return;e.preventDefault();if(e.key.startsWith('Gamepad'))this.padKeys=true;if(GR.inAct(this,a,'key'))this.act(a);}
-  act(a){const s=this.state;if(GR.megaKey(this,a))return;GR.navBefore(this,a);
+  act(a){const s=this.state;if(!s.err&&(GR.creditsKey(this,a)||GR.megaKey(this,a)))return;GR.navBefore(this,a);
     if(s.err){if(a==='ok'||a==='back')this.errAct();return;}
-    if(s.screen==='splash'||s.screen==='boot')return;if(s.screen==='welcome'){if(a==='ok')this.go('lobby');return;}
+    if(s.screen==='splash'||s.screen==='boot')return;if(s.screen==='welcome'){if(a==='ok')this.go('lobby');else if(a==='y'||a==='x')GR.creditsOpen(this);return;}
     if(s.screen==='lobby'&&a==='y')a='add';
     if(s.screen==='sing'&&a==='x')a='v';
     if(s.screen==='sing'&&s.mode==='jukebox'&&!s.paused&&a==='rb'){this.jukeNext();return;}
@@ -1041,7 +1045,7 @@ class Component extends DCLogic {
     V.isPA=!!s.pauseAudio;V.notPA=!s.pauseAudio;V.pauseTitle=s.pauseAudio?'Audio':'Pausa';const stg=s.settings;
     V.paRows=[['Música',stg.music,String(stg.music)],['Efectos',stg.fx,String(stg.fx)],['Retraso del micro',Math.round(stg.delay/40),stg.delay+' ms']].map((r,i)=>{const on=s.paF===i;return {label:r[0],val:r[2],bg:on?C.red:'transparent',fg:on?'#fff':ink,cells:Array.from({length:10},(_,j)=>({c:j<r[1]?(on?'#fff':ink):(on?'rgba(255,255,255,0.35)':C.n3)})),click:()=>this.setState({paF:i})};});
     V.onKeyOk=()=>this.act('ok');V.onKeyBack=()=>this.act('back');V.onKeyX=()=>this.act('x');V.onKeyY=()=>this.act('y');V.onKeyL=()=>this.act('lb');V.onKeyR=()=>this.act('rb');
-    V.isBoot=s.screen==='boot';V.videoEl=GR.videoUrl(this)&&s.screen==='sing'?React.createElement('video',{key:'v',src:GR.videoUrl(this),autoPlay:true,muted:true,loop:false,playsInline:true,'data-gramola':'videoclip',style:{position:'absolute',inset:0,width:1920,height:1080,objectFit:'cover'}}):null;V.gk=GR.gk();V.isSplash=s.screen==='splash';V.isWelcome=s.screen==='welcome';V.spOp=s.splashIn&&!s.splashOut?1:0;V.spOpMs=s.splashOut?700:1000;V.bootOp=s.bootIn===false?0:1;V.spClip=s.splashRed?'circle(75% at 50% 50%)':'circle(0% at 50% 50%)';V.spOrigOp=1;V.spWhiteOp=0;V.spTf=s.splashIn?'scale(1)':'scale(0.94)';V.spMsgOp=s.splashMsg&&!s.splashMsgOut?1:0;V.spMsgTf=s.splashMsg&&!s.splashMsgOut?'translateY(0)':'translateY(18px)';
+    V.isBoot=s.screen==='boot';V.videoEl=GR.videoUrl(this)&&s.screen==='sing'?React.createElement('video',{key:'v',src:GR.videoUrl(this),autoPlay:true,muted:true,loop:false,playsInline:true,'data-gramola':'videoclip',style:{position:'absolute',inset:0,width:1920,height:1080,objectFit:'cover'}}):null;V.gk=GR.gk();V.onCredits=e=>{if(e&&e.stopPropagation)e.stopPropagation();GR.creditsOpen(this);};V.onPagePrev=()=>GR.gridPage(this,-1);V.onPageNext=()=>GR.gridPage(this,1);V.isSplash=s.screen==='splash';V.isWelcome=s.screen==='welcome';V.spOp=s.splashIn&&!s.splashOut?1:0;V.spOpMs=s.splashOut?700:1000;V.bootOp=s.bootIn===false?0:1;V.spClip=s.splashRed?'circle(75% at 50% 50%)':'circle(0% at 50% 50%)';V.spOrigOp=1;V.spWhiteOp=0;V.spTf=s.splashIn?'scale(1)':'scale(0.94)';V.spMsgOp=s.splashMsg&&!s.splashMsgOut?1:0;V.spMsgTf=s.splashMsg&&!s.splashMsgOut?'translateY(0)':'translateY(18px)';
     if(!this._pressEl||this._pressGk!==GR.gk().ok){this._pressGk=GR.gk().ok;const h=React.createElement;this._pressEl=h('div',{style:{display:'flex',alignItems:'center',gap:20,fontSize:40,fontWeight:800,animation:'gPulse 1.8s ease-in-out infinite'}},h('span',null,'Pulsa'),h('span',{style:{width:60,height:60,borderRadius:'50%',background:C.ink,color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:26,fontWeight:800}},GR.gk().ok),h('span',null,'para continuar'));}V.pressEl=this._pressEl;V.bootW=Math.round(s.bootK*100);V.room=s.room;V.safe=!!this.props.showSafeArea;
     V.isJukebox=s.screen==='sing'&&s.mode==='jukebox';
     V.jq=s.jq.slice(0,4).filter(i=>SONGS[i]&&SONGS[i].id).map(i=>{const so=SONGS[i];return {title:so.title,artist:so.artist,bg:so.cv[0],blk:so.cv[1]};});
@@ -1050,14 +1054,14 @@ class Component extends DCLogic {
     V.recIsTable=s.recTab<3;V.recIsRanks=s.recTab===3;
     V.recHead=[['Canción','Récord','Quién'],['Cantante','Canciones','Mejor puntuación'],['Cantante','Racha','Canción']][Math.min(2,s.recTab)].map(l=>({l}));
     const pc=nm=>{const P=PLAYERS.find(p=>p[0]===nm);return P?P[1]:C.n3;};
-    const r0=SONGS.map(so=>{const [sc,nm]=so.rec.split(' · ');return [so.title,sc||'—',nm||'Sin récord todavía',parseInt((sc||'0').replace('.',''))||0];}).sort((a,b)=>b[3]-a[3]);
+    const r0=SONGS.map(so=>{const [sc,nm]=so.rec.split(' · ');return [so.title,sc||'—',nm||'Sin récord todavía',parseInt((sc||'0').replace('.',''))||0];}).sort((a,b)=>b[3]-a[3]).filter(r=>r[3]>0).slice(0,8);
     V.recRows=(s.recTab===0?r0.map(r=>({a:r[0],b:r[1],c:r[2],color:pc(r[2])})):(s.recTab===1?REC2:REC3).map(r=>({a:r[0],b:r[1],c:r[2],color:pc(r[0])}))).map((r,i)=>({...r,pos:String(i+1).padStart(2,'0'),bg:i===0?'#fff':'transparent'}));
     V.ranks=RANKS.map((r,i)=>({num:String(i+1).padStart(2,'0'),name:r[1],range:RANGE[i],bars:[5,4,3,2,1,0].map(j=>({w:Math.round((j+1)/6*100),c:j>i?C.n2:j===i?C.red:ink}))}));
     V.isSettings=s.screen==='settings';const st=s.settings;
     V.setRows=SET_ROWS.map((r,i)=>{const on=s.setF===i;const o={label:r.label,bg:on?'#fff':'transparent',bar:on?C.red:'transparent',isSeg:r.type==='seg',isBar:r.type==='bar',isAct:r.type==='act',opts:[],cells:[],val:'',cta:'',click:()=>{if(s.setF===i)this.act('ok');else this.setState({setF:i});}};
       if(r.type==='seg')o.opts=r.opts.map((l,j)=>({label:l,br:j<r.opts.length-1?'2px solid '+ink:'none',bg:st[r.k]===j?(on?C.red:ink):'transparent',fg:st[r.k]===j?'#fff':ink}));
       if(r.type==='bar'){o.cells=Array.from({length:10},(_,j)=>({c:j<st[r.k]?(on?C.red:ink):C.n3}));o.val=String(st[r.k]);}
-      if(r.type==='act'){o.val=r.k==='delay'?st.delay+' ms':r.k==='kick'?(n?PLAYERS[n-1][0]:'Nadie en la sala'):s.room;o.cta=r.k==='delay'?'Calibrar':r.k==='kick'?'Expulsar':'Generar';}
+      if(r.type==='act'){o.val=r.k==='delay'?st.delay+' ms':r.k==='kick'?(n?PLAYERS[n-1][0]:'Nadie en la sala'):r.k==='credits'?'Proyecto libre y sin ánimo de lucro':s.room;o.cta=r.k==='delay'?'Calibrar':r.k==='kick'?'Expulsar':r.k==='credits'?'Ver':'Generar';}
       return o;});
     V.setNum=String(s.setF+1).padStart(2,'0')+' / 0'+SET_ROWS.length;V.setTitle=SET_ROWS[s.setF].label;V.setHelp=SET_ROWS[s.setF].help;
     const cb=s.calib;V.isCalib=s.screen==='calib';V.calSaved=st.delay+' ms';V.calManual=cb.manual+' ms';V.calPct=(cb.manual/400*100).toFixed(1);V.calSlBc=cb.f===1?C.red:ink;
@@ -1074,7 +1078,7 @@ class Component extends DCLogic {
       const landed=!p.spinning&&p.spin>=0;
       V.chCards=CHALL.map((c,i)=>{const on=p.spin===i;return {num:String(i+1).padStart(2,'0'),name:c[0],desc:c[1],bg:on?C.red:'#fff',fg:on?'#fff':ink,t:on&&landed?'scale(1.05)':'scale(1)',s:on&&landed?SHADOW:'none',z:on?2:1};});
       V.roulHint=p.spinning?'Girando…':landed?'Reto: '+CHALL[p.ch][0]:'Pulsa OK y que decida la ruleta';
-      if(sp==='turn'){const pi=this.turnPlayer(p);V.turnName=PLAYERS[pi][0];V.turnTeam=TEAMS[p.turn][0];V.turnColor=TEAMS[p.turn][1];}
+      if(sp==='turn'){const pi=this.turnPlayer(p);V.turnName=pi==null?'—':PLAYERS[pi][0];V.turnTeam=TEAMS[p.turn][0];V.turnColor=TEAMS[p.turn][1];}
       V.chNum=String(p.ch+1).padStart(2,'0');V.chName=CHALL[p.ch][0];V.chDesc=CHALL[p.ch][1];
       const mx=Math.max(1,...p.scores.slice(0,p.nT));let pos=0;
       V.boardRows=Array.from({length:p.nT},(_,t)=>t).sort((a,b)=>p.scores[b]-p.scores[a]).map((t,i,arr)=>{if(i===0||p.scores[t]!==p.scores[arr[i-1]])pos=i+1;return {pos,name:TEAMS[t][0],color:TEAMS[t][1],players:this.teamIds(p,t).map(k=>PLAYERS[k][0]).join(' · '),score:fmt(p.scores[t]),pct:(p.scores[t]/mx*100).toFixed(1),bg:i===0?'#fff':'transparent'};});
@@ -1086,13 +1090,13 @@ class Component extends DCLogic {
   renderVals(){const s=this.state;
     const slots=Array.from({length:8},(_,i)=>{if(i<s.count){const p=PLAYERS[i];return {...GR.photoOf(p[3],p[1]),name:p[0],color:p[1],shape:this.isOff(i)?'⊘':p[2],shapeColor:C.ink,op:this.isOff(i)?0.4:1,bg:s.justJ===i?C.red:'#fff',bc:C.ink,nameColor:s.justJ===i?'#fff':C.ink,shapeColor:s.justJ===i?'#fff':C.ink,t:s.justJ===i?'scale(1.08)':'scale(1)'};}
       return {ph:'none',phw:0,pho:'none',name:'Libre',color:'transparent',shape:'+',shapeColor:C.n5,op:1,bg:'transparent',bc:C.n3,nameColor:C.n5,t:'scale(1)'};});
-    const tiles=MODES.map((m,i)=>{const on=s.menuF===i;return {ol:on?'2px solid '+C.ink:'none',num:String(i+1).padStart(2,'0'),name:m[0],short:m[1],bg:on?C.red:'#fff',fg:on?'#fff':C.ink,t:on?'scale(1.05)':'scale(1)',s:on?'0 18px 40px rgba(32,30,29,0.38), 0 4px 12px rgba(32,30,29,0.22)':'none',z:on?2:1,br:i<6?'2px solid '+C.ink:'none',click:()=>{this.setState({menuF:i});this.menuAct(i);}};});
+    const tiles=MODES.map((m,i)=>{const on=s.menuF===i;return {hover:()=>{if(!on)this.setState({menuF:i});},ol:on?'2px solid '+C.ink:'none',num:String(i+1).padStart(2,'0'),name:m[0],short:m[1],bg:on?C.red:'#fff',fg:on?'#fff':C.ink,t:on?'scale(1.05)':'scale(1)',s:on?'0 18px 40px rgba(32,30,29,0.38), 0 4px 12px rgba(32,30,29,0.22)':'none',z:on?2:1,br:i<6?'2px solid '+C.ink:'none',click:()=>{this.setState({menuF:i});this.menuAct(i);}};});
     const hero={num:String(s.menuF+1).padStart(2,'0'),name:MODES[s.menuF][0],desc:MODES[s.menuF][2]};
     const list=this.songsList();const sf=Math.min(s.songF,Math.max(0,list.length-1));
     const chipLab=['Buscar'+(s.query?' · «'+s.query+'»':''),'Orden · '+ORDERS[s.ord],'Idioma · '+LANGS[s.lng],'Década · '+(s.dec?'Años '+DECS[s.dec]:'Todas'),'Género · '+GENS[s.gen]],chipAct=[!!s.query,false,s.lng>0,s.dec>0,s.gen>0];
     const filters=chipLab.map((label,i)=>{const on=s.zone==='filters'&&s.filterF===i,act=chipAct[i];return {label,bg:on?C.red:act?C.ink:'transparent',fg:on||act?'#fff':C.ink,ol:'none',click:()=>{this.setState({zone:'filters',filterF:i});this.filterAct(i);}};});
     const CW=[440,280,200,150],CO=[0,400,660,860],COP=[1,0.9,0.7,0.45];
-    const covers=list.map((so,i)=>{const d=i-sf,ad=Math.min(Math.abs(d),4),on=d===0,gz=s.zone==='grid';const w=CW[Math.min(ad,3)],off=ad>3?1000:CO[ad];return {left:Math.round(960+Math.sign(d)*off-w/2),w,mt:-Math.round(w/2),op:ad>3?0:COP[ad],z:10-ad,s:on&&gz?SHADOW:'none',ol:on&&gz?'6px solid #ec3013':'0 solid transparent',bg:so.cv[0],blk:so.cv[1],fg:so.cv[2],ini:ini(so.title),fs:Math.round(w*0.24),duo:so.duo,click:()=>{if(on&&s.zone==='grid')this.startSetup();else this.setState({songF:i,zone:'grid'});}};});
+    const covers=[],_coversNo=((so,i)=>{const d=i-sf,ad=Math.min(Math.abs(d),4),on=d===0,gz=s.zone==='grid';const w=CW[Math.min(ad,3)],off=ad>3?1000:CO[ad];return {left:Math.round(960+Math.sign(d)*off-w/2),w,mt:-Math.round(w/2),op:ad>3?0:COP[ad],z:10-ad,s:on&&gz?SHADOW:'none',ol:on&&gz?'6px solid #ec3013':'0 solid transparent',bg:so.cv[0],blk:so.cv[1],fg:so.cv[2],ini:ini(so.title),fs:Math.round(w*0.24),duo:so.duo,click:()=>{if(on&&s.zone==='grid')this.startSetup();else this.setState({songF:i,zone:'grid'});}};});
     const cs=s.screen==='songs'?(list[sf]||SONGS[0]):(GR.megaCard(s)||SONGS[s.songSel]||SONGS[0]);
     const cur={tfs:GR.fitTitle(cs.title),title:cs.title,artist:cs.artist,durYear:cs.dur+' · '+cs.year,lang:cs.lang+(cs.duo?' · Dúo':''),diff:[1,2,3].map(k=>({c:k<=cs.diff?C.ink:C.n3})),record:cs.rec,bg:cs.cv[0],blk:cs.cv[1],fg:cs.cv[2],ini:ini(cs.title)};
     const N=s.setup.length;

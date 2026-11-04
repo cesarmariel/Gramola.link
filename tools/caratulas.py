@@ -142,7 +142,9 @@ def aplicar(raiz, salida):
                 t = t[:m.start()] + '#COVER:cover-itunes.jpg' + t[m.end():]
             else:
                 t = re.sub(r'^(#TITLE:.*)$', r'\1\n#COVER:cover-itunes.jpg', t, count=1, flags=re.M)
-            open(p, 'w', encoding='utf-8', newline='').write(t)
+            with open(p + '.tmp', 'w', encoding='utf-8', newline='') as f:   # (nunca un .txt a medias)
+                f.write(t)
+            os.replace(p + '.tmp', p)
             if txt == min(ts, key=len):
                 json.dump({'antes': antes, **hecho[d]}, open(os.path.join(carpeta, 'caratula.json'), 'w'), ensure_ascii=False)
         print(f'{n}. {d}')

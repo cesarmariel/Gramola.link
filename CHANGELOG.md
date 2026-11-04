@@ -2,6 +2,104 @@
 
 Versiones con el esquema `1.AA.MMDD.HHMM` (fecha y hora del despliegue).
 
+## 1.26.1103.1347
+- Editor: el trozo de voz de una frase (cuando no empieza en un silencio) se afina con la curva de tono: empieza en el primer instante en que la voz tiene tono y acaba en el último. El reconocimiento adelanta cada palabra al hueco anterior (en «Dance The Night» unos 0,4 s) y marcaba en ámbar frases que estaban bien.
+
+## 1.26.1103.1339
+- **Editor por frases sobre la voz** (modo sencillo): al elegir una frase solo se ve ella con su trozo de voz (banda «VOZ» con las palabras que dice, reconocidas por el trabajador) y se escribe en qué **segundo empieza y acaba** (Enter aplica; ↑ ↓ ±0,05 s). Al mover el inicio la frase se desplaza; al mover el fin sus sílabas se estiran o encogen; con «lo que viene detrás se mueve igual» (por defecto) todas las frases posteriores se desplazan lo mismo. «◉ Usar la voz» la pone donde la voz. Lista de frases con un punto verde (empieza donde la voz), ámbar (la voz empieza en otro sitio) o hueco (sin voz cerca). «▶ Escuchar» reproduce la frase con su trozo de voz.
+- **Trabajador**: con la voz separada parte la canción en tramos por los silencios y reconoce qué dice cada uno palabra a palabra (faster-whisper «small», ~50 s por canción) → `voz-tramos.json`. Al crear o volver a encajar, cada línea de la letra se busca solo en la zona donde la voz la dice (palabras reconocidas emparejadas con la letra en orden, coincidencias largas primero: cada estribillo repetido va al suyo; la letra sincronizada queda de reserva), y la primera sílaba de cada frase se lleva a donde arranca la voz de su tramo. En «José José - Volcán» (prueba contra la versión corregida a mano): la primera frase, que salía 4 s tarde, ya sale en su sitio; mediana de 26 ms de desvío por línea.
+- «Analizar la voz» guarda también los tramos y lo reconocido (idioma de la cabecera); las canciones analizadas antes solo tienen la voz y el tono: el editor calcula los tramos en el navegador y «Volver a analizar la voz» añade el reconocimiento.
+- El idioma de la letra se detecta por sus palabras (en el admin, al crear, y en el trabajador, que avisa si no es el pedido); frases largas partidas donde el cantante respira; notas largas que no se comen las pausas en mezclas densas.
+- Servidor mann: swap de 4 GB y lanzador con tope de memoria para el banco de pruebas del trabajador (el 03-nov dos procesos de torch a la vez dejaron la máquina sin memoria).
+
+## 1.26.1103.1259
+- Una sala cuya tele lleva 3 minutos desconectada se cierra sola (antes 15 minutos): los móviles reciben el aviso de sala cerrada y la tele, si vuelve después, abre una sala nueva.
+
+## 1.26.1103.1257
+- Canciones: dos botones ‹ › en el extremo derecho de la fila de filtros, a su misma altura, para pasar una pantalla de fichas adelante o atrás con el ratón (o el puntero de la tele), con un desplazamiento largo y suave (720 ms); el salto ficha a ficha con el mando sigue igual.
+
+## 1.26.1103.1253
+- Rejilla de canciones: con el ratón, pinchar una ficha la elige sin mover la lista; solo el mando y el teclado la desplazan.
+
+## 1.26.1103.1252
+- Rejilla de canciones: se deja como estaba antes de los cambios del desplazamiento (transición de 260 ms, repetición de teclas y cruceta de siempre, y las fichas se eligen con clic, no al pasar el ratón). Las fichas del menú sí se siguen eligiendo al pasar por encima.
+
+## 1.26.1103.1249
+- Lista de canciones más tranquila: al mantener pulsada una flecha o la cruceta avanza una ficha cada 200 ms (antes el teclado repetía unas 30 veces por segundo y la cruceta cada 110 ms) y el desplazamiento dura 520 ms.
+
+## 1.26.1103.1240
+- La rejilla de canciones se desplaza más suave (420 ms con una curva más tendida, antes 260 ms).
+
+## 1.26.1103.1239
+- Créditos: «Volver» responde al clic y la rueda del ratón desplaza el texto.
+
+## 1.26.1103.1233
+- El clic en «Créditos» del pie de la bienvenida no abría el panel: el mismo clic subía a la pantalla y lo cerraba como si fuera «OK».
+- Rejilla de canciones con ratón: al elegir una ficha pasando por encima, la rejilla ya no se desplaza mientras la ficha se vea entera (antes se movía, la ficha de debajo del puntero cambiaba y se elegía otra, y así sin parar). Con el mando sigue desplazándose como siempre.
+
+## 1.26.1103.1201
+- Con ratón, las fichas del menú y de la rejilla de canciones se eligen al pasar por encima (clic = entrar).
+- Canciones: al cambiar un filtro (década, idioma, género) o buscar, el avance que suena pasa a ser el de la canción que enseña la ficha (antes seguía sonando la de antes).
+
+## 1.26.1103.1155
+- Sobre los elementos clicables ya no sale la mano: todo hereda el puntero propio (y nada cuando está escondido).
+
+## 1.26.1103.1154
+- El puntero no aparece durante el arranque (logo, aviso y carga); solo a partir de la bienvenida.
+
+## 1.26.1103.1153
+- Puntero propio en escritorio: la flecha plana en rojo con contorno de tinta, grande (72 px); se esconde a los 2,5 s quieto.
+
+## 1.26.1103.1150
+- En escritorio, el puntero del ratón aparece al moverlo y se esconde a los 2,5 s quieto (antes estaba siempre oculto, pensado solo para la tele).
+
+## 1.26.1103.1147
+- **Ayudas de botones según haya mando o no**: con un mando conectado (PlayStation o Xbox, detectado al pulsar un botón) se muestran sus símbolos (✕ ○ □ △ o A B X Y); sin mando, los del mando a distancia de la tele: OK, ← y los botones de colores (rojo, verde, amarillo, azul) como puntos de color. Al desconectar el mando vuelven las ayudas de la tele. Antes se mostraban siempre los de PlayStation.
+
+## 1.26.1103.1142
+- Bienvenida: el acceso a Créditos sale discreto a la derecha del pie, la versión va pequeña y centrada (sin la palabra «Versión») y el «Pulsa ✕ para continuar» queda solo.
+
+## 1.26.1103.1135
+- **Créditos** (Ajustes → Créditos, y △ en la bienvenida): qué es Gramola (software libre con licencia MIT, sin ánimo de lucro, sin pagos ni publicidad, hecho con respeto a los artistas; retirada de contenidos en soporte@gramola.link), y todo lo que usa con su autor y su licencia: tipografía, librerías de la tele y el móvil, servidor, herramientas de creación de canciones, servicios consultados e infraestructura. Música del menú creada con SUNO.AI; diseño original de NUVOLACAT.
+
+## 1.26.1103.1109
+- Pendientes menores del repaso: el selector del Megamix se esconde mientras hay un aviso (antes lo tapaba); `tools/version.py` pone la versión en todos los sitios de una vez, incluidos el `?v=` del móvil y el nombre de la caché de su service worker (así el móvil siempre baja el código nuevo tras un despliegue), y `deploy.sh` no despliega si no coinciden; el admin puede «Recargar móviles» de una sala (tras un despliegue del micro); la pantalla de resultados ya no calcula el carrusel de portadas que no se usa; las portadas de la bienvenida se guardan reducidas (90 imágenes grandes quedaban en memoria para siempre).
+
+## 1.26.1103.1102
+- **Repaso total** (tres revisiones independientes más pruebas de reconexión con la tele real):
+  - **Tele**: salir de la cuenta atrás (o del fundido hacia el canto) antes de que llegara dejaba la cuenta viva y la canción arrancaba sola en otra pantalla, o el audio seguía sonando en el menú; el resultado de «¡Récord!» y los puntos de la pantalla final ahora se corrigen con la respuesta del servidor (si recorta puntos avisa, si no se ha podido guardar lo dice y no hay confeti); la calibración «Retraso del micro» se había quedado sin voz tras limitar el envío de voz del móvil (ahora en la calibración cantan todos); al cerrar una sala desde el admin la tele se quedaba con un código muerto (ahora pide otra y avisa); el aviso de «sala perdida» dice la verdad (sala vieja, sala nueva, los móviles tienen que volver a escanear) y la sala se recuerda 14 min en el aparato por si la app de la tele se reinicia; «Nuevo código» recarga las direcciones de audio con el pase nuevo; en Pásalo y Preparar, si alguien se va, cada jugador conserva su equipo y sus ajustes (antes se corrían de fila) y las rondas se ajustan a los equipos; Récords «Por canción» muestra las 8 con récord (antes la biblioteca entera y se salía de pantalla); «Canción no disponible» en Pásalo o Jukebox ya no manda a Canciones con el modo equivocado; ajustes guardados fuera de rango no dejan la pantalla en blanco; con el selector de Megamix abierto, los avisos se pueden cerrar; en pausa se mandaba un reloj por fotograma.
+  - **Servidor**: la latencia de la tele se descontaba dos veces en la puntuación del servidor (récords recortados en teles con mucha latencia); la partitura del servidor no respetaba `#START`/`#END`; quien canta y falla cuenta con 0 (antes desaparecía); los jugadores que cierran la app sin «Salir» ya no ocupan su color para siempre (10 min); adivinar códigos de sala tiene freno (10 fallos por minuto y dirección); el mismo token desde dos móviles ya no los cierra por turnos sin fin (el desplazado se entera); el aviso de «sala llena» a la tele, uno cada 10 s; un móvil que entra con la tele caída no ve el micro abierto; las salas se guardan al parar y se restauran al arrancar (un despliegue ya no echa a nadie); los ficheros de datos corruptos se apartan con fecha en vez de pisarse (antes un `admin.json` roto borraba las llaves de Touch ID en silencio); sin carpeta de datos escribible no arranca; el récord se marca guardado solo cuando se ha escrito (disco lleno = reintento posible); el `.txt` y los audios que lee la tele se escriben a un temporal y se renombran (nunca a medias); los trabajos de creación terminados se borran a los 30 días si la canción ya no está en preparación, y el original no MP3 se borra tras convertir; un trabajador que se reinicia devuelve su trabajo a la cola al momento; las versiones del editor siguen a la canción al renombrarla; el admin puede borrar ficheros que empiezan por punto; la copia del admin incluye las llaves y las novedades; la búsqueda de letra en segundo plano ya no pisa un borrador que el admin haya editado o continuado; la carpeta de la canción con caracteres invisibles vuelve a coincidir; la redirección de carpetas codifica bien los nombres raros.
+  - **Despliegue y copias**: `deploy.sh` comprueba la sintaxis, espera a que nadie esté cantando, instala en una copia y solo entonces cambia (un fallo de npm ya no deja el servicio caído) y solo cambia permisos de lo que toca; copia diaria de `data/` y `web/songs` en el servidor.
+  - **Móvil**: pantalla propia cuando la misma sesión se abre en otro móvil; mensaje de «demasiados intentos».
+  - **Editor**: si el Megamix automático estaba ocupado al guardar, se vuelve a pedir en unos segundos (antes quedaba con los tiempos viejos sin aviso).
+  - Los retoques de hoy a la página de la tele son enganches de `tools/build-tv.py`: regenerarla desde el diseño los conserva.
+
+## 1.26.1103.1023
+- **Seguridad** (auditoría forense): el WebSocket solo se acepta desde la propia web (una página ajena no puede usar los navegadores de sus visitantes para abrir salas) y hay tope de 300 sockets por IP; cabeceras `Referrer-Policy` y `Permissions-Policy` (micro y cámara solo para la propia web) en todo lo que sirve Node; la foto de jugador que ve el admin va con `nosniff` y CSP; los nombres de jugador se limpian de caracteres invisibles y bidi, y un cantante llamado `constructor` o `__proto__` ya no corrompe los récords; la descarga de portadas no sigue redirecciones.
+- En Cloudflare: TLS mínimo 1.2, HTTPS forzado, HSTS (6 meses, con subdominios) y un tope de 120 peticiones a `/api/` cada 10 s por IP. En el servidor: fail2ban vigilando el SSH (había 14.000 intentos de contraseña de root al día sin nada que los frenara).
+- Después, en el servidor: SSH solo con clave (la contraseña ya no entra), `admin.` registrado como alias de dominio en Plesk y certificado reemitido para que cubra `admin.`, `micro.` y `www.` → Cloudflare en SSL «strict» (antes «full»); el traductor de otra app que escuchaba en el puerto 2737 ya solo acepta conexiones locales; del entorno del trabajador se quitaron `transformers` y `tokenizers` (solo los usaba un experimento y tenían avisos de seguridad).
+
+## 1.26.1103.1010
+- **Los récords los comprueba el servidor** (`server/puntuacion.js`): la tele sigue puntuando y dibujando en directo, pero el servidor lleva su propia cuenta con la misma regla y la misma partitura (lector compartido `web/js/ultrastar.js`) usando la voz que reenvía a la tele. La tele le dice qué canción empieza (`sing`: cantantes, parte, margen, ajuste del micro) y cada segundo por dónde va (`clock`). Al guardar: solo jugadores de la sala (con el nombre con el que entraron, nunca el que diga la tele), sin bots ni quien no ha cantado, puntos recortados a **lo visto × 1,25 + 200** y racha a **la vista + 3**, canción cantada entera y una sola vez. Antes cualquiera con una sala podía inventarse un récord con una petición.
+- **Tele**: el Megamix acababa al instante si la canción anterior había llegado al final; el QR se regeneraba 60 veces por segundo fuera de la sala (también cantando); «Pásalo» se quedaba en blanco si un equipo se quedaba sin jugadores; un fallo del audio en la cuenta atrás dejaba la partida clavada en 0:00; «Nuevo código de sala» avisaba de «sala perdida» y recargaba la biblioteca; dos pantallas con la misma sala se la robaban sin parar (`replaced`); si falla el pase de tele al arrancar se reintenta (antes, «Cargando… 95 %» para siempre) y en el arranque también se avisa de «Sin conexión»; con notas pegadas la primera ranura de cada una era imposible de acertar (el 100 % no existía); en pausa los móviles seguían con el micro abierto; `#START` ya no dispara una ráfaga de «Fallo» y `#END` se respeta; un jugador que sale en «Preparar partida» ya no deja un cantante fantasma; la propina de vibrato no pasa de 10.000; un móvil ya no puede llenar la sala de simulados ni echar jugadores; «Sala llena» durante el canto es un aviso, no una pantalla; la lista de canciones del diseño se calcula solo cuando cambia algo (antes en cada fotograma de resultados).
+- **Móvil**: una nota larga a volumen constante dejaba de detectarse a los 7 s (el suelo de ruido se la comía); el AudioContext se crea antes de pedir el micro (iPhone con el aviso de permiso lento se quedaba sin vúmetro); si el sistema corta el micro (llamada, otra app) se vuelve a pedir; sin pong en 7 s se reconecta (socket zombi al volver del fondo en Android); la voz solo se manda cuando toca cantar (antes 25 mensajes/s desde que entrabas); la tele caída a mitad de canción manda a la espera y al volver recupera el canto; sin sala no se queda el micro abierto; el lector de QR que no carga avisa en vez de quedarse con la cámara encendida; el saludo no se manda dos veces al reconectar (daba «color ocupado» del propio color); la caché de la PWA guardaba rutas que la página no pide y, sin red que responda, la app tardaba hasta un minuto en abrir (ahora 4 s y a lo guardado).
+- **Panel admin**: abrir el editor y cambiar de apartado antes de que cargara pisaba la vista nueva; la subida de audio se quedaba colgada si el proxy devolvía un error en HTML; deshacer un cambio de BPM no devolvía la rejilla; «Publicar» desde la ficha no la refrescaba; «Publicar» y «Volver a encajar» seguían aunque el guardado fallara; al volver a entrar tras caducar la sesión se duplicaban los sondeos y los avisos; dobles clics en Igualar volumen, Megamix, Restaurar, Enviar aviso y Publicar; un clic en una nota o un corte sin moverlos ya no cuenta como cambio ni borra «rehacer»; Escape al editar una sílaba no la aplica; GAP con texto no la pone a 0; «Desplazar» por debajo de un tiempo avisa; las notas guardadas nunca se solapan ni tienen tiempos negativos (también tras cambiar el BPM o «Dejar sin cantar»); sílabas separadas por tabulador no se pierden; un hash raro o una canción inexistente no dejan la vista en blanco (botón «Volver»).
+- **Creación**: un trabajo que tumbe al trabajador dos veces pasa a error (antes se repetía cada 20 min para siempre); borrar un trabajo en curso lo cancela de verdad; la letra se lee antes de marcarlo «procesando»; igualar volumen y Megamix ya no corren dos veces a la vez sobre la misma canción; `megamix.mp3`, `megamix.json` y el `.txt` de carátulas se escriben a un temporal y se renombran (nunca un fichero a medias); el temporal de normalizar no se queda en la carpeta si ffmpeg falla; los `#MP3`/`#AUDIO` con rutas se rechazan; `deploy.sh` reinicia también el trabajador (importa `crear.py` al arrancar); mensajes de error con causa (ffmpeg, letra sin encajar).
+- **Servidor**: el manejador de WebSocket va en try/catch y hay tope de 300 mensajes/s por conexión; un fichero que desaparece mientras se sirve o una petición cortada a medias ya no dejan nada colgado; errores sin capturar se registran sin tumbar el proceso (y si el puerto está ocupado sí sale, para que systemd reintente).
+- Pruebas: `npm test` añade la partida verificada en el servidor (voz real de dos móviles falsos, uno recortado); en el navegador se probaron la tele real cantando de principio a fin, el panel entero (admin + tele + móvil) y el editor.
+
+## 1.26.1103.0941
+- **Servidor más robusto** (revisión de seguridad; parte de los fallos los señaló un fork de la comunidad):
+  - Una cookie mal codificada (`gtv=%`) o un cuerpo JSON que no fuera un objeto (`null`) tumbaban el proceso entero y se caían todas las salas hasta que systemd lo levantaba. Ahora dan 400 o se ignoran, y cualquier error no previsto en una petición responde 500 sin parar el servidor.
+  - La ruta se descodifica y normaliza una sola vez antes de mirar permisos: `/%73ongs/…`, `//songs/…` o `/app/../songs/…` ya no se saltan el pase de tele (en producción Cloudflare y Apache ya lo paraban; ahora también lo para Node).
+  - Tope de 500 salas abiertas a la vez: al agotarse los 6.390 códigos el servidor se quedaba colgado para siempre buscando uno libre. Si se llega al tope, la tele recibe `error busy`, avisa y vuelve a pedir sala a los 30 s.
+  - Récords: solo canciones que existen en la biblioteca y solo jugadores bien formados (un `players:[null]` también tumbaba el servidor).
+  - Telemetría de la tele: solo la manda una tele con sala y solo la ve el admin (antes era pública).
+  - Al cerrar una sala con «Nuevo código», los cierres de los móviles ya no mandan listas de jugadores de la sala vieja a la tele.
+  - Admin: el .txt del editor con JSON mal formado responde 400 (no 500); rangos de audio fuera de fichero en Creación responden 416.
+  - Creación desde Spotify: la letra se busca en segundo plano al instalar el borrador, así el trabajador no da por fallida una descarga buena porque LRCLIB, Genius o songlyrics tarden.
+- **Pruebas del servidor** (`cd server && npm test`): peticiones raras, pase de tele con rutas codificadas, telemetría, partida completa (sala, jugador, canciones, récord), tope de salas y «Nuevo código».
+
 ## 1.26.1102.1646
 - **Editor · frases**: con palabras elegidas, «✂ Separar en otra frase», «⤒ Pasar a la frase anterior» y «⤓ Pasar a la frase siguiente»; «Unir con la siguiente» junta dos frases.
 - **Editor · trozo sin cantar**: se marca arrastrando (botón «⌇ Marcar trozo sin cantar» o sobre la forma de onda), se puede escuchar y «Dejar sin cantar» aparta las sílabas que caían dentro (antes o después del trozo) y deja un corte de frase en el hueco.
