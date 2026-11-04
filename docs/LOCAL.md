@@ -32,3 +32,8 @@ Un móvil físico no llega al Mac mediante localhost. Para probarlo harán falta
 La documentación consultada el 2 de noviembre de 2026 admite WebSockets, con conexiones sujetas a la duración de las funciones. Las reconexiones pueden alcanzar otra instancia, por lo que las salas no pueden depender exclusivamente del Map actual. Habrá que decidir almacenamiento compartido de salas/récords, biblioteca de canciones y ejecución del trabajador con sus modelos y FFmpeg. No hay despliegue Vercel configurado ni realizado.
 
 Fuente: https://vercel.com/docs/functions/websockets
+
+
+## Teclado
+
+Flechas: navegar. Enter o Espacio: aceptar. Escape: volver. P: pausa. Q/E: opciones laterales. J o +: simular jugador en la sala; -: quitarlo. X/Y: acciones adicionales indicadas en pantalla. En Buscar puedes escribir directamente con el teclado, borrar con Retroceso y terminar con Enter o Escape. Los campos de texto y atajos del navegador conservan su comportamiento. Mantener Enter no debe saltar pantallas; las flechas sí admiten repetición.

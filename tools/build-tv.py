@@ -277,11 +277,16 @@ sub("V.jq=s.jq.slice(0,4).map(i=>{const so=SONGS[i];", "V.jq=s.jq.slice(0,4).fil
 sub("const cs=s.screen==='songs'?(list[sf]||SONGS[0]):SONGS[s.songSel];", "const cs=s.screen==='songs'?(list[sf]||SONGS[0]):(GR.megaCard(s)||SONGS[s.songSel]||SONGS[0]);", name='ficha segura (y Megamix)')
 sub("let l=SONGS.slice();", "let l=SONGS.filter(x=>x.id);", name='sin relleno en la lista')
 
+sub('onKey(e){const map=', 'onKey(e){if(GramolaKeyboard.handle(this,e))return;const map=', name='teclado físico y búsqueda')
+
+sub("['Espacio · Y','Borrar · X','Buscar']", "[GR.gk().ok==='↵'?'Espacio':'Espacio · '+GR.gk().y,GR.gk().ok==='↵'?'Borrar · Retroceso':'Borrar · '+GR.gk().x,'Buscar']", name='etiquetas de búsqueda')
+sub("'Escribe con el mando…'", "(GR.gk().ok==='↵'?'Escribe con el teclado…':'Escribe con el mando…')", name='ayuda de búsqueda')
+
 # --- página: título, iconos, rutas y el puente antes del runtime del diseño
 sub('<head>', '<head>\n<base href="/tv/">\n<title>Gramola</title>\n<meta name="theme-color" content="#ec3013">\n'
     '<link rel="icon" href="/assets/iconos/favicon-32.png" sizes="32x32">\n<link rel="apple-touch-icon" href="/assets/iconos/favicon-180.png">\n'
     '<style>html,body{margin:0;background:#0e0f0f;overflow:hidden;cursor:none}</style>\n'
-    '<script src="/vendor/qrcode.js"></script>\n<script src="/tv/gramola-bridge.js?v=' + VERSION + '"></script>', name='head')
+    '<script src="/vendor/qrcode.js"></script>\n<script src="/js/keyboard.js"></script>\n<script src="/tv/gramola-bridge.js?v=' + VERSION + '"></script>', name='head')
 
 if fails:
     print('ERROR: estos enganches ya no encajan con el diseño nuevo:', *fails, sep='\n  - ')

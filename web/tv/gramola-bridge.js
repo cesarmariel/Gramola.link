@@ -493,6 +493,7 @@ window.GR = (() => {
   // Con un mando de PlayStation conectado, las ayudas muestran ✕ ○ □ △ L1 R1; con uno de Xbox, A B X Y LB RB;
   // sin mando (mando de la tele, teclado), los del diseño. Cambian solas al conectar o desconectar el mando.
   const GLYPHS = {
+    keyboard: { ok: '↵', back: 'Esc', x: 'X', y: 'Y', l: 'Q', r: 'E', lr: 'Q E', menu: 'P' },
     tele: { ok: 'OK', back: '←', x: 'X', y: 'Y', l: 'L', r: 'R', lr: 'L R', menu: '≡' },
     ps: { ok: '✕', back: '○', x: '□', y: '△', l: 'L1', r: 'R1', lr: 'L1 R1', menu: '≡' },
     xbox: { ok: 'A', back: 'B', x: 'X', y: 'Y', l: 'LB', r: 'RB', lr: 'LB RB', menu: '≡' },
@@ -521,7 +522,7 @@ window.GR = (() => {
     c._lastIn = { a, t, src };
     return true;
   };
-  G.gk = () => GLYPHS.ps;   // por decisión del usuario: siempre los botones del mando de PlayStation
+  G.gk = () => detectPad() === 'tele' && /Windows|Macintosh|Linux/.test(navigator.userAgent) && !/Android|Mobile/.test(navigator.userAgent) ? GLYPHS.keyboard : (GLYPHS[padKind] || GLYPHS.tele);
   G.padKind = () => padKind;
   function padWatch(c) {
     const now = performance.now();
