@@ -9,6 +9,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source deploy/deploy.env
+# Grupo del usuario de la app y nombres de los servicios en el servidor (Doku: gramola / doku-gramola)
+DEPLOY_GROUP="${DEPLOY_GROUP:-$DEPLOY_USER}"
+DEPLOY_SERVICE="${DEPLOY_SERVICE:-gramola}"
+DEPLOY_WORKER="${DEPLOY_WORKER:-gramola-trabajador}"
 # Opciones extra de SSH (por ejemplo una conexión maestra ya abierta: -o ControlPath=…)
 SSH="ssh ${DEPLOY_SSH_OPTS:-}"
 
@@ -34,10 +38,10 @@ rsync -az -e "$SSH" --delete --exclude __pycache__ tools/ "$DEPLOY_HOST:$DEPLOY_
 $SSH "$DEPLOY_HOST" "set -e; cd $DEPLOY_DIR; mkdir -p data
   (cd server.new && npm ci --omit=dev --silent && node --check server.js)
   rm -rf server.old; mv server server.old; mv server.new server; rm -rf server.old
-  chown -R $DEPLOY_USER:psacln server tools data
-  find web -maxdepth 1 -mindepth 1 ! -name songs -exec chown -R $DEPLOY_USER:psacln {} +
-  find web/songs ! -user $DEPLOY_USER -exec chown $DEPLOY_USER:psacln {} + 2>/dev/null || true
-  systemctl restart gramola; systemctl try-restart gramola-trabajador 2>/dev/null || true
+  chown -R $DEPLOY_USER:$DEPLOY_GROUP server tools data
+  find web -maxdepth 1 -mindepth 1 ! -name songs -exec chown -R $DEPLOY_USER:$DEPLOY_GROUP {} +
+  find web/songs ! -user $DEPLOY_USER -exec chown $DEPLOY_USER:$DEPLOY_GROUP {} + 2>/dev/null || true
+  systemctl restart $DEPLOY_SERVICE; systemctl try-restart $DEPLOY_WORKER 2>/dev/null || true
   sleep 1; curl -fsS http://127.0.0.1:8877/api/health"
 echo
 echo "Desplegado."
