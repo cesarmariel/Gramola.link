@@ -37,10 +37,15 @@ module.exports = function admin(ctx) {
 
   const readJson = (f, d) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return d; } };
   const writeJson = (f, data) => { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f + '.tmp', JSON.stringify(data)); fs.renameSync(f + '.tmp', f); };
+  const writeAtomic = ctx.writeAtomic || ((f, data) => { fs.writeFileSync(f + '.tmp', data); fs.renameSync(f + '.tmp', f); });
+  const copyAtomic = (a, b) => { fs.copyFileSync(a, b + '.tmp'); fs.renameSync(b + '.tmp', b); };
+  // (los ficheros de datos importantes: si están rotos se apartan con fecha en vez de pisarlos en silencio)
+  const leerJson = ctx.leerJson || readJson;
 
   // ===================================================================== estadísticas y actividad
-  const stats = readJson(STATS_FILE, { days: {}, totals: {} });
-  let events = readJson(EVENTS_FILE, []);
+  const stats = leerJson(STATS_FILE, { days: {}, totals: {} });
+  let events = leerJson(EVENTS_FILE, []);
+  if (!Array.isArray(events)) events = [];
   let dirty = false;
   const today = () => new Date().toISOString().slice(0, 10);
   function day() {
@@ -60,17 +65,17 @@ module.exports = function admin(ctx) {
     if (rooms.size > d.peakRooms) { d.peakRooms = rooms.size; dirty = true; }
     if (players > d.peakPlayers) { d.peakPlayers = players; dirty = true; }
   }
-  setInterval(() => {
-    peaks();
-    if (!dirty) return;
+  function flush() {
     dirty = false;
     const keys = Object.keys(stats.days).sort();
     for (const k of keys.slice(0, Math.max(0, keys.length - 400))) delete stats.days[k];
     try { writeJson(STATS_FILE, stats); writeJson(EVENTS_FILE, events); } catch (e) { console.error('admin: no se pudieron guardar las estadísticas', e.message); }
-  }, 15000).unref();
+  }
+  setInterval(() => { peaks(); if (dirty) flush(); }, 15000).unref();
 
   // ===================================================================== autenticación (WebAuthn)
-  const auth = readJson(AUTH_FILE, { keys: [], sessions: [] });
+  const auth = leerJson(AUTH_FILE, { keys: [], sessions: [] });
+  if (!Array.isArray(auth.keys)) auth.keys = []; if (!Array.isArray(auth.sessions)) auth.sessions = [];
   const saveAuth = () => writeJson(AUTH_FILE, auth);
   const rand = (n = 32) => crypto.randomBytes(n).toString('base64url');
   const hash = s => crypto.createHash('sha256').update(s).digest('hex');
@@ -87,7 +92,7 @@ module.exports = function admin(ctx) {
   };
   function cookie(req, name) {
     const m = (req.headers.cookie || '').match(new RegExp('(?:^|; )' + name + '=([^;]+)'));
-    try { return m ? decodeURIComponent(m[1]) : null; } catch { return null; }
+    try { return m ? decodeURIComponent(m[1]) : null; } catch { return null; }   // una cookie mal codificada no tumba nada
   }
   const secure = req => originOf(req).startsWith('https') ? '; Secure' : '';
   function sessionOf(req) {
@@ -142,6 +147,7 @@ module.exports = function admin(ctx) {
       req.on('data', c => { size += c.length; if (size > max) { reject(httpErr(413, 'Demasiado grande')); req.destroy(); return; } chunks.push(c); });
       req.on('end', () => resolve(Buffer.concat(chunks)));
       req.on('error', reject);
+      req.on('close', () => reject(httpErr(400, 'Petición cortada')));
     });
   }
   async function body(req) {
@@ -161,6 +167,15 @@ module.exports = function admin(ctx) {
     if (mustExist && !fs.existsSync(d)) throw httpErr(404, 'No existe esa canción');
     return d;
   };
+  // Nombre del audio según la cabecera (#MP3 o #AUDIO): un nombre de fichero dentro de la carpeta, nada de rutas
+  const audioOf = h => { const a = h.MP3 || h.AUDIO; return a && !/[\/\\\0]/.test(a) && a !== '..' && a !== '.' ? a : null; };
+  // Cerrojo por carpeta: no se lanzan dos ffmpeg a la vez sobre el mismo audio (igualar volumen, Megamix)
+  const ocupadas = new Set();
+  async function conCerrojo(dir, fn) {
+    if (ocupadas.has(dir)) throw httpErr(409, 'Esta canción ya se está procesando; espera a que acabe');
+    ocupadas.add(dir);
+    try { return await fn(); } finally { ocupadas.delete(dir); }
+  }
   function readText(file) {
     const buf = fs.readFileSync(file);
     const u = buf.toString('utf8');
@@ -195,7 +210,7 @@ module.exports = function admin(ctx) {
           lines.splice(firstBody, 0, `#${k}:${v}`); firstBody++;
         }
       }
-      fs.writeFileSync(p, lines.join('\r\n'), 'utf8');
+      writeAtomic(p, lines.join('\r\n'));   // (el .txt que lee la tele nunca queda a medias)
     }
     ctx.songsChanged();
   }
@@ -236,10 +251,11 @@ module.exports = function admin(ctx) {
   }
   function run(cmd, args, opts = {}) {
     return new Promise(resolve => {
-      const p = spawn(cmd, args, { ...opts });
+      // En su propio grupo de procesos: al agotarse el tiempo se mata también el ffmpeg que haya lanzado python
+      const p = spawn(cmd, args, { ...opts, detached: true });
       let out = '', err = '';
       p.stdout.on('data', d => (out += d)); p.stderr.on('data', d => (err += d));
-      const to = setTimeout(() => p.kill('SIGKILL'), opts.timeout || 300000);
+      const to = setTimeout(() => { try { process.kill(-p.pid, 'SIGKILL'); } catch { p.kill('SIGKILL'); } }, opts.timeout || 300000);
       p.on('close', code => { clearTimeout(to); resolve({ code, out: out.trim(), err: err.trim().slice(-2000) }); });
       p.on('error', e => { clearTimeout(to); resolve({ code: -1, out: '', err: e.message }); });
     });
@@ -437,8 +453,14 @@ module.exports = function admin(ctx) {
     ev('admin', `Mensaje a la sala ${r.code}: «${text}»`);
     json(res, 200, { ok: true });
   });
-  on('POST', '/rooms/([A-Z]{4})/reload', (req, res, m) => {
-    const r = roomOf(m[1]);
+  on('POST', '/rooms/([A-Z]{4})/reload', async (req, res, m) => {
+    const r = roomOf(m[1]), b = await body(req);
+    if (b.phones) {   // los móviles de la sala (tras un despliegue del micro)
+      let n = 0;
+      for (const p of r.players.values()) if (p.ws) { ctx.sendTo(p.ws, { type: 'admin', action: 'reload' }); n++; }
+      ev('admin', `Recarga de ${n} móviles de la sala ${r.code}`);
+      return json(res, 200, { ok: true, phones: n });
+    }
     if (!r.host) throw httpErr(400, 'La tele de esa sala no está conectada');
     ctx.sendTo(r.host, { type: 'admin', action: 'reload' });
     ev('admin', `Recarga de la tele de la sala ${r.code}`);
@@ -448,7 +470,7 @@ module.exports = function admin(ctx) {
     const p = roomOf(m[1]).players.get(+m[2]);
     if (!p || !p.photo) throw httpErr(404, 'Sin foto');
     const buf = Buffer.from(p.photo.split(',')[1], 'base64');
-    res.writeHead(200, { 'content-type': 'image/jpeg', 'cache-control': 'no-store' });
+    res.writeHead(200, { 'content-type': 'image/jpeg', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'" });
     res.end(buf);
   });
   on('POST', '/broadcast', async (req, res) => {
@@ -483,12 +505,14 @@ module.exports = function admin(ctx) {
   on('GET', '/server', (req, res) => { sizeCache.at = 0; json(res, 200, serverInfo()); });
   on('POST', '/server/restart', (req, res) => {
     ev('admin', 'Reinicio del servidor desde el admin');
-    try { writeJson(STATS_FILE, stats); writeJson(EVENTS_FILE, events); } catch {}
+    flush();
+    try { ctx.saveRooms && ctx.saveRooms(); } catch {}
     json(res, 200, { ok: true });
-    setTimeout(() => process.exit(0), 400);   // systemd lo vuelve a levantar (Restart=always)
+    setTimeout(() => process.exit(0), 400);   // systemd lo vuelve a levantar (Restart=always) y restaura las salas
   });
   on('GET', '/backup', (req, res) => {
-    const data = { at: new Date().toISOString(), version: versionNow(), records: ctx.records(), stats, events };
+    // (con las llaves de Touch ID y las novedades: sin admin.json hay que volver a dar de alta por SSH)
+    const data = { at: new Date().toISOString(), version: versionNow(), records: ctx.records(), stats, events, novedades: ctx.novedades(), admin: auth };
     res.writeHead(200, { 'content-type': 'application/json', 'content-disposition': `attachment; filename="gramola-datos-${today()}.json"`, 'cache-control': 'no-store' });
     res.end(JSON.stringify(data, null, 1));
   });
@@ -514,21 +538,23 @@ module.exports = function admin(ctx) {
       audio: (h.MP3 || h.AUDIO) ? base + encodeURIComponent(h.MP3 || h.AUDIO) : null,
       vocals: has('voz.mp3') ? base + 'voz.mp3?v=' + Math.round(fs.statSync(path.join(dir, 'voz.mp3')).mtimeMs) : null,
       pitch: has('voz-tono.json') ? base + 'voz-tono.json?v=' + Math.round(fs.statSync(path.join(dir, 'voz-tono.json')).mtimeMs) : null,
+      tramos: has('voz-tramos.json') ? base + 'voz-tramos.json?v=' + Math.round(fs.statSync(path.join(dir, 'voz-tramos.json')).mtimeMs) : null,
       megamix: readJson(path.join(dir, 'megamix.json'), null),
       draft: has('borrador.json'),
     });
   });
   on('PUT', '/songs/([^/]+)/chart', async (req, res, m) => {
     const id = decodeURIComponent(m[1]), dir = songDir(id), f = chartFile(dir);
-    const b = JSON.parse((await readRaw(req, 2 * 1024 * 1024)).toString('utf8') || '{}');
-    const text = String(b.text || '');
+    let b;
+    try { b = JSON.parse((await readRaw(req, 2 * 1024 * 1024)).toString('utf8') || '{}'); } catch { throw httpErr(400, 'JSON no válido'); }
+    const text = String((b && b.text) || '');
     if (!/^#TITLE:/m.test(text) || !/^#BPM:/m.test(text) || !/^[:*FRG]\s*-?\d+\s+\d+\s+-?\d+/m.test(text)) throw httpErr(400, 'El .txt no es válido (falta TITLE, BPM o notas)');
     const vd = verDir(id);
     fs.mkdirSync(vd, { recursive: true });
     fs.copyFileSync(path.join(dir, f), path.join(vd, new Date().toISOString().replace(/[:.]/g, '-') + '.txt'));
     const old = fs.readdirSync(vd).sort();
     for (const x of old.slice(0, Math.max(0, old.length - 60))) fs.unlinkSync(path.join(vd, x));
-    fs.writeFileSync(path.join(dir, f), text.replace(/\r?\n/g, '\r\n'), 'utf8');
+    writeAtomic(path.join(dir, f), text.replace(/\r?\n/g, '\r\n'));
     ctx.songsChanged();
     ev('songs', `Editor: «${id}» guardada${b.note ? ' (' + String(b.note).slice(0, 80) + ')' : ''}`);
     json(res, 200, { ok: true });
@@ -550,6 +576,8 @@ module.exports = function admin(ctx) {
   // como BORRADOR (no sale en la tele hasta «Publicar»).
   const JOBS = path.join(DATA_DIR, 'trabajos');
   const WORKER_FILE = path.join(DATA_DIR, 'trabajador.json');
+  // Lo que deja el trabajador junto a la canción: la voz sola, su tono y los tramos de voz con lo que dice (reconocimiento)
+  const VOZ_FILES = ['voz.mp3', 'voz-tono.json', 'voz-tramos.json'];
   let worker = { seen: 0, host: '', job: null };
   const jobPath = (id, f = 'job.json') => path.join(JOBS, safeName(id), f);
   const jobGet = id => { const j = readJson(jobPath(id), null); if (!j) throw httpErr(404, 'No existe ese trabajo'); return j; };
@@ -575,7 +603,9 @@ module.exports = function admin(ctx) {
       j = { id, kind: 'spotify', trackId: m[1], url: 'https://open.spotify.com/track/' + m[1], titulo: 'Canción de Spotify', artista: '', state: 'pendiente', created: Date.now() };
     } else if (b.kind === 'analizar') {
       const sid = String(b.song || ''); songDir(sid);
-      j = { id, kind: 'analizar', song: sid, titulo: headerOf(songDir(sid)).TITLE || sid, artista: headerOf(songDir(sid)).ARTIST || '', state: 'pendiente', created: Date.now() };
+      const hh = headerOf(songDir(sid));
+      const IDIOMA = { spanish: 'es', english: 'en', catalan: 'ca', french: 'fr', italian: 'it', portuguese: 'pt', german: 'de', galician: 'gl', basque: 'eu' };
+      j = { id, kind: 'analizar', song: sid, titulo: hh.TITLE || sid, artista: hh.ARTIST || '', idioma: IDIOMA[String(hh.LANGUAGE || '').trim().toLowerCase()] || null, state: 'pendiente', created: Date.now() };
     } else {
       const titulo = String(b.titulo || '').trim().slice(0, 120), artista = String(b.artista || '').trim().slice(0, 120), letra = String(b.letra || '').slice(0, 30000);
       if (!titulo || !artista) throw httpErr(400, 'Faltan el título o el artista');
@@ -602,6 +632,7 @@ module.exports = function admin(ctx) {
     if (ext !== 'mp3') {
       const r = await run('ffmpeg', ['-y', '-loglevel', 'error', '-i', jobPath(j.id, 'entrada.' + ext), '-vn', '-c:a', 'libmp3lame', '-b:a', '192k', jobPath(j.id, 'entrada.mp3')]);
       if (r.code !== 0) throw httpErr(400, 'No se pudo convertir el audio: ' + r.err);
+      try { fs.unlinkSync(jobPath(j.id, 'entrada.' + ext)); } catch {}   // (el original ya no hace falta: no se guardan dos audios)
     }
     j.state = 'pendiente'; j.size = buf.length; jobPut(j);
     json(res, 200, j);
@@ -635,11 +666,12 @@ module.exports = function admin(ctx) {
     const rg = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
     if (rg && m[2] === 'audio' && (rg[1] || rg[2])) {
       const a = rg[1] ? +rg[1] : st.size - +rg[2], e = rg[1] && rg[2] ? Math.min(+rg[2], st.size - 1) : st.size - 1;
+      if (!(a >= 0 && a <= e && a < st.size)) { res.writeHead(416, { 'content-range': `bytes */${st.size}` }); return res.end(); }
       res.writeHead(206, { 'content-type': type, 'accept-ranges': 'bytes', 'content-range': `bytes ${a}-${e}/${st.size}`, 'content-length': e - a + 1, 'cache-control': 'no-store' });
-      return fs.createReadStream(f, { start: a, end: e }).pipe(res);
+      return fs.createReadStream(f, { start: a, end: e }).on('error', () => res.destroy()).pipe(res);
     }
     res.writeHead(200, { 'content-type': type, 'accept-ranges': 'bytes', 'content-length': st.size, 'cache-control': 'no-store' });
-    fs.createReadStream(f).pipe(res);
+    fs.createReadStream(f).on('error', () => res.destroy()).pipe(res);
   });
   on('POST', '/jobs/([^/]+)/retry', (req, res, m) => { const j = jobGet(m[1]); j.state = 'pendiente'; j.error = null; j.progress = 0; j.msg = ''; jobPut(j); json(res, 200, j); });
   on('DELETE', '/jobs/([^/]+)', async (req, res, m) => { jobGet(m[1]); await fsp.rm(path.join(JOBS, safeName(m[1])), { recursive: true, force: true }); json(res, 200, { ok: true }); });
@@ -799,6 +831,7 @@ module.exports = function admin(ctx) {
     const dest = path.join(SONGS_DIR, to);
     if (fs.existsSync(dest)) throw httpErr(409, 'Ya hay una canción con ese nombre de carpeta');
     fs.renameSync(dir, dest);
+    try { if (fs.existsSync(verDir(id))) fs.renameSync(verDir(id), verDir(to)); } catch {}   // (las versiones del editor siguen a la canción)
     const nv = ctx.novedades();
     if (nv[id]) { nv[to] = nv[id]; delete nv[id]; ctx.saveNovedades(); }
     const rec = ctx.records();
@@ -849,13 +882,15 @@ module.exports = function admin(ctx) {
     const buf = await readRaw(req, 60 * 1024 * 1024);
     const nueva = !fs.existsSync(dir);
     fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, name), buf);
+    writeAtomic(path.join(dir, name), buf);   // (un .mp3 de 60 MB a medias no se sirve nunca a una tele)
     ctx.songsChanged();
     ev('songs', `${nueva ? 'Canción nueva' : 'Fichero subido'}: «${id}/${name}» (${(buf.length / 1048576).toFixed(1)} MB)`);
     json(res, 200, { ok: true });
   });
   on('DELETE', '/songs/([^/]+)/files/([^/]+)', (req, res, m) => {
-    const id = decodeURIComponent(m[1]), dir = songDir(id), name = safeName(decodeURIComponent(m[2]));
+    // (también los que empiezan por punto: .DS_Store y ._Cancion.mp3 que deja un Mac al copiar)
+    const id = decodeURIComponent(m[1]), dir = songDir(id), name = decodeURIComponent(m[2]).normalize('NFC');
+    if (!name || name.length > 200 || name === '.' || name === '..' || /[\/\\\0]/.test(name)) throw httpErr(400, 'Nombre no válido');
     const f = path.join(dir, name);
     if (!fs.existsSync(f)) throw httpErr(404, 'No existe ese fichero');
     fs.unlinkSync(f);
@@ -872,13 +907,15 @@ module.exports = function admin(ctx) {
     } else if (b.mode === 'manual') {
       const a = Math.round(+b.start), e = Math.round(+b.end);
       if (!(a >= 0 && e - a >= 5000 && e - a <= 90000)) throw httpErr(400, 'El estribillo tiene que durar entre 5 y 90 segundos');
-      const h = headerOf(dir), audio = h.MP3 || h.AUDIO;
+      const audio = audioOf(headerOf(dir));
       if (!audio || !fs.existsSync(path.join(dir, audio))) throw httpErr(400, 'La canción no tiene audio');
       const off = Math.max(0, a - 5000);
-      r = await run('ffmpeg', ['-y', '-loglevel', 'error', '-i', path.join(dir, audio), '-ss', (off / 1000).toFixed(3), '-to', ((e + 3000) / 1000).toFixed(3), '-vn', '-ac', '2', '-c:a', 'libmp3lame', '-b:a', '192k', path.join(dir, 'megamix.mp3')]);
-      if (r.code === 0) { writeJson(path.join(dir, 'megamix.json'), { file: 'megamix.mp3', offset: off, start: a, end: e, origen: 'manual' }); r.out = 'ok · estribillo manual ' + Math.round((e - a) / 1000) + ' s'; }
+      // (se corta a un temporal y se renombra al final: nunca queda un megamix.mp3 a medias)
+      r = await conCerrojo(dir, () => run('ffmpeg', ['-y', '-loglevel', 'error', '-i', path.join(dir, audio), '-ss', (off / 1000).toFixed(3), '-to', ((e + 3000) / 1000).toFixed(3), '-vn', '-ac', '2', '-c:a', 'libmp3lame', '-b:a', '192k', '-f', 'mp3', path.join(dir, 'megamix.mp3.tmp')]));
+      if (r.code === 0) { fs.renameSync(path.join(dir, 'megamix.mp3.tmp'), path.join(dir, 'megamix.mp3')); writeJson(path.join(dir, 'megamix.json'), { file: 'megamix.mp3', offset: off, start: a, end: e, origen: 'manual' }); r.out = 'ok · estribillo manual ' + Math.round((e - a) / 1000) + ' s'; }
+      else try { fs.unlinkSync(path.join(dir, 'megamix.mp3.tmp')); } catch {}
     } else {
-      r = await py('import megamix; print(megamix.preparar(d, forzar=True, auto=True))', dir);
+      r = await conCerrojo(dir, () => py('import megamix; print(megamix.preparar(d, forzar=True, auto=True))', dir));
     }
     ctx.songsChanged();
     ev('songs', `Megamix de «${id}»: ${r.code === 0 ? r.out : 'error'}`);
@@ -887,14 +924,14 @@ module.exports = function admin(ctx) {
   });
   on('POST', '/songs/([^/]+)/normalize', async (req, res, m) => {
     const id = decodeURIComponent(m[1]), dir = songDir(id);
-    const r = await py('import normalizar; print(normalizar.una(d)[1])', dir);
+    const r = await conCerrojo(dir, () => py('import normalizar; print(normalizar.una(d)[1])', dir));
     ctx.songsChanged();
     ev('songs', `Volumen de «${id}»: ${r.code === 0 ? r.out : 'error'}`);
     if (r.code !== 0) throw httpErr(500, 'No se pudo: ' + (r.err || r.out));
     json(res, 200, { ok: true, result: r.out });
   });
   on('POST', '/songs/([^/]+)/measure', async (req, res, m) => {
-    const id = decodeURIComponent(m[1]), dir = songDir(id), h = headerOf(dir), audio = h.MP3 || h.AUDIO;
+    const id = decodeURIComponent(m[1]), dir = songDir(id), audio = audioOf(headerOf(dir));
     if (!audio) throw httpErr(400, 'Sin audio');
     const r = await run('ffmpeg', ['-hide_banner', '-nostats', '-i', path.join(dir, audio), '-vn', '-af', 'loudnorm=I=-12:TP=-1:LRA=11:print_format=json', '-f', 'null', '-']);
     const j = (r.err.match(/\{[^{}]*"input_i"[^{}]*\}/s) || [])[0];
@@ -923,7 +960,7 @@ module.exports = function admin(ctx) {
       const u = new URL(String(b.url || ''));
       const src = /(^|\.)mzstatic\.com$/.test(u.hostname) ? 'itunes' : /(^|\.)dzcdn\.net$/.test(u.hostname) ? 'deezer' : null;
       if (u.protocol !== 'https:' || !src) throw httpErr(400, 'Solo portadas de iTunes o Deezer');
-      const r = await fetch(u, { signal: AbortSignal.timeout(20000) });
+      const r = await fetch(u, { signal: AbortSignal.timeout(20000), redirect: 'error' });   // (sin seguir redirecciones: la portada viene de donde se ha dicho)
       if (!r.ok) throw httpErr(502, 'No se pudo descargar la portada');
       const buf = Buffer.from(await r.arrayBuffer());
       if (buf.length < 2000 || buf.length > 8e6) throw httpErr(502, 'La portada descargada no es válida');
@@ -1009,17 +1046,26 @@ module.exports = function admin(ctx) {
       const k = normKey(j.artista) + '|' + normKey(j.titulo);
       const same = ctx.scanSongs(true).find(s => normKey(s.artist) + '|' + normKey(s.title) === k);
       j.dup = same ? same.id : null;
-      try {
-        const l = await buscarLetra(j.artista, j.titulo, j.duracion);
-        if (l) { fs.writeFileSync(src('letra.txt'), l.texto); if (l.lrc) fs.writeFileSync(src('letra.lrc'), l.lrc); j.letraFuente = l.fuente + (l.sincronizada ? ' (sincronizada)' : ''); }
-      } catch {}
       j.state = 'borrador';
       ev('songs', `Descargada de Spotify: «${j.artista} - ${j.titulo}» (borrador)${j.dup ? ' · ya existe en la biblioteca' : ''}`);
+      // La letra se busca en segundo plano (LRCLIB, Genius, songlyrics pueden tardar más de un minuto entre reintentos):
+      // el trabajador recibe su respuesta enseguida y no da por fallida la descarga por un tiempo de espera agotado
+      (async () => {
+        try {
+          const l = await buscarLetra(j.artista, j.titulo, j.duracion);
+          // Puede haber pasado un minuto: se relee el trabajo de disco y solo se toca si sigue siendo un borrador sin
+          // letra (si el admin ya escribió la suya o pulsó «Continuar», no se pisa nada)
+          const cur = readJson(jobPath(j.id), null);
+          if (!l || !cur || cur.state !== 'borrador' || fs.existsSync(src('letra.txt'))) return;
+          fs.writeFileSync(src('letra.txt'), l.texto); if (l.lrc) fs.writeFileSync(src('letra.lrc'), l.lrc);
+          jobPut({ ...cur, letraFuente: l.fuente + (l.sincronizada ? ' (sincronizada)' : '') });
+        } catch {}
+      })();
       return;
     }
     if (j.kind === 'analizar') {
       const dir = songDir(j.song);
-      for (const f of ['voz.mp3', 'voz-tono.json']) if (fs.existsSync(src(f))) fs.copyFileSync(src(f), path.join(dir, f));
+      for (const f of VOZ_FILES) if (fs.existsSync(src(f))) fs.copyFileSync(src(f), path.join(dir, f));
       ev('songs', `Voz analizada: «${j.song}»`);
       return;
     }
@@ -1032,8 +1078,8 @@ module.exports = function admin(ctx) {
       const nuevo = readText(src('cancion.txt')), viejo = readText(path.join(dir, f));
       const cab = viejo.split(/\r?\n/).filter(l => /^#/.test(l) && !/^#(GAP|BPM|RELATIVE):/i.test(l));
       const de = nuevo.split(/\r?\n/), cuerpo = de.filter(l => !/^#/.test(l)), gb = de.filter(l => /^#(GAP|BPM):/i.test(l));
-      fs.writeFileSync(path.join(dir, f), [...cab, ...gb, ...cuerpo].join('\r\n'), 'utf8');
-      for (const x of ['voz.mp3', 'voz-tono.json']) if (fs.existsSync(src(x))) fs.copyFileSync(src(x), path.join(dir, x));
+      writeAtomic(path.join(dir, f), [...cab, ...gb, ...cuerpo].join('\r\n'));
+      for (const x of VOZ_FILES) if (fs.existsSync(src(x))) copyAtomic(src(x), path.join(dir, x));
       j.reencajar = false;
       ctx.songsChanged();
       ev('songs', `Vuelta a encajar: «${j.song}» (la versión anterior está en Versiones)`);
@@ -1043,9 +1089,9 @@ module.exports = function admin(ctx) {
     const folder = fs.existsSync(path.join(SONGS_DIR, j.folder)) ? folderFor(j.artista, j.titulo) : j.folder;
     const dir = path.join(SONGS_DIR, folder);
     fs.mkdirSync(dir, { recursive: true });
-    fs.copyFileSync(src('entrada.mp3'), path.join(dir, j.audioName));
-    fs.copyFileSync(src('cancion.txt'), path.join(dir, folder + '.txt'));
-    for (const f of ['voz.mp3', 'voz-tono.json']) if (fs.existsSync(src(f))) fs.copyFileSync(src(f), path.join(dir, f));
+    copyAtomic(src('entrada.mp3'), path.join(dir, j.audioName));
+    copyAtomic(src('cancion.txt'), path.join(dir, folder + '.txt'));
+    for (const f of VOZ_FILES) if (fs.existsSync(src(f))) copyAtomic(src(f), path.join(dir, f));
     writeJson(path.join(dir, 'borrador.json'), { trabajo: j.id, creada: Date.now() });
     j.song = folder;
     ctx.songsChanged();
@@ -1061,38 +1107,65 @@ module.exports = function admin(ctx) {
           if (buf.length > 2000) { fs.writeFileSync(path.join(dir, 'cover-itunes.jpg'), buf); setCover(dir, 'cover-itunes.jpg', { origen: 'itunes', disco: r.album, año: r.year, url: r.art }); }
         }
       } catch {}
-      await py('import normalizar; print(normalizar.una(d)[1])', dir).catch(() => {});
-      await py('import megamix; print(megamix.preparar(d, forzar=True, auto=True))', dir).catch(() => {});
+      await conCerrojo(dir, () => py('import normalizar; print(normalizar.una(d)[1])', dir)).catch(() => {});
+      await conCerrojo(dir, () => py('import megamix; print(megamix.preparar(d, forzar=True, auto=True))', dir)).catch(() => {});
       ctx.songsChanged();
     })();
   }
   const wroutes = [];
   const won = (method, pattern, fn) => wroutes.push({ method, re: new RegExp('^/api/worker' + pattern + '$'), fn });
+  // Trabajos viejos: lo que queda en data/trabajos/ (audio de entrada, voz, partitura) solo sirve para «volver a
+  // encajar» una canción en preparación. A los 30 días, si ya no está en preparación, se borra
+  function limpiarTrabajos() {
+    try {
+      for (const j of jobsAll()) {
+        if (!['hecho', 'error'].includes(j.state) || Date.now() - (j.finished || j.updated || j.created || 0) < 30 * 86400e3) continue;
+        if (j.song && fs.existsSync(path.join(SONGS_DIR, j.song, 'borrador.json'))) continue;
+        fs.rmSync(path.join(JOBS, safeName(j.id)), { recursive: true, force: true });
+      }
+    } catch (e) { console.error('trabajos: no se pudieron limpiar', e.message); }
+  }
+  setTimeout(limpiarTrabajos, 60e3).unref(); setInterval(limpiarTrabajos, 6 * 3600e3).unref();
   won('POST', '/next', async (req, res) => {
     const b = await body(req);
+    // Si el trabajador reaparece tras más de un minuto callado con un trabajo a medias, es que se reinició: el trabajo
+    // vuelve a la cola ahora y no a los 20 min
+    if (worker.job && worker.seen && Date.now() - worker.seen > 60e3) {
+      const x = jobsAll().find(j => j.id === worker.job);
+      if (x && x.state === 'procesando') { x.retries = (x.retries || 0) + 1; x.state = x.retries > 1 ? 'error' : 'pendiente'; x.msg = 'El trabajador se reinició: vuelve a la cola'; if (x.state === 'error') x.error = 'El trabajador se ha caído dos veces con este trabajo'; jobPut(x); }
+      worker.job = null;
+    }
     worker = { seen: Date.now(), host: String(b.host || '').slice(0, 60), job: worker.job, version: String(b.version || '').slice(0, 20) };
-    // Un trabajo que lleva 20 min sin dar señales (el trabajador se reinició a medias) vuelve a la cola
-    for (const x of jobsAll()) if (x.state === 'procesando' && Date.now() - (x.updated || 0) > 20 * 60e3) { x.state = 'pendiente'; x.msg = 'Vuelve a la cola'; jobPut(x); }
+    // Un trabajo que lleva 20 min sin dar señales (el trabajador se reinició a medias) vuelve a la cola, una vez:
+    // si vuelve a pasar, se da por fallido (si no, un audio que revienta al trabajador se repetiría sin fin)
+    for (const x of jobsAll()) if (x.state === 'procesando' && Date.now() - (x.updated || 0) > 20 * 60e3) {
+      x.retries = (x.retries || 0) + 1;
+      if (x.retries > 1) { x.state = 'error'; x.error = 'El trabajador se ha caído dos veces con este trabajo (¿audio demasiado largo?)'; ev('songs', `Error en el trabajo «${x.artista} - ${x.titulo}»: ${x.error}`); }
+      else { x.state = 'pendiente'; x.msg = 'Vuelve a la cola'; }
+      jobPut(x);
+    }
     const pend = jobsAll().reverse().filter(x => x.state === 'pendiente');
     const j = pend.find(x => x.kind === 'spotify') || pend[0];   // las descargas de Spotify son rápidas: primero
     if (!j) return json(res, 200, {});
-    j.state = 'procesando'; j.started = Date.now(); j.progress = 0; j.msg = 'Empezando'; j.worker = worker.host; jobPut(j);
-    worker.job = j.id;
     const out = { ...j };
     if (j.kind === 'crear') {
-      out.letra = fs.readFileSync(jobPath(j.id, 'letra.txt'), 'utf8');
+      // (la letra se lee antes de marcarlo «procesando»: si falta, el trabajo queda en error y no en el limbo)
+      try { out.letra = fs.readFileSync(jobPath(j.id, 'letra.txt'), 'utf8'); } catch { j.state = 'error'; j.error = 'Falta la letra del trabajo'; jobPut(j); return json(res, 200, {}); }
       try { out.lrc = fs.readFileSync(jobPath(j.id, 'letra.lrc'), 'utf8'); } catch {}
     }
+    j.state = 'procesando'; j.started = Date.now(); j.progress = 0; j.msg = 'Empezando'; j.worker = worker.host; jobPut(j);
+    worker.job = j.id;
+    Object.assign(out, { state: j.state, started: j.started, progress: 0, msg: j.msg, worker: j.worker });
     json(res, 200, out);
   });
   won('GET', '/jobs/([^/]+)/input', (req, res, m) => {
     const j = jobGet(m[1]);
     let f;
     if (j.kind === 'crear') f = jobPath(j.id, 'entrada.mp3');
-    else { const dir = songDir(j.song), h = headerOf(dir); f = path.join(dir, h.MP3 || h.AUDIO || ''); }
+    else { const dir = songDir(j.song), a = audioOf(headerOf(dir)); f = a ? path.join(dir, a) : ''; }
     if (!fs.existsSync(f)) throw httpErr(404, 'Falta el audio');
     res.writeHead(200, { 'content-type': 'audio/mpeg', 'content-length': fs.statSync(f).size });
-    fs.createReadStream(f).pipe(res);
+    fs.createReadStream(f).on('error', () => res.destroy()).pipe(res);
   });
   won('POST', '/jobs/([^/]+)/progress', async (req, res, m) => {
     const j = jobGet(m[1]), b = await body(req);
@@ -1102,7 +1175,7 @@ module.exports = function admin(ctx) {
   });
   won('PUT', '/jobs/([^/]+)/result/([^/]+)', async (req, res, m) => {
     const j = jobGet(m[1]), name = decodeURIComponent(m[2]);
-    if (!['cancion.txt', 'voz.mp3', 'voz-tono.json', 'entrada.mp3', 'portada.jpg', 'meta.json'].includes(name)) throw httpErr(400, 'Fichero no admitido');
+    if (!['cancion.txt', ...VOZ_FILES, 'entrada.mp3', 'portada.jpg', 'meta.json'].includes(name)) throw httpErr(400, 'Fichero no admitido');
     fs.writeFileSync(jobPath(j.id, name), await readRaw(req, 40 * 1024 * 1024));
     json(res, 200, { ok: true });
   });
@@ -1174,5 +1247,5 @@ module.exports = function admin(ctx) {
     return true;
   }
 
-  return { handle, isAuthed, ev, count, peaks };
+  return { handle, isAuthed, ev, count, peaks, flush };
 };

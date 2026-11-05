@@ -7,8 +7,15 @@
 Pasos (todo en local, en el Mac):
   1. Separa la voz de la música con Demucs (htdemucs) → voz.mp3
   2. Mide el tono de la voz cada 10 ms con CREPE (pYIN de reserva) → voz-tono.json ([[ms, midi|null], …])
+  2b. Parte la voz en TRAMOS por los silencios (un silencio de 0,35 s separa; lo que dura menos de 0,3 s no cuenta) y
+     reconoce qué dice cada tramo con faster-whisper (palabra a palabra, con tiempos) → voz-tramos.json. Con eso el
+     editor enseña cada frase sobre su trozo de voz y propone dónde empieza y acaba.
   3. (crear) Alinea la letra sobre la voz con el alineador forzado multilingüe MMS (wav2vec2): cada letra de la
-     letra recibe su instante exacto. No transcribe: coloca el texto que se le da.
+     letra recibe su instante exacto. No transcribe: coloca el texto que se le da. Antes, cada línea de la letra se
+     empareja con las palabras reconocidas (en orden, coincidencias largas primero: los estribillos repetidos van cada
+     uno a su sitio) y el alineador solo busca cada línea en la zona donde la voz la dice; si no hay reconocimiento,
+     con la letra sincronizada (LRC) si la hay. Al final, la primera sílaba de cada frase se lleva a donde arranca la
+     voz en su tramo (si arranca a menos de 0,6 s).
   4. (crear) Parte las palabras en sílabas (pyphen, según el idioma) y da a cada sílaba su inicio, su fin y su nota:
      - el fin se alarga mientras suene la voz (energía de la voz separada + tono detectado, sin cortar en respiraciones
        de menos de 0,12 s), así las NOTAS LARGAS quedan enteras hasta la siguiente sílaba o hasta que la voz calla;
@@ -57,8 +64,11 @@ def liberar():
 # ---------------------------------------------------------------------------- audio
 def leer_audio(path, sr=SR, canales=2):
     """Audio en float32 (canales, n) con ffmpeg."""
-    out = subprocess.run(['ffmpeg', '-v', 'error', '-i', path, '-f', 'f32le', '-ac', str(canales), '-ar', str(sr), '-'],
-                         capture_output=True, check=True).stdout
+    r = subprocess.run(['ffmpeg', '-v', 'error', '-i', path, '-f', 'f32le', '-ac', str(canales), '-ar', str(sr), '-'],
+                       capture_output=True)
+    if r.returncode != 0:
+        raise RuntimeError('ffmpeg no ha podido leer el audio: ' + r.stderr.decode('utf-8', 'replace').strip()[-500:])
+    out = r.stdout
     a = np.frombuffer(out, dtype=np.float32)
     return a.reshape(-1, canales).T.copy()
 
@@ -134,6 +144,139 @@ def curva_json(t, midi):
     return [[int(round(a * 1000)), (None if math.isnan(m) else round(float(m), 2))] for a, m in zip(t, midi)]
 
 
+# ---------------------------------------------------------------------------- 2b. tramos de voz y reconocimiento
+ASR_MODELO = os.environ.get('GRAMOLA_ASR', 'small')   # faster-whisper: «small» tarda ~50 s por canción en el servidor (845 MB)
+ASR_IDIOMAS = {'es', 'en', 'ca', 'fr', 'it', 'pt', 'de', 'gl', 'eu'}
+
+
+def tramos_voz(voz, sr=SR, hueco=0.35, minimo=0.3):
+    """Trozos seguidos de voz, por los silencios de la voz separada: [(ini, fin)] en segundos. Un silencio de menos de
+    «hueco» no parte (respiraciones, pausas dentro de la frase) y lo que dura menos de «minimo» no cuenta."""
+    paso = 0.01
+    n = len(voz) // int(sr * paso)
+    act = actividad(voz, n, sr, paso)
+    out, i = [], 0
+    while i < n:
+        if not act[i]:
+            i += 1
+            continue
+        j = i
+        while j < n and act[j]:
+            j += 1
+        a, b = i * paso, j * paso
+        if out and a - out[-1][1] < hueco:
+            out[-1][1] = b
+        else:
+            out.append([a, b])
+        i = j
+    return [(round(a, 2), round(b, 2)) for a, b in out if b - a >= minimo]
+
+
+def transcribir(voz, tramos, idioma=None, sr=SR):
+    """Qué dice la voz en cada tramo (faster-whisper, modelo ASR_MODELO): devuelve (idioma, [(ini, fin, texto)],
+    [(ini, fin, palabra)]) con los tiempos en segundos. Sin faster-whisper instalado, listas vacías."""
+    try:
+        from faster_whisper import WhisperModel
+    except ImportError:
+        log('· (sin faster-whisper: no se reconoce lo que dice la voz)')
+        return idioma, [], []
+    import torch
+    import torchaudio
+    y = torchaudio.functional.resample(torch.from_numpy(voz)[None], sr, 16000)[0].numpy()
+    model = WhisperModel(ASR_MODELO, device='cpu', compute_type='int8', cpu_threads=min(4, os.cpu_count() or 1))
+    lang = idioma if idioma in ASR_IDIOMAS else None
+    opc = dict(beam_size=1, temperature=0.0, condition_on_previous_text=False, word_timestamps=True, vad_filter=False)
+    if lang is None and tramos:
+        a, b = max(tramos, key=lambda x: x[1] - x[0])   # el idioma, por el tramo más largo
+        _, info = model.transcribe(y[int(a * 16000):int(b * 16000)], **opc)
+        lang = info.language if info.language_probability > 0.5 else 'es'
+        log(f'· La voz parece «{lang}» ({info.language_probability:.0%})')
+    textos, palabras = [], []
+    for a, b in tramos:
+        segs, _ = model.transcribe(y[int(a * 16000):int(b * 16000)], language=lang, **opc)
+        ws = []
+        for sg in segs:
+            for w in sg.words or []:
+                t = w.word.strip()
+                if t:
+                    ws.append((round(a + w.start, 2), round(a + w.end, 2), t))
+        palabras += ws
+        textos.append((a, b, ' '.join(w[2] for w in ws)))
+    del model
+    liberar()
+    return lang, textos, palabras
+
+
+def norm_palabra(w):
+    return ''.join(x for ch in w for x in normalizar(ch) if x in "abcdefghijklmnopqrstuvwxyz'")
+
+
+def ventanas_asr(lineas, palabras_asr, dur, tramos=()):
+    """Con lo que la voz dice (palabras reconocidas con su tiempo), la zona donde cae cada línea de la letra, en el
+    mismo formato que ventanas_lrc: {línea: (ini, fin, ini_marca)}. Las palabras de la letra y las reconocidas se
+    emparejan en orden, coincidencias largas primero (difflib), así cada estribillo repetido va al suyo."""
+    import difflib
+    pal = palabras_de(lineas)
+    if len(palabras_asr) < 5:
+        return {}
+    a, b = [p[3] for p in pal], [norm_palabra(w) for _, _, w in palabras_asr]
+    casa = {}
+    for blk in difflib.SequenceMatcher(None, a, b, autojunk=False).get_matching_blocks():
+        for k in range(blk.size):
+            casa[blk.a + k] = blk.b + k
+    por_linea = {}
+    for i, p in enumerate(pal):
+        if i in casa:
+            por_linea.setdefault(p[0], []).append(casa[i])
+    out, usadas = {}, set(casa.values())
+    tramo_de = lambda t: next((x for x in tramos if x[0] - 0.06 <= t <= x[1] + 0.06), None)
+    for li, ks in por_linea.items():
+        n_pal = sum(1 for p in pal if p[0] == li)
+        if len(ks) < max(1, n_pal / 3):   # pocas palabras reconocidas de la línea: no fiarse
+            continue
+        # las palabras reconocidas pegadas a la línea que no son de ninguna otra (mal oídas) también son suyas,
+        # mientras estén en el mismo tramo de voz
+        lo, hi = ks[0], ks[-1]
+        t0, t1 = tramo_de(palabras_asr[lo][0]), tramo_de(palabras_asr[hi][1])
+        while lo > 0 and lo - 1 not in usadas and t0 and palabras_asr[lo - 1][0] >= t0[0] - 0.06:
+            lo -= 1
+        while hi + 1 < len(palabras_asr) and hi + 1 not in usadas and t1 and palabras_asr[hi + 1][1] <= t1[1] + 0.06:
+            hi += 1
+        ini, fin = palabras_asr[lo][0], palabras_asr[hi][1]
+        out[li] = (max(0, ini - 0.5), min(dur, fin + 0.5), ini)
+    log(f'· Reconocimiento: {len(casa)} de {len(pal)} palabras de la letra encontradas, {len(out)} de {len(lineas)} líneas situadas')
+    if len(out) < len(lineas) * 0.5:
+        return {}
+    for li in range(len(lineas)):   # las líneas sin sitio: entre la anterior y la siguiente que sí lo tienen
+        if li in out:
+            continue
+        prev = max((x for x in out if x < li), default=None)
+        nxt = min((x for x in out if x > li), default=None)
+        out[li] = (out[prev][0] if prev is not None else 0.0, out[nxt][1] if nxt is not None else dur, None)
+    return out
+
+
+def ajustar_a_voz(notas, tramos, tope=0.6):
+    """La primera sílaba de cada frase arranca donde arranca la voz en su tramo (si el tramo empieza a menos de «tope»
+    segundos y la frase anterior ya había callado). Devuelve cuántas se han movido."""
+    movidas = 0
+    for i, n in enumerate(notas):
+        if i and n.get('frase', n['linea']) == notas[i - 1].get('frase', notas[i - 1]['linea']):
+            continue
+        prev_fin = notas[i - 1]['fin'] if i else -1
+        cand = [a for a, b in tramos if abs(a - n['ini']) <= tope and n['ini'] < b and prev_fin <= a + 0.05]
+        if not cand:
+            continue
+        a = min(cand, key=lambda x: abs(x - n['ini']))
+        if abs(a - n['ini']) < 0.02:
+            continue
+        sig = notas[i + 1]['ini'] if i + 1 < len(notas) else n['fin'] + 1
+        n['ini'] = min(a, sig - 0.1)
+        n['fin'] = max(n['fin'], n['ini'] + 0.08)
+        movidas += 1
+    return movidas
+
+
 # ---------------------------------------------------------------------------- 3. alinear la letra
 def normalizar(c):
     c = unicodedata.normalize('NFD', c.lower())
@@ -196,7 +339,8 @@ def ventanas_lrc(lineas, lrc, dur):
     return out
 
 
-def alinear(voz, sr, palabras, ventanas=None):
+def alinear(voz, sr, palabras, ventanas=None, fiables=False):
+    """«fiables»: las ventanas salen de esta misma grabación (reconocimiento) y no se comprueba su desfase."""
     import torch
     import torchaudio
     from torchaudio.pipelines import MMS_FA as bundle
@@ -236,14 +380,17 @@ def alinear(voz, sr, palabras, ventanas=None):
             p0 = next((p for p in validas if p[0] == li), None)
             if w and w[2] is not None and p0 and tiempos.get(id(p0)):
                 dif.append(tiempos[id(p0)][0][0] - w[2])
-        if len(dif) < 4:
-            return tiempos
-        d = float(np.median(dif))
-        casan = sum(abs(x - d) < 1.5 for x in dif) / len(dif)
-        log(f'  (letra sincronizada: desfase {d:+.1f} s, casan {casan:.0%} de las líneas)')
-        if casan < 0.6:
-            return tiempos
-        ventanas = {k: (max(0, a + d), b + d, s) for k, (a, b, s) in ventanas.items()}
+        if fiables:
+            d = 0.0
+        else:
+            if len(dif) < 4:
+                return tiempos
+            d = float(np.median(dif))
+            casan = sum(abs(x - d) < 1.5 for x in dif) / len(dif)
+            log(f'  (letra sincronizada: desfase {d:+.1f} s, casan {casan:.0%} de las líneas)')
+            if casan < 0.6:
+                return tiempos
+            ventanas = {k: (max(0, a + d), b + d, s) for k, (a, b, s) in ventanas.items()}
         globales = dict(tiempos)
         tiempos = {}
         try:
@@ -274,6 +421,17 @@ def silabas(palabra, idioma):
 
 
 USA_VOZ = True
+
+
+def energia_db(voz, n, sr=SR, paso=0.01):
+    """Energía de la voz separada en dB cada 10 ms (n valores)."""
+    h = int(sr * paso)
+    m = len(voz) // h
+    e = np.sqrt(np.mean(voz[:m * h].reshape(m, h) ** 2, axis=1) + 1e-12)
+    db = 20 * np.log10(e)
+    out = np.full(n, -120.0)
+    out[:min(n, m)] = db[:min(n, m)]
+    return out
 
 
 def actividad(voz, n, sr=SR, paso=0.01):
@@ -378,14 +536,37 @@ def construir(lineas, palabras, tiempos, t, midi, idioma, voz=None):
             while j < a1 and suena[j]:
                 j += 1
             n['fin'] = max(n['ini'] + 0.12, j * paso)
-    # Fin de cada sílaba: se alarga mientras siga sonando la voz, hasta la siguiente sílaba (las notas largas, enteras)
+    # Fin de cada sílaba: se alarga mientras siga sonando la voz, hasta la siguiente sílaba (las notas largas, enteras).
+    # «Sonando» aquí es exigente: energía a menos de 14 dB del pico de la propia sílaba y tono detectado a menos de
+    # 80 ms; si no, en mezclas densas (coros, eco, segundas voces) la voz separada nunca calla, las notas se comían
+    # las pausas entre frases y no quedaba hueco alguno en la letra.
+    db = energia_db(voz, len(t)) if voz is not None else None
+    cerca8 = np.convolve(con_tono.astype(float), np.ones(17), 'same') > 0
     for i, n in enumerate(notas):
         sig = notas[i + 1]['ini'] if i + 1 < len(notas) else n['fin'] + 4
+        a0 = int(n['ini'] / paso)
         j = int(max(n['fin'], n['ini'] + 0.06) / paso)
-        while j < len(t) and j * paso < sig - 0.03 and suena[j]:
+        pico = db[a0:max(a0 + 1, j)].max() if db is not None else 0
+        tope = n['fin'] + 2.5   # una nota no se alarga más de 2,5 s sobre lo que dijo el alineador
+        while j < len(t) and j * paso < sig - 0.03 and j * paso < tope and suena[j] and cerca8[j] and (db is None or db[j] >= pico - 14):
             j += 1
         fin = max(n['fin'], j * paso)
         n['fin'] = max(n['ini'] + 0.08, min(fin, sig - 0.02))
+    # Frases: una por línea de la letra y, además, donde el cantante hace una pausa dentro de una línea (medio segundo
+    # entre sílaba y sílaba, o algo menos si la voz calla de verdad): así las líneas largas de la letra se parten donde
+    # se respira, y la tele enseña el hueco
+    frase = 0
+    for i, n in enumerate(notas):
+        if i:
+            p = notas[i - 1]
+            hueco = n['ini'] - p['fin']
+            callada = (1 - suena[int(p['fin'] / paso):max(int(p['fin'] / paso) + 1, int(n['ini'] / paso))].mean()) if hueco > 0 else 0
+            mismo = n['linea'] == p['linea']
+            antes = sum(1 for x in notas[:i] if x.get('frase') == frase)
+            despues = sum(1 for x in notas[i:] if x['linea'] == n['linea'])
+            if not mismo or ((hueco >= 0.5 or (hueco >= 0.35 and callada >= 0.7)) and antes >= 2 and despues >= 2):
+                frase += 1
+        n['frase'] = frase
     # Tono: el que se sostiene (sin el arranque), y las notas largas solo se parten si el tono cambia de verdad
     out, ultimo = [], None
     for n in notas:
@@ -408,7 +589,7 @@ def construir(lineas, palabras, tiempos, t, midi, idioma, voz=None):
         seg = tramos(t[sel], vl, umbral=1.0, minimo=0.25) if n['fin'] - n['ini'] > 0.6 else []
         if len(seg) > 1:
             for k, (a2, b2, p) in enumerate(seg):
-                out.append({'linea': n['linea'], 'ini': n['ini'] if k == 0 else a2, 'fin': n['fin'] if k == len(seg) - 1 else b2,
+                out.append({'linea': n['linea'], 'frase': n.get('frase', n['linea']), 'ini': n['ini'] if k == 0 else a2, 'fin': n['fin'] if k == len(seg) - 1 else b2,
                             'texto': n['texto'] if k == 0 else '~', 'midi': p})
             ultimo = seg[-1][2]
         else:
@@ -463,6 +644,8 @@ def tramos(ts, ms, umbral=0.8, minimo=0.18):
 
 # ---------------------------------------------------------------------------- 5. UltraStar
 def ultrastar(notas, titulo, artista, idioma, anio, mp3, portada=None):
+    if not notas:
+        raise ValueError('No se ha podido encajar ninguna palabra de la letra con la voz (¿letra o idioma equivocados?)')
     gap = int(round(notas[0]['ini'] * 1000))
     beat = lambda s: int(round((s * 1000 - gap) / BEAT))
     head = [f'#TITLE:{titulo}', f'#ARTIST:{artista}', f'#LANGUAGE:{LANGS.get(idioma, ("", idioma))[1]}']
@@ -478,9 +661,14 @@ def ultrastar(notas, titulo, artista, idioma, anio, mp3, portada=None):
         b, l = beat(n['ini']), max(1, int(round((n['fin'] - n['ini']) * 1000 / BEAT)))
         if prev_fin is not None and b < prev_fin:
             b = prev_fin
-        if i and n['linea'] != notas[i - 1]['linea']:
-            hueco = b - prev_fin
-            body.append(f'- {prev_fin + max(0, min(8, hueco // 2))}')
+        if i and n.get('frase', n['linea']) != notas[i - 1].get('frase', notas[i - 1]['linea']):
+            # Dónde cambia la línea en pantalla dentro de la pausa (convención de los editores UltraStar, como YASS):
+            # pausa corta → justo antes de la frase nueva; pausa de 1-2 s → medio segundo después de callarse;
+            # 2-4 s → al segundo; más → a los dos segundos (la frase vieja se queda un rato, luego se ve la que viene)
+            pausa = (b - prev_fin) * BEAT / 1000
+            tras = 0.5 if pausa < 2 else 1.0 if pausa < 4 else 2.0
+            corte = max(prev_fin, b - int(round(150 / BEAT))) if pausa < 1 else prev_fin + int(round(tras * 1000 / BEAT))
+            body.append(f'- {max(prev_fin, min(corte, b))}')
         texto = n['texto'].replace('\n', ' ')
         body.append(f": {b} {l} {n['midi']} {texto}")
         prev_fin = b + l
@@ -488,29 +676,69 @@ def ultrastar(notas, titulo, artista, idioma, anio, mp3, portada=None):
 
 
 # ---------------------------------------------------------------------------- órdenes
-def analizar(audio, salida, progreso=lambda p, m: None):
+def analizar(audio, salida, progreso=lambda p, m: None, idioma=None):
+    """voz.mp3 + voz-tono.json + voz-tramos.json (tramos de voz y lo que dice, si hay faster-whisper)."""
     os.makedirs(salida, exist_ok=True)
     progreso(5, 'Separando la voz')
     voz = separar_voz(audio)
-    progreso(55, 'Guardando la voz')
+    progreso(50, 'Guardando la voz')
     guardar_mp3(voz, SR, os.path.join(salida, 'voz.mp3'))
-    progreso(65, 'Midiendo el tono')
+    progreso(55, 'Midiendo el tono')
     t, midi = medir_tono(voz)
     json.dump(curva_json(t, midi), open(os.path.join(salida, 'voz-tono.json'), 'w'), separators=(',', ':'))
+    progreso(66, 'Reconociendo lo que dice la voz')
+    tr = tramos_voz(voz)
+    lang, textos, palabras = transcribir(voz, tr, idioma)
+    json.dump({'v': 1, 'modelo': ASR_MODELO if palabras else None, 'idioma': lang,
+               'tramos': [[a, b, (next((x[2] for x in textos if x[0] == a), ''))] for a, b in tr], 'palabras': [list(p) for p in palabras]},
+              open(os.path.join(salida, 'voz-tramos.json'), 'w'), ensure_ascii=False, separators=(',', ':'))
+    log(f'· {len(tr)} tramos de voz, {len(palabras)} palabras reconocidas')
     return voz, t, midi
+
+
+STOP = {   # palabras muy frecuentes, para adivinar el idioma de la letra (el admin propone «es» por defecto)
+    'es': 'que de no la el y a en un es me te se mi tu por lo con para como yo si más ya mi sin del al las los una pero'.split(),
+    'en': 'the you and i to a of in it my me is that on we your this for be all with so like just what but oh got'.split(),
+    'ca': 'que de no la el i a en un és em et es el meu teu per amb com jo si més ja sense del al les els una però hi'.split(),
+    'fr': 'que de ne la le et à un est je tu me te mon ma pour avec comme si plus sans des les une mais pas dans'.split(),
+    'it': 'che di non la il e a un è mi ti io tu per con come se più già senza del al le una ma nel sei'.split(),
+    'pt': 'que de não a o e um é me te eu você por com como se mais já sem do na os as uma mas'.split(),
+    'de': 'der die und ich du nicht das ist ein es zu mit dich mich wir sie auf für von so wie was'.split(),
+}
+
+
+def detectar_idioma(lineas, pedido='es'):
+    """El idioma que más parece la letra; si el pedido no se le acerca, se cambia (y se avisa)."""
+    w = [x for l in lineas for x in re.findall(r"[a-záéíóúàèìòùäëïöüñçœ']+", l.lower())]
+    if len(w) < 20:
+        return pedido
+    punt = {k: sum(1 for x in w if x in set(v)) / len(w) for k, v in STOP.items()}
+    mejor = max(punt, key=punt.get)
+    if mejor != pedido and punt[mejor] >= 0.12 and punt[mejor] >= 2 * punt.get(pedido, 0):
+        log(f'· La letra parece {LANGS.get(mejor, (mejor, mejor))[1]} y no {LANGS.get(pedido, (pedido, pedido))[1]}: se usa {mejor}')
+        return mejor
+    return pedido
 
 
 def crear(audio, letra, salida, titulo, artista, idioma='es', anio=None, mp3='audio.mp3', progreso=lambda p, m: None, lrc=None):
     lineas = [l.strip() for l in letra.replace('\r', '').split('\n') if l.strip()]
     if not lineas:
         raise ValueError('La letra está vacía')
-    voz, t, midi = analizar(audio, salida, progreso)
+    idioma = detectar_idioma(lineas, idioma)
+    voz, t, midi = analizar(audio, salida, progreso, idioma)
     progreso(75, 'Alineando la letra')
     pal = palabras_de(lineas)
-    ven = ventanas_lrc(lineas, lrc, len(voz) / SR) if lrc else None
-    tiempos = alinear(voz, SR, pal, ven)
+    dur = len(voz) / SR
+    rec = json.load(open(os.path.join(salida, 'voz-tramos.json')))
+    tr = [tuple(x[:2]) for x in rec['tramos']]
+    ven = ventanas_asr(lineas, [tuple(x) for x in rec['palabras']], dur, tr)
+    fiables = bool(ven)
+    if not ven and lrc:
+        ven = ventanas_lrc(lineas, lrc, dur)
+    tiempos = alinear(voz, SR, pal, ven or None, fiables)
     progreso(90, 'Sílabas y notas')
     notas = construir(lineas, pal, tiempos, t, midi, idioma, voz)
+    log(f'· {ajustar_a_voz(notas, tr)} frases llevadas a donde arranca la voz')
     txt = ultrastar(notas, titulo, artista, idioma, anio, mp3)
     open(os.path.join(salida, 'cancion.txt'), 'w', encoding='utf-8').write(txt)
     progreso(100, f'{len(notas)} notas en {len(lineas)} frases')
@@ -529,7 +757,7 @@ if __name__ == '__main__':
     ap.add_argument('--lrc', help='letra sincronizada (LRC) para guiar el encaje')
     a = ap.parse_args()
     if a.orden == 'analizar':
-        analizar(a.audio, a.resto[0], lambda p, m: log(f'{p}% {m}'))
+        analizar(a.audio, a.resto[0], lambda p, m: log(f'{p}% {m}'), a.idioma)
     else:
         letra = open(a.resto[0], encoding='utf-8').read()
         crear(a.audio, letra, a.resto[1], a.titulo, a.artista, a.idioma, a.anio, os.path.basename(a.audio), lambda p, m: log(f'{p}% {m}'),

@@ -65,7 +65,7 @@ test('telemetría deshabilitada por defecto', async () => {
   assert.equal((await fetch(base + '/api/telemetry')).status, 404);
   assert.equal((await fetch(base + '/api/telemetry', { method: 'POST', body: '{}' })).status, 404);
 });
-test('sala, entrada de jugador, catálogo y récord funcionan juntos', async () => {
+test('sala, catálogo y jugador funcionan; un récord sin canto se rechaza', async () => {
   const host = new WebSocket(`ws://127.0.0.1:${port}/ws`); sockets.push(host); await once(host, 'open');
   const reply = once(host, 'message'); host.send(JSON.stringify({ type: 'host' }));
   const room = JSON.parse((await reply)[0]); assert.equal(room.type, 'room');
@@ -78,6 +78,7 @@ test('sala, entrada de jugador, catálogo y récord funcionan juntos', async () 
   const invalid = await fetch(base + '/api/records', { method: 'POST', body: JSON.stringify({ code: room.code, token: room.token, players: [null] }) });
   assert.equal(invalid.status, 400);
   const saved = await fetch(base + '/api/records', { method: 'POST', body: JSON.stringify({ code: room.code, token: room.token, song: 'demo', players: [{ name: 'Prueba', score: 1234 }] }) });
-  assert.equal(saved.status, 200);
-  assert.equal((await (await fetch(base + '/api/records')).json()).songs.demo.score, 1234);
+  assert.equal(saved.status, 403);
+  assert.equal((await saved.json()).error, 'sesion');
+  assert.equal((await (await fetch(base + '/api/records')).json()).songs.demo, undefined);
 });

@@ -4,14 +4,16 @@ Corre **en el mismo servidor** que Gramola, como servicio `gramola-trabajador`, 
 límites (2,5 núcleos, 5 GB) para no frenar el resto de webs. Atiende la cola del admin (*Creación*):
 
 - **Crear canción**: audio + letra → `.txt` UltraStar, que queda como **borrador** hasta publicarlo.
-- **Analizar la voz** de una canción que ya existe: `voz.mp3` (la voz sola) y `voz-tono.json` (su tono cada 10 ms),
-  que el editor dibuja para encajar las notas.
+- **Analizar la voz** de una canción que ya existe: `voz.mp3` (la voz sola), `voz-tono.json` (su tono cada 10 ms) y
+  `voz-tramos.json` (tramos de voz por los silencios y lo que dice cada uno, palabra a palabra con su tiempo), que el
+  editor usa para enseñar cada frase sobre su trozo de voz.
 
 | Paso | Herramienta | Notas |
 |---|---|---|
 | Separar la voz | Demucs `htdemucs` | CPU (en un Mac usa la GPU si se ejecuta allí) |
 | Tono | CREPE (modelo pequeño) · pYIN de reserva | En una canción de prueba: 76 % de notas a ±1 semitono frente al 54 % de pYIN |
-| Encajar la letra | Alineador forzado MMS (wav2vec2, torchaudio) | No transcribe: coloca la letra dada. En la prueba, mediana de 65 ms y el 90 % de las palabras a menos de 150 ms de la versión hecha a mano |
+| Tramos y reconocimiento | Energía de la voz separada (silencios de 0,35 s separan; tramos de 0,3 s o más) · faster-whisper `small` (int8, CPU; `GRAMOLA_ASR` cambia el modelo) | ~50 s por canción, 850 MB. Idioma: el de la letra o, si no, el que whisper detecta en el tramo más largo |
+| Encajar la letra | Alineador forzado MMS (wav2vec2, torchaudio) | No transcribe: coloca la letra dada. Cada línea se busca solo en la zona donde la voz la dice (palabras reconocidas emparejadas con la letra en orden, coincidencias largas primero; si no hay reconocimiento, con la letra sincronizada LRC). La primera sílaba de cada frase se lleva a donde arranca la voz de su tramo (si está a menos de 0,6 s). En la prueba, mediana de 65 ms y el 90 % de las palabras a menos de 150 ms de la versión hecha a mano |
 | Sílabas | pyphen | Castellano, inglés, catalán, francés, italiano, portugués, alemán, gallego, euskera |
 
 En el servidor (4 núcleos, con los límites del servicio) tarda unos **5 minutos por canción**, con un pico de ~3,2 GB de memoria.
@@ -26,7 +28,7 @@ uv venv --python /usr/bin/python3.12 .venv
 uv pip install --python .venv/bin/python --index-url https://download.pytorch.org/whl/cpu \
   --extra-index-url https://pypi.org/simple --index-strategy unsafe-best-match \
   "torch==2.8.0+cpu" "torchaudio==2.8.0+cpu" "demucs==4.0.1" "torchcrepe==0.0.24" \
-  "librosa==0.11.0" "pyphen==0.17.2" "soundfile==0.13.1" "numpy<2.3"
+  "librosa==0.11.0" "pyphen==0.17.2" "soundfile==0.13.1" "numpy<2.3" "faster-whisper>=1.2"
 chown -R USUARIO:psacln /opt/gramola-trabajador
 ```
 

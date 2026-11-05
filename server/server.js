@@ -11,6 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
+const { Sesion } = require('./puntuacion');
 
 const PORT = Number(process.env.PORT || 8877);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -20,7 +21,8 @@ const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const SERVE_STATIC = process.env.SERVE_STATIC !== '0';
 const ENABLE_TELEMETRY = process.env.ENABLE_TELEMETRY === '1';
 const MAX_PLAYERS = 8;
-const ROOM_TTL_MS = 15 * 60 * 1000; // la sala aguanta 15 min sin tele conectada
+const MAX_ROOMS = Number(process.env.MAX_ROOMS || 500);   // tope de salas a la vez (hay 6.390 códigos; sin tope, al agotarse el servidor se quedaría colgado)
+const ROOM_TTL_MS = 3 * 60 * 1000;  // la sala se cierra sola a los 3 min sin tele conectada (orden del usuario, 03-nov)
 // Un color por micro: J1..J8
 const COLORS = ['#ff4fa3', '#3fd0ff', '#ffd23f', '#7cff6b', '#b38cff', '#ff8a3d', '#4fffd8', '#ff5a5a'];
 
@@ -32,16 +34,41 @@ function readText(file) {
   return utf8.includes('�') ? buf.toString('latin1') : utf8.replace(/^﻿/, '');
 }
 
+// Lee un JSON de datos. Si el fichero existe pero está roto (disco lleno a medias, edición a mano), no se sustituye en
+// silencio por «vacío» y se pisa en la siguiente escritura: se aparta con fecha y se avisa en el registro
+function leerJson(file, def) {
+  let raw;
+  try { raw = fs.readFileSync(file, 'utf8'); } catch { return def; }
+  try { const v = JSON.parse(raw); return v == null ? def : v; } catch (e) {
+    const apartado = `${file}.corrupto-${new Date().toISOString().replace(/[:.]/g, '-')}`;
+    try { fs.renameSync(file, apartado); } catch {}
+    console.error(`DATOS: ${file} no es JSON válido (${e.message}); apartado en ${apartado}`);
+    return def;
+  }
+}
+// Escritura atómica: a un temporal y renombrar (un corte a medias nunca deja el fichero vacío o truncado)
+function writeAtomic(file, data) { fs.writeFileSync(file + '.tmp', data); fs.renameSync(file + '.tmp', file); }
+// Comprobaciones al arrancar: sin datos escribibles no se arranca (systemd lo muestra); sin canciones, aviso
+try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.accessSync(DATA_DIR, fs.constants.W_OK); } catch (e) { console.error('No se puede escribir en la carpeta de datos', DATA_DIR + ':', e.message); process.exit(1); }
+if (!fs.existsSync(SONGS_DIR)) console.error('AVISO: la carpeta de canciones no existe:', SONGS_DIR);
+
 const num = s => parseFloat(String(s || '0').replace(',', '.')) || 0;
 let songsCache = { at: 0, list: [] };
+// Lector UltraStar: el mismo fichero que usa la tele (web/js/ultrastar.js), para que la partitura sea idéntica
+let ultrastar = null;
+const parser = () => ultrastar || (ultrastar = import(require('url').pathToFileURL(path.join(WEB_DIR, 'js', 'ultrastar.js')).href).catch(e => { ultrastar = null; throw e; }));
+async function loadChart(songId) {
+  const dir = path.join(SONGS_DIR, songId);
+  const txt = fs.readdirSync(dir).find(f => f.toLowerCase().endsWith('.txt'));
+  if (!txt) throw new Error('sin .txt');
+  const { parseUltraStar } = await parser();
+  return parseUltraStar(readText(path.join(dir, txt)));
+}
 // Novedades: canciones marcadas desde la administración para que salgan primero en la tele ({ id: fecha })
 const NEW_FILE = path.join(DATA_DIR, 'novedades.json');
-let novedades = {}, novedadesMtime = 0;
-try { novedades = JSON.parse(fs.readFileSync(NEW_FILE, 'utf8')) || {}; } catch {}
+let novedades = leerJson(NEW_FILE, {}), novedadesMtime = 0;
 function saveNovedades() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(NEW_FILE + '.tmp', JSON.stringify(novedades));
-  fs.renameSync(NEW_FILE + '.tmp', NEW_FILE);
+  writeAtomic(NEW_FILE, JSON.stringify(novedades));
   try { novedadesMtime = fs.statSync(NEW_FILE).mtimeMs; } catch {}
   songsCache.at = 0;
 }
@@ -121,36 +148,36 @@ function scanSongs(force) {
 
 // ======================================================================= récords
 const RECORDS_FILE = path.join(DATA_DIR, 'records.json');
-let records = { songs: {}, singers: {}, plays: {} };
-try { records = { ...records, ...JSON.parse(fs.readFileSync(RECORDS_FILE, 'utf8')) }; } catch {}
+let records = { songs: {}, singers: {}, plays: {}, ...leerJson(RECORDS_FILE, {}) };
 
-function saveRecords() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  const tmp = RECORDS_FILE + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(records));
-  fs.renameSync(tmp, RECORDS_FILE);
-}
+function saveRecords() { writeAtomic(RECORDS_FILE, JSON.stringify(records)); }
 
-const clean = (s, n) => String(s || '').replace(/[\u0000-\u001f]/g, '').trim().slice(0, n);
+// Texto de usuario: sin caracteres de control ni invisibles (anchura cero, marcas de dirección bidi: un nombre que
+// parece vacío o que se escribe al revés), recortado
+const clean = (s, n) => String(s || '').replace(/[\u0000-\u001f\u007f​-‏‪-‮⁦-⁩﻿]/g, '').trim().slice(0, n);
+const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);   // (un cantante llamado «constructor» no toca el prototipo)
+// Carpeta de canción tal cual (sin quitar invisibles: alguna carpeta creada desde Spotify los lleva y tiene que coincidir)
+const songKey = s => String(s || '').replace(/[\u0000-\u001f]/g, '').slice(0, 200);
 
 function addRecord(body) {
   const songId = clean(body.song, 200);
   if (!songId || !Array.isArray(body.players)) return null;
   const now = new Date().toISOString().slice(0, 10);
-  const best = records.songs[songId] || null;
+  const best = own(records.songs, songId) ? records.songs[songId] : null;
   let isNew = false;
-  records.plays[songId] = (records.plays[songId] || 0) + 1;
+  records.plays[songId] = (own(records.plays, songId) ? records.plays[songId] : 0) + 1;
   for (const p of body.players.slice(0, MAX_PLAYERS)) {
+    if (!p || typeof p !== 'object') continue;
     const name = clean(p.name, 16);
     const score = Math.max(0, Math.min(10000, Math.round(+p.score || 0)));
     const streak = Math.max(0, Math.min(10000, Math.round(+p.streak || 0)));
-    if (!name || p.bot) continue;
-    const s = records.singers[name] || { songs: 0, best: 0, streak: 0 };
+    if (!name || p.bot || name === '__proto__') continue;
+    const s = own(records.singers, name) ? records.singers[name] : { songs: 0, best: 0, streak: 0 };
     s.songs++;
     s.best = Math.max(s.best, score);
     s.streak = Math.max(s.streak, streak);
     records.singers[name] = s;
-    const cur = records.songs[songId];
+    const cur = own(records.songs, songId) ? records.songs[songId] : null;
     if (!cur || score > cur.score) {
       records.songs[songId] = { score, name, date: now, title: clean(body.title, 80), artist: clean(body.artist, 80) };
       if (score > 0) isNew = true;
@@ -167,10 +194,12 @@ const rooms = new Map(); // code -> room
 const CONS = 'BCDFGJKLMNPRSTVZ', VOW = 'AEIOU';
 const BAD = new Set(['PUTA', 'CACA', 'PEDO', 'CULO', 'MOCO', 'PIPI', 'PENE', 'TETA', 'COCA', 'NAZI']);
 function newCode() {
-  for (;;) {
+  // Con el tope de salas siempre quedan códigos libres; el límite de intentos es por si acaso (nunca un bucle sin fin)
+  for (let i = 0; i < 5000; i++) {
     const c = CONS[crypto.randomInt(CONS.length)] + VOW[crypto.randomInt(5)] + CONS[crypto.randomInt(CONS.length)] + VOW[crypto.randomInt(5)];
     if (!rooms.has(c) && !BAD.has(c)) return c;
   }
+  return null;
 }
 
 function send(ws, msg) {
@@ -202,15 +231,21 @@ function freeSlot(room) {
 }
 
 function createRoom(hostWs) {
-  const room = { code: newCode(), hostToken: crypto.randomUUID(), host: hostWs, players: new Map(), nextId: 1, state: null, emptySince: null, createdAt: Date.now(), hostInfo: hostWs && hostWs.info };
+  // null si no cabe ninguna sala más (la tele recibe un error y lo vuelve a intentar al reconectar)
+  if (rooms.size >= MAX_ROOMS) return null;
+  const code = newCode();
+  if (!code) return null;
+  const room = { code, hostToken: crypto.randomUUID(), host: hostWs, players: new Map(), nextId: 1, state: null, emptySince: null, createdAt: Date.now(), hostInfo: hostWs && hostWs.info };
   rooms.set(room.code, room);
   admin.count('rooms');
   admin.ev('room', `Sala ${room.code} abierta`, { room: room.code, ...(hostWs && hostWs.info ? { country: hostWs.info.country } : {}) });
   return room;
 }
 
-function closeRoom(room) {
+function closeRoom(room, avisarTele = false) {
+  room.closed = true;   // los cierres de los móviles que vienen detrás ya no anuncian nada a la tele
   toPlayers(room, { type: 'closed' });
+  if (avisarTele) toHost(room, { type: 'closed' });   // (cerrada desde el admin: la tele pide una sala nueva; con «new-code» no hace falta)
   for (const p of room.players.values()) p.ws && p.ws.close();
   rooms.delete(room.code);
   admin.ev('room', `Sala ${room.code} cerrada (${room.players.size} jugadores, ${Math.round((Date.now() - room.createdAt) / 60000)} min)`, { room: room.code });
@@ -219,14 +254,54 @@ function closeRoom(room) {
 setInterval(() => {
   const now = Date.now();
   for (const room of rooms.values()) {
-    if (!room.host && room.emptySince && now - room.emptySince > ROOM_TTL_MS) closeRoom(room);
+    if (!room.host && room.emptySince && now - room.emptySince > ROOM_TTL_MS) { closeRoom(room); continue; }
+    // Jugadores fantasma: quien cerró la app sin «Salir» ocupaba su color para siempre (y la sala se llenaba)
+    let cambio = false;
+    for (const p of [...room.players.values()]) if (!p.ws && !p.bot && p.offlineAt && now - p.offlineAt > 10 * 60e3) { room.players.delete(p.id); cambio = true; }
+    if (cambio) announce(room);
   }
-}, 60 * 1000).unref();
+  for (const [ip, f] of fallos) if (now - f.at > 60e3) fallos.delete(ip);
+}, 30 * 1000).unref();   // (cada 30 s: el cierre a los 3 min sin tele llega con poco retraso)
+
+// Adivinar códigos de sala: 6.390 posibles con hasta 500 abiertas → sin freno, 1 acierto cada 13 intentos.
+// Más de 10 intentos fallidos por minuto y dirección → «espera un minuto»
+const fallos = new Map();
+function intentoFallido(ip) { const now = Date.now(); const f = fallos.get(ip) || { n: 0, at: now }; if (now - f.at > 60e3) { f.n = 0; f.at = now; } f.n++; fallos.set(ip, f); }
+function bloqueado(ip) { const f = fallos.get(ip); return !!f && Date.now() - f.at <= 60e3 && f.n >= 10; }
+
+// Salas persistidas al reiniciar (despliegue): la tele recupera la suya con «recovered» y los móviles con su token,
+// y el reinicio pasa casi inadvertido (solo se pierde la cuenta de la canción en curso, que no da récord)
+const ROOMS_FILE = path.join(DATA_DIR, 'salas.json');
+function saveRooms() {
+  const l = [...rooms.values()].filter(r => !r.closed).map(r => ({
+    code: r.code, hostToken: r.hostToken, nextId: r.nextId, createdAt: r.createdAt,
+    players: [...r.players.values()].map(p => ({ id: p.id, token: p.token, name: p.name, slot: p.slot, bot: !!p.bot })),
+  }));
+  writeAtomic(ROOMS_FILE, JSON.stringify({ at: Date.now(), rooms: l }));
+}
+function restoreRooms() {
+  const d = leerJson(ROOMS_FILE, null);
+  try { fs.unlinkSync(ROOMS_FILE); } catch {}
+  if (!d || !Array.isArray(d.rooms) || Date.now() - (+d.at || 0) > ROOM_TTL_MS) return;
+  let n = 0;
+  for (const r of d.rooms) {
+    if (!/^[A-Z]{4}$/.test(String(r.code)) || rooms.has(r.code) || typeof r.hostToken !== 'string') continue;
+    const room = { code: r.code, hostToken: r.hostToken, host: null, players: new Map(), nextId: +r.nextId || 1, state: null, emptySince: Date.now(), createdAt: +r.createdAt || Date.now(), hostInfo: null };
+    for (const p of (Array.isArray(r.players) ? r.players : []).slice(0, MAX_PLAYERS)) {
+      if (!p || typeof p.token !== 'string') continue;
+      room.players.set(+p.id, { id: +p.id, token: p.token, name: clean(p.name, 16) || 'Cantante', slot: Math.max(1, Math.min(MAX_PLAYERS, +p.slot || 1)), ws: null, bot: !!p.bot, offlineAt: Date.now() });
+    }
+    rooms.set(room.code, room); n++;
+  }
+  if (n) console.log(`salas restauradas tras el reinicio: ${n}`);
+}
 
 // ======================================================================= HTTP
 const telemetry = [];
+// Cabeceras de seguridad comunes a todo lo que sirve Node (la tele y el móvil usan micro y cámara; nada más)
+const SEG = { 'x-content-type-options': 'nosniff', 'referrer-policy': 'strict-origin-when-cross-origin', 'permissions-policy': 'microphone=(self), camera=(self), geolocation=(), payment=(), usb=()' };
 function json(res, code, data) {
-  res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+  res.writeHead(code, { ...SEG, 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
   res.end(JSON.stringify(data));
 }
 
@@ -241,12 +316,20 @@ function readBody(req, max = 32 * 1024) {
     });
     req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
     req.on('error', reject);
+    req.on('close', () => reject(new Error('cortado')));   // (si ya llegó «end», no hace nada)
   });
+}
+// Cuerpo JSON que tiene que ser un objeto (ni null, ni lista, ni texto suelto): si no, error 400
+async function readJsonBody(req, max) {
+  const body = JSON.parse(await readBody(req, max));
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('objeto');
+  return body;
 }
 
 // Pase de tele: las canciones (con derechos) solo se sirven a una tele con sala abierta
 function cookie(req, name) {
   const m = (req.headers.cookie || '').match(new RegExp('(?:^|; )' + name + '=([^;]+)'));
+  // Una cookie mal codificada («gtv=%») no puede tumbar el servidor: cuenta como que no hay cookie
   try { return m ? decodeURIComponent(m[1]) : null; } catch { return null; }
 }
 function hasTvPass(req) {
@@ -265,31 +348,31 @@ const admin = require('./admin')({
   DATA_DIR, SONGS_DIR, WEB_DIR, rooms, COLORS,
   scanSongs, songsChanged: () => { songsCache.at = 0; },
   novedades: () => novedades, saveNovedades, records: () => records, saveRecords, telemetry: () => telemetry,
-  sendTo: send, closeRoom: r => closeRoom(r), announce: r => announce(r), wsCount: () => wss.clients.size,
+  sendTo: send, closeRoom: r => closeRoom(r, true), announce: r => announce(r), wsCount: () => wss.clients.size,
+  leerJson, writeAtomic, saveRooms,
 });
 
+// Cualquier fallo no previsto en una petición responde 500 y el servidor sigue (antes, un error sin capturar lo tumbaba
+// y se caían todas las salas hasta que systemd lo levantaba)
 const server = http.createServer((req, res) => {
   handleHttp(req, res).catch(e => {
-    console.error('http:', e.message);
+    console.error('http:', e && e.message);
     if (res.headersSent) return res.destroy();
     json(res, 500, { error: 'Error interno' });
   });
 });
 
-async function readJsonBody(req, max) {
-  const body = JSON.parse(await readBody(req, max));
-  if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('objeto JSON requerido');
-  return body;
-}
-
 async function handleHttp(req, res) {
-  let url;
-  try {
-    const parsed = new URL(req.url, 'http://x');
-    url = { pathname: decodeURIComponent(parsed.pathname), search: parsed.search, searchParams: parsed.searchParams };
-  } catch { return json(res, 400, { error: 'ruta' }); }
+  // («//songs/…» no es un host: con varias barras al principio la URL se lee como ruta)
+  const parsed = new URL(String(req.url || '/').replace(/^\/{2,}/, '/'), 'http://x');
+  // La ruta se descodifica y normaliza UNA sola vez («//songs», «/app/../songs» o «/%73ongs» son «/songs») y con esa
+  // misma ruta se miran los permisos y se sirve el fichero: así no hay forma de saltarse el pase de tele
+  let pathname;
+  try { pathname = path.posix.normalize(decodeURIComponent(parsed.pathname)); } catch { return json(res, 400, { error: 'ruta' }); }
+  if (pathname.includes('\0')) return json(res, 400, { error: 'ruta' });
+  const url = { pathname, search: parsed.search, searchParams: parsed.searchParams };
   const host = String(req.headers.host || '');
-  if (await admin.handle(req, res, url)) return;
+  if (await admin.handle(req, res, parsed)) return;   // el admin trabaja con la ruta tal cual llega (descodifica cada trozo)
   // Subdominio micro.: la app del micro en la raíz
   if (MICRO_HOST.test(host) && MICRO_FILES[url.pathname] && (req.method === 'GET' || req.method === 'HEAD')) {
     return serveStatic(req, res, MICRO_FILES[url.pathname]);
@@ -320,11 +403,18 @@ async function handleHttp(req, res) {
   // Los borradores (canciones creadas sin revisar) no salen en la tele
   // (en la vista previa del admin también las que están en preparación)
   if (req.method === 'GET' && url.pathname === '/api/songs') return json(res, 200, scanSongs().filter(s => !s.draft || (url.searchParams.has('preparacion') && admin.isAuthed(req))));
-  if (req.method === 'GET' && url.pathname === '/api/health') return json(res, 200, { ok: true, rooms: rooms.size });
+  if (req.method === 'GET' && url.pathname === '/api/health') {
+    // (singing: cuántos están cantando ahora mismo; el despliegue espera a que sea 0)
+    let singing = 0; const t = Date.now();
+    for (const r of rooms.values()) for (const p of r.players.values()) if (p.pitchAt && t - p.pitchAt < 3000) singing++;
+    return json(res, 200, { ok: true, rooms: rooms.size, singing, songs: scanSongs().length });
+  }
   if (req.method === 'GET' && url.pathname === '/api/records') return json(res, 200, records);
-  // Telemetría de rendimiento de las pruebas en la tele (solo números; se guarda en memoria, últimas 300)
+  // Telemetría de rendimiento de las pruebas en la tele (solo números; se guarda en memoria, últimas 300).
+  // La manda una tele con sala abierta y solo la ve el admin.
   if (req.method === 'POST' && url.pathname === '/api/telemetry') {
     if (!ENABLE_TELEMETRY) return json(res, 404, { error: 'No disponible' });
+    if (!hasTvPass(req)) return json(res, 403, { error: 'sala' });
     let body;
     try { body = await readJsonBody(req, 4096); } catch { return json(res, 400, { error: 'json' }); }
     const pick = ['fps', 'p95', 'worst', 'heap', 'screen', 'singers', 'video', 'cam', 'note', 'ua'];
@@ -335,23 +425,45 @@ async function handleHttp(req, res) {
   }
   if (req.method === 'GET' && url.pathname === '/api/telemetry') {
     if (!ENABLE_TELEMETRY) return json(res, 404, { error: 'No disponible' });
-    if (!admin.isAuthed(req)) return json(res, 401, { error: 'Sesión requerida' });
+    if (!admin.isAuthed(req)) return json(res, 401, { error: 'admin' });
     return json(res, 200, telemetry.slice(-100));
   }
   if (req.method === 'POST' && url.pathname === '/api/records') {
     // Solo una tele con sala abierta puede guardar (código + token de la sala)
     let body;
     try { body = await readJsonBody(req); } catch { return json(res, 400, { error: 'json' }); }
-    if (!Array.isArray(body.players) || body.players.some(p => !p || typeof p !== 'object' || Array.isArray(p))) return json(res, 400, { error: 'jugadores' });
     const room = rooms.get(String(body.code || '').toUpperCase());
     if (!room || room.hostToken !== body.token) return json(res, 403, { error: 'sala' });
-    const r = addRecord(body);
+    if (!Array.isArray(body.players) || body.players.some(p => !p || typeof p !== 'object')) return json(res, 400, { error: 'jugadores' });
+    // Solo canciones de la biblioteca: que nadie llene el salón de la fama de canciones inventadas
+    const songId = songKey(body.song);
+    const entry = scanSongs().find(s => s.id === songId);
+    if (!entry) return json(res, 400, { error: 'cancion' });
+    // Lo que se guarda no lo decide la tele: tiene que haber una canción cantada entera en esta sala (mensaje «sing» +
+    // reloj), cada jugador tiene que ser uno de la sala (no un bot, con su nombre de verdad) y los puntos no pueden
+    // pasar de lo que el servidor ha visto acertar con la voz que ha reenviado (ver server/puntuacion.js)
+    const sg = room.sing;
+    if (!sg || sg.song !== songId) return json(res, 403, { error: 'sesion' });
+    if (sg.saved) return json(res, 409, { error: 'repetida' });
+    if (!sg.complete()) return json(res, 403, { error: 'incompleta' });
+    const players = [], vistos = [];
+    for (const p of body.players.slice(0, MAX_PLAYERS)) {
+      const pl = room.players.get(+p.id);
+      if (!pl || pl.bot) continue;
+      const v = sg.verify(pl.id, p.score, p.streak);
+      if (!v) continue;
+      players.push({ name: pl.name, score: v.score, streak: v.streak });
+      vistos.push(`${pl.name} ${v.score}${v.score !== Math.round(+p.score || 0) ? ` (la tele decía ${Math.round(+p.score || 0)}, visto ${v.visto.score})` : ''}`);
+    }
+    let r;
+    try { r = addRecord({ song: songId, title: entry.title, artist: entry.artist, players }); }
+    catch (e) { console.error('records:', e.message); return json(res, 500, { error: 'guardar' }); }   // (disco lleno: se puede reintentar)
+    sg.saved = true;
     if (r) {
       admin.count('plays');
-      const who = (Array.isArray(body.players) ? body.players : []).filter(p => !p.bot).map(p => `${clean(p.name, 16)} ${Math.round(+p.score || 0)}`).join(', ');
-      admin.ev('play', `Sala ${room.code}: «${clean(body.title, 80)}»${who ? ' — ' + who : ''}${r.isNew ? ' · ¡récord!' : ''}`, { room: room.code, song: clean(body.song, 200) });
+      admin.ev('play', `Sala ${room.code}: «${entry.title}»${vistos.length ? ' — ' + vistos.join(', ') : ''}${r.isNew ? ' · ¡récord!' : ''}`, { room: room.code, song: songId });
     }
-    return r ? json(res, 200, r) : json(res, 400, { error: 'datos' });
+    return r ? json(res, 200, { ...r, players }) : json(res, 400, { error: 'datos' });
   }
   if (SERVE_STATIC && (req.method === 'GET' || req.method === 'HEAD')) return serveStatic(req, res, url.pathname);
   res.writeHead(404); res.end();
@@ -367,27 +479,33 @@ const MIME = {
 };
 
 function serveStatic(req, res, pathname) {
-  const rel = pathname; // La ruta ya se decodificó antes de comprobar permisos.
+  // pathname llega ya descodificado y normalizado (es el mismo con el que se han mirado los permisos)
+  const rel = pathname;
   const isSong = rel.startsWith('/songs/');
   const root = isSong ? SONGS_DIR : WEB_DIR;
   let file = path.normalize(path.join(root, isSong ? rel.slice(7) : rel));
   if (file !== root && !file.startsWith(root + path.sep)) { res.writeHead(403); return res.end(); }
+  // Las canciones viven dentro de web/ (web/songs): por la web nunca se sirve nada de esa carpeta sin pasar por /songs/
+  if (!isSong && (file === SONGS_DIR || file.startsWith(SONGS_DIR + path.sep))) { res.writeHead(403); return res.end(); }
   fs.stat(file, (err, st) => {
     if (!err && st.isDirectory()) {
-      if (!pathname.endsWith('/')) { res.writeHead(301, { location: pathname + '/' }); return res.end(); }
+      if (!pathname.endsWith('/')) { res.writeHead(301, { location: pathname.split('/').map(encodeURIComponent).join('/') + '/' }); return res.end(); }
       file = path.join(file, 'index.html');
       return fs.stat(file, (e2, st2) => out(e2, st2));
     }
     out(err, st);
   });
   function out(err, st) {
+    try { out2(err, st); } catch (e) { console.error('static:', e.message); if (!res.headersSent) res.writeHead(500); res.end(); }
+  }
+  const stream = (opts) => fs.createReadStream(file, opts).on('error', () => res.destroy()).pipe(res);   // (un fichero que desaparece a medias no tumba nada)
+  function out2(err, st) {
     if (err || !st.isFile()) { res.writeHead(404, { 'content-type': 'text/plain' }); return res.end('No encontrado'); }
     const type = MIME[path.extname(file).toLowerCase()] || 'application/octet-stream';
     const long = /\/assets\/|\/audio\//.test(rel) || isSong;
     const headers = {
-      'content-type': type, 'accept-ranges': 'bytes',
+      ...SEG, 'content-type': type, 'accept-ranges': 'bytes',
       'cache-control': type.startsWith('text/html') || type.startsWith('text/javascript') ? 'no-cache' : long ? 'public, max-age=86400' : 'public, max-age=300',
-      'x-content-type-options': 'nosniff',
     };
     const m = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
     if (m && (m[1] || m[2])) {
@@ -396,7 +514,7 @@ function serveStatic(req, res, pathname) {
       if (start > end || start >= st.size || start < 0) { res.writeHead(416, { 'content-range': `bytes */${st.size}` }); return res.end(); }
       res.writeHead(206, { ...headers, 'content-range': `bytes ${start}-${end}/${st.size}`, 'content-length': end - start + 1 });
       if (isSong && req.method === 'GET') admin.count('songBytes', end - start + 1);
-      return req.method === 'HEAD' ? res.end() : fs.createReadStream(file, { start, end }).pipe(res);
+      return req.method === 'HEAD' ? res.end() : stream({ start, end });
     }
     // Páginas: la dirección pública (para las vistas previas en redes) sale de la petición, no va escrita en el código
     if (type.startsWith('text/html')) {
@@ -407,23 +525,54 @@ function serveStatic(req, res, pathname) {
     }
     res.writeHead(200, { ...headers, 'content-length': st.size });
     if (isSong && req.method === 'GET') admin.count('songBytes', st.size);
-    return req.method === 'HEAD' ? res.end() : fs.createReadStream(file).pipe(res);
+    return req.method === 'HEAD' ? res.end() : stream();
   }
 }
 
 // ======================================================================= WebSocket
-const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 64 * 1024 });   // (la foto del jugador ~10 KB)
+// Solo se aceptan sockets abiertos desde la propia web (tele, micro o admin del mismo dominio, o pruebas en local):
+// una página ajena no puede usar los navegadores de sus visitantes para abrir salas o entrar en ellas.
+// (los clientes que no son navegador no mandan Origin: se admiten)
+function origenPermitido(req) {
+  const o = String(req.headers.origin || '');
+  if (!o) return true;
+  let h;
+  try { h = new URL(o).hostname.toLowerCase(); } catch { return false; }
+  if (/^(localhost|127\.0\.0\.1|\d+\.\d+\.\d+\.\d+)$/.test(h) || h.endsWith('.localhost')) return true;
+  const base = String(req.headers.host || '').toLowerCase().split(':')[0].replace(/^(www|micro|admin)\./, '');
+  return !!base && (h === base || h.endsWith('.' + base));
+}
+// Conexiones a la vez por dirección IP (según Cloudflare): un local con 20 teles y 160 móviles entra de sobra
+const MAX_WS_POR_IP = 300;
+const wsPorIp = new Map();
+const ipDe = req => String(req.headers['cf-connecting-ip'] || req.socket.remoteAddress || '');
+const wss = new WebSocketServer({
+  server, path: '/ws', maxPayload: 64 * 1024,   // (la foto del jugador ~10 KB)
+  verifyClient: ({ req }) => origenPermitido(req) && (wsPorIp.get(ipDe(req)) || 0) < MAX_WS_POR_IP,
+});
 
 wss.on('connection', (ws, req) => {
   ws.isAlive = true;
+  const ip = ipDe(req);
+  wsPorIp.set(ip, (wsPorIp.get(ip) || 0) + 1);
+  ws.once('close', () => { const n = (wsPorIp.get(ip) || 1) - 1; if (n <= 0) wsPorIp.delete(ip); else wsPorIp.set(ip, n); });
   // Para el admin: de dónde se conecta (país según Cloudflare) y con qué aparato
   ws.info = { country: String(req.headers['cf-ipcountry'] || ''), ua: String(req.headers['user-agent'] || '').slice(0, 200), at: Date.now() };
   ws.on('pong', () => { ws.isAlive = true; });
   let role = null; // 'host' | 'player'
   let room = null;
   let player = null;
+  // Ritmo: un móvil manda 25 lecturas por segundo y la tele poco más; quien pase de 300 mensajes en un segundo se va
+  let rate = { n: 0, at: 0 };
 
   ws.on('message', raw => {
+    // Un mensaje raro no puede tumbar el servidor: se registra y se sigue
+    try { onMessage(raw); } catch (e) { console.error('ws:', e.message); }
+  });
+  function onMessage(raw) {
+    const nowS = Date.now() / 1000 | 0;
+    if (rate.at !== nowS) rate = { n: 0, at: nowS };
+    if (++rate.n > 300) return ws.terminate();
     let m;
     try { m = JSON.parse(raw); } catch { return; }
     if (!m || typeof m.type !== 'string') return;
@@ -431,6 +580,8 @@ wss.on('connection', (ws, req) => {
     // Ping de aplicación para medir la latencia (tele y móviles)
     if (m.type === 'ping') return send(ws, { type: 'pong', t: m.t });
 
+    // Una tele cuya sala se ha cerrado (desde el admin) pide otra por el mismo socket
+    if (m.type === 'host' && role === 'host' && (!room || room.closed)) { role = null; room = null; }
     // Un móvil ya dentro de una sala puede consultar otra o cambiarse a otra (escanear otro QR)
     if (role === 'player' && (m.type === 'peek' || m.type === 'join')) {
       const target = String(m.code || '').toUpperCase().trim();
@@ -457,6 +608,7 @@ wss.on('connection', (ws, req) => {
           room.host = ws;
         } else {
           room = createRoom(ws);
+          if (!room) return send(ws, { type: 'error', code: 'busy', msg: 'El servidor está lleno de salas; prueba en unos minutos' });
         }
         room.emptySince = null;
         room.hostInfo = ws.info;
@@ -468,20 +620,23 @@ wss.on('connection', (ws, req) => {
       }
       // El móvil pregunta por la sala antes de elegir color
       if (m.type === 'peek') {
+        if (bloqueado(ip)) return send(ws, { type: 'error', code: 'slow', msg: 'Demasiados intentos. Espera un minuto.' });
         const r = rooms.get(String(m.code || '').toUpperCase().trim());
-        if (!r) return send(ws, { type: 'error', code: 'no-room', msg: 'No hay ninguna sala con ese código' });
+        if (!r) { intentoFallido(ip); return send(ws, { type: 'error', code: 'no-room', msg: 'No hay ninguna sala con ese código' }); }
         const mine = m.token && [...r.players.values()].find(p => p.token === m.token);
         return send(ws, { type: 'peek', code: r.code, taken: takenSlots(r, mine && mine.id), mySlot: mine ? mine.slot : 0, full: !mine && r.players.size >= MAX_PLAYERS, hostOnline: !!r.host, colors: COLORS });
       }
       if (m.type === 'join') {
+        if (bloqueado(ip)) return send(ws, { type: 'error', code: 'slow', msg: 'Demasiados intentos. Espera un minuto.' });
         const code = String(m.code || '').toUpperCase().trim();
         room = rooms.get(code);
-        if (!room) return send(ws, { type: 'error', code: 'no-room', msg: 'No hay ninguna sala con ese código' });
+        if (!room) { intentoFallido(ip); return send(ws, { type: 'error', code: 'no-room', msg: 'No hay ninguna sala con ese código' }); }
         const name = clean(m.name, 16) || 'Cantante';
         let slot = Math.round(+m.slot || 0);
         player = m.token && [...room.players.values()].find(p => p.token === m.token);
         if (!player && room.players.size >= MAX_PLAYERS) {
-          toHost(room, { type: 'full-attempt', name });
+          // (el aviso a la tele, como mucho uno cada 10 s: un desconocido no puede sacar el modal a voluntad)
+          if (!room.lastFull || Date.now() - room.lastFull > 10e3) { room.lastFull = Date.now(); toHost(room, { type: 'full-attempt', name }); }
           room = null;
           return send(ws, { type: 'error', code: 'full', msg: 'La sala está llena (8 jugadores)' });
         }
@@ -491,8 +646,9 @@ wss.on('connection', (ws, req) => {
           slot = player ? player.slot : freeSlot(room);
         }
         if (player) {
-          if (player.ws && player.ws !== ws) player.ws.close();
-          Object.assign(player, { ws, name, slot });
+          // El mismo token desde otro aparato: el anterior se entera (si no, los dos se cerraban por turnos sin fin)
+          if (player.ws && player.ws !== ws) { send(player.ws, { type: 'replaced' }); player.ws.close(); }
+          Object.assign(player, { ws, name, slot, offlineAt: null });
         } else {
           player = { id: room.nextId++, token: crypto.randomUUID(), name, slot, ws, joinedAt: Date.now(), info: ws.info };
           room.players.set(player.id, player);
@@ -516,7 +672,9 @@ wss.on('connection', (ws, req) => {
         const lat = typeof m.lat === 'number' ? Math.max(0, Math.min(2000, Math.round(m.lat))) : 0;
         player.lat = lat; player.lastV = v; player.lastN = n;
         if (n !== null && v > 0.02) player.pitchAt = Date.now();
-        return toHost(room, { type: 'pitch', p: player.id, n, v, lat });
+        toHost(room, { type: 'pitch', p: player.id, n, v, lat });
+        if (room.sing) try { room.sing.sample(player.id, n, v, lat); } catch (e) { console.error('puntuacion:', e.message); }
+        return;
       }
       if (m.type === 'input') return toHost(room, { type: 'input', p: player.id, key: clean(m.key, 8) });
       // Foto del jugador (cámara frontal, JPEG pequeño): solo en memoria mientras dure la sala
@@ -526,9 +684,11 @@ wss.on('connection', (ws, req) => {
         return toHost(room, { type: 'photo', p: player.id, data });
       }
       if (m.type === 'leave') {
-        admin.ev('player', `${player.name} sale de la sala ${room.code}`, { room: room.code });
-        room.players.delete(player.id);
-        announce(room);
+        if (!room.closed) {
+          admin.ev('player', `${player.name} sale de la sala ${room.code}`, { room: room.code });
+          room.players.delete(player.id);
+          announce(room);
+        }
         return ws.close();
       }
       return;
@@ -540,6 +700,20 @@ wss.on('connection', (ws, req) => {
         room.stateAt = Date.now();
         return toPlayers(room, room.state);
       }
+      if (m.type === 'sing') {
+        // Empieza una canción: el servidor prepara su cuenta (partitura + cantantes). Si algo falla, no hay sesión y no
+        // se aceptará el récord de esta canción (mejor sin récord que con uno sin comprobar)
+        const songId = songKey(m.song), r = room;
+        r.sing = null;
+        if (!songId || !scanSongs().some(s => s.id === songId)) return;
+        loadChart(songId).then(song => {
+          if (r.closed || r.host !== ws) return;
+          r.sing = new Sesion(songId, song, { duo: !!m.duo, delay: m.delay, singers: Array.isArray(m.singers) ? m.singers.slice(0, MAX_PLAYERS) : [] });
+          if (m.clock) r.sing.setClock(m.clock);
+        }).catch(e => console.error('puntuacion: no se pudo leer la partitura de', songId, e.message));
+        return;
+      }
+      if (m.type === 'clock') { if (room.sing) room.sing.setClock(m); return; }
       if (m.type === 'kick') {
         const p = room.players.get(m.p);
         if (p) { send(p.ws, { type: 'kicked' }); p.ws && p.ws.close(); room.players.delete(m.p); }
@@ -558,19 +732,22 @@ wss.on('connection', (ws, req) => {
         // Ajustes → «Nuevo código de sala»: cierra la sala y abre otra
         closeRoom(room);
         room = createRoom(ws);
+        if (!room) { role = null; return send(ws, { type: 'error', code: 'busy', msg: 'El servidor está lleno de salas; prueba en unos minutos' }); }
         return send(ws, { type: 'room', code: room.code, token: room.hostToken, recovered: false, players: [] });
       }
     }
-  });
+  }
 
   ws.on('close', () => {
-    if (!room) return;
+    if (!room || room.closed) return;   // una sala ya cerrada no manda listas de jugadores a nadie
     if (role === 'host' && room.host === ws) {
       room.host = null;
+      room.state = null;   // (sin tele no hay «cantando»: un móvil que entre ahora no verá el micro abierto)
       room.emptySince = Date.now();
       toPlayers(room, { type: 'host', online: false });
     } else if (role === 'player' && player && player.ws === ws) {
       player.ws = null;
+      player.offlineAt = Date.now();
       announce(room);
     }
   });
@@ -584,5 +761,25 @@ setInterval(() => {
     ws.ping();
   }
 }, 25 * 1000).unref();
+
+// Último recurso: un error que se escape de todo lo anterior se registra y el servidor sigue con sus salas (si el
+// proceso muriera, systemd lo levantaría, pero todas las salas y los que están cantando se perderían)
+process.on('unhandledRejection', e => console.error('promesa sin capturar:', e && e.stack || e));
+process.on('uncaughtException', e => console.error('error sin capturar:', e && e.stack || e));
+// (si no se puede escuchar, por ejemplo con el puerto ocupado, sí hay que salir: systemd lo reintenta)
+server.on('error', e => { console.error('no se puede escuchar:', e.message); process.exit(1); });
+
+// Parada ordenada (reinicio por despliegue): se guardan las salas y las estadísticas y se avisa a las teles
+let saliendo = false;
+function salir() {
+  if (saliendo) return; saliendo = true;
+  try { saveRooms(); } catch (e) { console.error('no se pudieron guardar las salas:', e.message); }
+  try { admin.flush(); } catch {}
+  for (const r of rooms.values()) toHost(r, { type: 'admin', action: 'toast', text: 'El servidor se reinicia un momento; la partida sigue' });
+  setTimeout(() => process.exit(0), 250);
+}
+process.on('SIGTERM', salir);
+process.on('SIGINT', salir);
+restoreRooms();
 
 server.listen(PORT, HOST, () => console.log(`gramola: escuchando en ${HOST}:${server.address().port}, canciones en ${SONGS_DIR}`));

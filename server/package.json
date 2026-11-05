@@ -1,7 +1,7 @@
 {
   "name": "musicbox-server",
   "version": "0.1.0",
-  "description": "Servidor de salas de MusicBox (karaoke con el móvil como micro)",
+  "description": "Servidor de salas de MusicBox (karaoke con el m\u00f3vil como micro)",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

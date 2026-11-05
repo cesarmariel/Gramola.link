@@ -11,7 +11,7 @@
 La tele es el escenario (**funciona en el navegador**) y cada móvil es un micrófono:
 escaneas el QR, eliges tu color y cantas. Gramola escucha el tono de cada voz y puntúa lo afinado que vas.
 
-![Versión](https://img.shields.io/badge/versi%C3%B3n-1.26.1102.1646-ec3013)
+![Versión](https://img.shields.io/badge/versi%C3%B3n-1.26.1103.1347-ec3013)
 ![Navegador](https://img.shields.io/badge/navegador-Edge%20%C2%B7%20Chrome%20%C2%B7%20Safari-1f6feb)
 ![PWA](https://img.shields.io/badge/micro-web%20%2B%20PWA-ec3013)
 ![Node.js 22+](https://img.shields.io/badge/Node.js-22%2B-5fa04e?logo=nodedotjs&logoColor=white)
@@ -66,7 +66,7 @@ escaneas el QR, eliges tu color y cantas. Gramola escucha el tono de cada voz y 
 | 🎲 **Pásalo** | Equipos, ruleta de 8 retos (*sin ver la letra, canta más agudo, susurrando…*), turnos, marcador y campeones. |
 | 📺 **Jukebox** | La letra en grande y sin puntos, para cantar todos; cola automática de canciones. |
 | 🏆 **Récords** | Salón de la fama por canción, cantantes con más canciones, rachas y rangos. |
-| ⚙️ **Ajustes** | Dificultad, **calibración del retraso del micro cantando**, volúmenes, estela, tamaño de letra y gestión de la sala. |
+| ⚙️ **Ajustes** | Dificultad, **calibración del retraso del micro cantando**, volúmenes, estela, tamaño de letra, gestión de la sala y **Créditos** (qué es Gramola, licencias de todo lo que usa y contacto para retirar contenidos; también con △ en la bienvenida). |
 
 ## 🌟 Detalles
 
@@ -121,6 +121,7 @@ Más detalle en **[docs/ARQUITECTURA.md](docs/ARQUITECTURA.md)**, **[docs/PROTOC
 
 ```bash
 cd server && npm install && npm start      # http://localhost:8877  (tele en /app)
+cd server && npm test                      # pruebas del servidor (salas, permisos, peticiones raras)
 python3 tools/build-tv.py                  # solo si cambia el diseño
 ```
 
@@ -149,7 +150,7 @@ un fragmento de *Sound Effects – Applause after a concert*, grabación de domi
 
 Portal propio en el subdominio `admin.`, con entrada **solo por Touch ID** (passkeys): salas y jugadores en directo
 (mensajes, echar, cerrar, recargar la tele), canciones (**Novedades**, que en la tele salen primero, carátulas de iTunes y Deezer, Megamix, volumen, cabecera,
-ficheros, subir canciones nuevas, retirar), un **editor de canciones** tipo DAW (notas, frases, tono guía, prueba con micro, versiones),
+ficheros, subir canciones nuevas, retirar), un **editor de canciones** por frases sobre la voz (cada frase sola con su trozo de voz y lo que dice, segundo de inicio y fin a mano, tono guía, prueba con micro, versiones; modo avanzado tipo DAW),
 **creación de canciones** a partir del audio (o importando una canción de Spotify) y la letra (con búsqueda automática en LRCLIB y Genius) (separación de voz, alineación y tono en un servicio del propio servidor), récords, actividad, estadísticas por día y estado del servidor.
 Detalles en **[docs/ADMIN.md](docs/ADMIN.md)**.
 

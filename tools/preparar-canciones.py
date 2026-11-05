@@ -109,6 +109,8 @@ def preparar(src_dir, dst_root, sin_video):
                                 '-c:a', 'libmp3lame', '-b:a', '192k', tmp], capture_output=True)
             if r.returncode == 0:
                 os.replace(tmp, os.path.join(dst, nfc(audio))); convertido = True
+            elif os.path.exists(tmp):
+                os.remove(tmp)
     new = {'MP3': nfc(audio), 'AUDIO': nfc(audio)}
     if cover:
         shutil.copy2(os.path.join(src_dir, cover), os.path.join(dst, nfc(cover)))

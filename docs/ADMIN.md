@@ -39,13 +39,30 @@ Las estadísticas por día se guardan en `data/stats.json` (último año).
 
 Desde la ficha, **«✎ Abrir en el editor»** (`#editor/<carpeta>`). Edita el mismo `.txt` que lee la tele.
 
-**Modo sencillo** (el de por defecto; «Modo avanzado» lleva a la línea de tiempo completa de abajo):
-- a la izquierda, la lista de frases (★ si tiene palabras doradas); al hacer clic, la frase llena el lienzo con cada
-  sílaba como un bloque con su texto, a la altura de su nota, sobre la curva de la voz real;
+**Modo sencillo** (el de por defecto; «Modo avanzado» lleva a la línea de tiempo completa de abajo). Trabaja **por
+frases sobre la voz**: con la voz separada (`voz.mp3`), el trabajador parte la canción en **tramos de voz** por los
+silencios y reconoce qué dice cada tramo palabra a palabra (`voz-tramos.json`, faster-whisper); el editor empareja las
+palabras de la letra con las reconocidas (en orden, coincidencias largas primero: cada estribillo repetido va al suyo)
+y así sabe en qué trozo de voz cae cada frase. Si la canción solo tiene `voz.mp3` (sin reconocimiento), los tramos se
+calculan en el navegador y a cada frase le toca el tramo que más se solapa con ella.
+- a la izquierda, la lista de frases (★ si tiene palabras doradas), con un punto por frase: verde si empieza donde la
+  voz (±0,25 s), amarillo si la voz empieza en otro sitio (el título dice cuánto), hueco si no hay voz cerca;
+- al hacer clic, en el lienzo **solo se ve esa frase y su trozo de voz** (banda azul «VOZ», con las palabras reconocidas
+  escritas sobre la onda), con cada sílaba como un bloque con su texto, a la altura de su nota, sobre la curva de la voz;
+- **Empieza** y **Acaba**: el segundo en que empieza y acaba la frase, para escribirlo a mano (Enter aplica; ↑ ↓ mueven
+  0,05 s, con ⇧ 0,5 s; vale `1:23,45`). Al cambiar «Empieza» la frase entera se desplaza; al cambiar «Acaba» sus sílabas
+  se estiran o encogen proporcionalmente. Con **«lo que viene detrás se mueve igual»** (marcado por defecto) todas las
+  frases y cortes posteriores se desplazan lo mismo, así se va corrigiendo la canción de principio a fin y cada frase
+  solo necesita su propio retoque; sin marcar, la frase no puede pisar a la siguiente.
+- **◉ Usar la voz**: pone «Empieza» y «Acaba» donde la voz (el inicio del trozo es donde arranca la voz detectada; si la
+  frase va seguida de otra sin silencio, donde empieza su primera palabra reconocida, afinado al primer instante en que
+  la voz tiene tono, porque el reconocimiento suele adelantar la palabra al hueco anterior). Debajo, «La voz dice: «…»» con
+  lo reconocido, si coincide con la letra y cuánto se desvía la frase.
+- «▶ Escuchar» reproduce la frase con su trozo de voz (con «Repetir frase», en bucle);
 - arriba, las **palabras de la frase como botones**: un clic elige sus sílabas; **★ Dorada** las marca (dan más puntos)
   y se ven en amarillo;
-- toda la frase: «▶ Escuchar la frase» (con «Repetir frase», en bucle), anterior/siguiente (o ← →), antes/después
-  (~50 ms), más corta/más larga (5 %) y «Ver en el juego desde aquí»;
+- toda la frase: anterior/siguiente (o ← →), antes/después (~50 ms), más corta/más larga (5 %) y «Ver en el juego
+  desde aquí»;
 - la sílaba o palabra elegida: acortar, alargar (sin pisar la siguiente), subir/bajar tono, mover, dorada; los bordes
   de los bloques también se arrastran.
 - **Frases**: con palabras elegidas, «✂ Separar en otra frase» las deja en una frase aparte; si están al principio o al
@@ -122,8 +139,9 @@ desfase entre la letra sincronizada y el audio (puede ser de otra versión: disc
 con un desfase constante en al menos el 60 % de las líneas, cada línea se busca solo en su zona corregida (así no se
 confunden estribillos repetidos ni se cuelan frases en los solos). Si no casa, se queda la alineación global.
 
-**«Analizar la voz»** (en la ficha) hace solo la parte de la voz para una canción que ya existe: deja `voz.mp3` y
-`voz-tono.json`, que el editor usa para encajar mejor.
+**«Analizar la voz»** (en la ficha) hace solo la parte de la voz para una canción que ya existe: deja `voz.mp3`,
+`voz-tono.json` y `voz-tramos.json` (tramos de voz y lo que dice), que el editor usa para encajar mejor. Las canciones
+analizadas antes de que existiera el reconocimiento solo tienen los dos primeros: «Volver a analizar la voz» lo añade.
 
 El apartado *Creación* muestra si el trabajador está conectado, la cola con su avance, y permite reintentar o borrar.
 La clave del trabajador se genera ahí (en el servidor solo se guarda su huella, `data/trabajador.json`) y va en

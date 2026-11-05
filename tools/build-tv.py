@@ -159,7 +159,18 @@ sub("const FILTERS=['Orden','Idioma','Década','Género','Solo dúos'];", "const
 sub(",'Género · '+GENS[s.gen],'Solo dúos'],chipAct=[!!s.query,false,s.lng>0,s.dec>0,s.gen>0,s.duoOnly];", ",'Género · '+GENS[s.gen]],chipAct=[!!s.query,false,s.lng>0,s.dec>0,s.gen>0];", name='sin chip dúos')
 
 # --- Megamix: teclas de su pantalla, ficha «Megamix» en Preparar/Resultados, sin récord por canción
-sub("  act(a){const s=this.state;", "  act(a){const s=this.state;if(GR.megaKey(this,a))return;GR.navBefore(this,a);", name='Megamix y zzzup: teclas')
+sub("  act(a){const s=this.state;", "  act(a){const s=this.state;if(!s.err&&(GR.creditsKey(this,a)||GR.megaKey(this,a)))return;GR.navBefore(this,a);", name='Megamix y zzzup: teclas')
+
+# --- Créditos (Ajustes → Créditos, y △ en la bienvenida): qué es Gramola, licencias y contacto
+sub("{k:'code',label:'Nuevo código de sala',type:'act',help:'Genera un código nuevo. Todos los móviles tendrán que volver a entrar.'}]",
+    "{k:'code',label:'Nuevo código de sala',type:'act',help:'Genera un código nuevo. Todos los móviles tendrán que volver a entrar.'},{k:'credits',label:'Créditos',type:'act',help:'Qué es Gramola, de quién es cada pieza que usa y cómo contactar.'}]", name='créditos: fila de Ajustes')
+sub("else{GR.newCode(this);}}}", "else if(r.k==='credits'){GR.creditsOpen(this);}else{GR.newCode(this);}}}", name='créditos: abrir desde Ajustes')
+sub("o.val=r.k==='delay'?st.delay+' ms':r.k==='kick'?(n?PLAYERS[n-1][0]:'Nadie en la sala'):s.room;o.cta=r.k==='delay'?'Calibrar':r.k==='kick'?'Expulsar':'Generar';",
+    "o.val=r.k==='delay'?st.delay+' ms':r.k==='kick'?(n?PLAYERS[n-1][0]:'Nadie en la sala'):r.k==='credits'?'Proyecto libre y sin ánimo de lucro':s.room;o.cta=r.k==='delay'?'Calibrar':r.k==='kick'?'Expulsar':r.k==='credits'?'Ver':'Generar';", name='créditos: fila')
+sub("if(s.screen==='welcome'){if(a==='ok')this.go('lobby');return;}", "if(s.screen==='welcome'){if(a==='ok')this.go('lobby');else if(a==='y'||a==='x')GR.creditsOpen(this);return;}", name='créditos: △ en la bienvenida')
+# En el pie de la bienvenida: logo a la izquierda, versión pequeña en el centro (sin la palabra «Versión») y «△ Créditos»
+# a la derecha (discreto, fuera del «Pulsa ✕ para continuar»)
+sub(r'(\{\{ pressEl \}\}</div>\n  <div style=")display:flex;justify-content:space-between;', r'\1display:grid;grid-template-columns:1fr auto 1fr;', regex=True, name='bienvenida: pie en tres columnas')
 sub("const recN=parseInt((song.rec.split(' ')[0]||'0').replace('.',''))||0;", "const recN=GR.mega?Infinity:(parseInt((song.rec.split(' ')[0]||'0').replace('.',''))||0);", name='Megamix: sin récord')
 sub("resAct(i){this.conf=[];", "resAct(i){this.conf=[];if(GR.megaRes(this,i))return;", name='Megamix: resultados')
 
@@ -168,12 +179,12 @@ sub("Pasa el micro", "Pásalo", count=0, name='Pásalo')
 
 # --- lista de canciones en rejilla de dos filas (sin transiciones en las fichas: se reutilizan al desplazarse y
 #     una animación de color hacía parpadear en rojo la ficha que antes estaba seleccionada) (en lugar del carrusel de una en una); el resto de la pantalla igual
-GRID_HTML = """      <div style="position:absolute;left:0;top:0;height:100%;transition:transform 260ms cubic-bezier(.2,.8,.2,1);transform:translateX({{ grid.tx }}px)">
+GRID_HTML = """      <div style="position:absolute;left:0;top:0;height:100%;transition:transform {{ grid.tr }};transform:translateX({{ grid.tx }}px)">
         <sc-for list="{{ grid.tags }}" as="g" hint-placeholder-count="3">
           <div style="position:absolute;left:{{ g.x }}px;top:{{ g.y }}px;width:52px;height:52px;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800;color:#fff;background:{{ g.bg }}">{{ g.l }}</div>
         </sc-for>
         <sc-for list="{{ grid.tiles }}" as="s" hint-placeholder-count="10">
-          <div onClick="{{ s.click }}" style="position:absolute;left:{{ s.x }}px;top:{{ s.y }}px;width:{{ s.w }}px;height:{{ s.h }}px;overflow:hidden;cursor:pointer;background:{{ s.tbg }};box-shadow:{{ s.sh }};transform:{{ s.t }};z-index:{{ s.z }}">
+          <div onClick="{{ s.click }}" style="position:absolute;left:{{ s.x}}px;top:{{ s.y }}px;width:{{ s.w }}px;height:{{ s.h }}px;overflow:hidden;cursor:pointer;background:{{ s.tbg }};box-shadow:{{ s.sh }};transform:{{ s.t }};z-index:{{ s.z }}">
             <div style="position:relative;width:100%;height:{{ s.ch }}px;overflow:hidden;background:{{ s.bg }}">
               <div style="position:absolute;right:0;bottom:0;width:58%;height:46%;background:{{ s.blk }}"></div>
               <div style="position:absolute;left:6%;top:3%;font-weight:800;line-height:1;letter-spacing:-0.05em;font-size:{{ s.fs }}px;color:{{ s.fg }}">{{ s.ini }}</div>
@@ -226,15 +237,17 @@ sub(r'(<img src="assets/nuvola/nuvola-blanco\.png"[^\n]*\n    </div>\n  </div>\n
 # --- ayudas de botones según el mando conectado (PlayStation ✕○□△, Xbox ABXY, o las del diseño)
 GK = {'OK': 'ok', '←': 'back', 'X': 'x', 'Y': 'y', 'L': 'l', 'R': 'r', 'L R': 'lr', '≡': 'menu'}
 sub(r'((?:min-width|width):4[48]px;height:4[48]px;[^>]*>)(OK|←|X|Y|L|R|L R|≡)(</div>)', lambda m: m.group(1) + '{{ gk.' + GK[m.group(2)] + ' }}' + m.group(3), regex=True, count=0, name='ayudas: símbolos')
-sub("V.isSplash=s.screen==='splash';", "V.gk=GR.gk();V.isSplash=s.screen==='splash';", name='ayudas: datos')
+sub("V.isSplash=s.screen==='splash';", "V.gk=GR.gk();V.onCredits=e=>{if(e&&e.stopPropagation)e.stopPropagation();GR.creditsOpen(this);};V.onPagePrev=()=>GR.gridPage(this,-1);V.onPageNext=()=>GR.gridPage(this,1);V.isSplash=s.screen==='splash';", name='ayudas: datos')
 sub("if(!this._pressEl){const h=React.createElement;this._pressEl=", "if(!this._pressEl||this._pressGk!==GR.gk().ok){this._pressGk=GR.gk().ok;const h=React.createElement;this._pressEl=", name='ayudas: pulsa')
 sub("fontSize:26,fontWeight:800}},'OK'),h('span',null,'para continuar')", "fontSize:26,fontWeight:800}},GR.gk().ok),h('span',null,'para continuar')", name='ayudas: pulsa OK')
 
 # --- subtítulo de Récords en el menú más corto (no cabía en una línea)
 sub("['Récords','Salón de la fama','Las mejores puntuaciones de la casa.']", "['Récords','Los mejores','Las mejores puntuaciones de la casa.']", name='menú: Los mejores')
 
-# --- tarjeta del menú seleccionada: borde negro por los cuatro lados (antes solo el de la derecha)
-sub("const tiles=MODES.map((m,i)=>{const on=s.menuF===i;return {num:", "const tiles=MODES.map((m,i)=>{const on=s.menuF===i;return {ol:on?'2px solid '+C.ink:'none',num:", name='menú: borde datos')
+# --- tarjeta del menú seleccionada: borde negro por los cuatro lados (antes solo el de la derecha); con ratón, la
+#     tarjeta se elige al pasar por encima
+sub("const tiles=MODES.map((m,i)=>{const on=s.menuF===i;return {num:", "const tiles=MODES.map((m,i)=>{const on=s.menuF===i;return {hover:()=>{if(!on)this.setState({menuF:i});},ol:on?'2px solid '+C.ink:'none',num:", name='menú: borde datos')
+sub('<div onClick="{{ m.click }}" style="height:260px;', '<div onClick="{{ m.click }}" onMouseEnter="{{ m.hover }}" style="height:260px;', name='menú: elegir con el ratón')
 sub("t:on?'scale(1.05)':'scale(1)',s:on?SHADOW:'none',z:on?2:1,br:i<6", "t:on?'scale(1.05)':'scale(1)',s:on?'0 18px 40px rgba(32,30,29,0.38), 0 4px 12px rgba(32,30,29,0.22)':'none',z:on?2:1,br:i<6", name='menú: sombra')
 sub("border-right:{{ m.br }};background:{{ m.bg }};", "border-right:{{ m.br }};outline:{{ m.ol }};outline-offset:-2px;background:{{ m.bg }};", name='menú: borde')
 
@@ -257,7 +270,10 @@ sub('\n    <div style="font-size:40px;font-weight:300;letter-spacing:-0.01em">Ka
 
 # --- versión (esquema 1.AA.MMDD.HHMM, fichero VERSION en la raíz del repo)
 VERSION = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'VERSION')).read().strip()
-sub('<span style="color:var(--color-neutral-700)">Versión 1.0.0</span>', f'<span style="color:var(--color-neutral-700)">Versión {VERSION}</span>', name='versión')
+sub('<span style="color:var(--color-neutral-700)">Versión 1.0.0</span>',
+    f'<span style="color:var(--color-neutral-700);font-size:22px;font-weight:500;justify-self:center">{VERSION}</span>'
+    '<span onClick="{{ onCredits }}" style="justify-self:end;display:flex;align-items:center;gap:12px;font-size:24px;font-weight:600;color:var(--color-neutral-700)">'
+    '<span style="width:40px;height:40px;border-radius:50%;border:2px solid var(--color-text);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:var(--color-text)">{{ gk.y }}</span>Créditos</span>', name='versión')
 # …y la misma versión en la insignia del README (así el repo muestra siempre la versión desplegada)
 _readme = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'README.md')
 if os.path.exists(_readme):
@@ -277,11 +293,58 @@ sub("V.jq=s.jq.slice(0,4).map(i=>{const so=SONGS[i];", "V.jq=s.jq.slice(0,4).fil
 sub("const cs=s.screen==='songs'?(list[sf]||SONGS[0]):SONGS[s.songSel];", "const cs=s.screen==='songs'?(list[sf]||SONGS[0]):(GR.megaCard(s)||SONGS[s.songSel]||SONGS[0]);", name='ficha segura (y Megamix)')
 sub("let l=SONGS.slice();", "let l=SONGS.filter(x=>x.id);", name='sin relleno en la lista')
 
+sub('onKey(e){const map=', 'onKey(e){if(GramolaKeyboard.handle(this,e))return;const map=', name='teclado físico y búsqueda')
+
+sub("['Espacio · Y','Borrar · X','Buscar']", "[GR.gk().ok==='↵'?'Espacio':'Espacio · '+GR.gk().y,GR.gk().ok==='↵'?'Borrar · Retroceso':'Borrar · '+GR.gk().x,'Buscar']", name='etiquetas de búsqueda')
+sub("'Escribe con el mando…'", "(GR.gk().ok==='↵'?'Escribe con el teclado…':'Escribe con el mando…')", name='ayuda de búsqueda')
+
 # --- página: título, iconos, rutas y el puente antes del runtime del diseño
 sub('<head>', '<head>\n<base href="/tv/">\n<title>Gramola</title>\n<meta name="theme-color" content="#ec3013">\n'
     '<link rel="icon" href="/assets/iconos/favicon-32.png" sizes="32x32">\n<link rel="apple-touch-icon" href="/assets/iconos/favicon-180.png">\n'
     '<style>html,body{margin:0;background:#0e0f0f;overflow:hidden;cursor:none}</style>\n'
-    '<script src="/vendor/qrcode.js"></script>\n<script src="/tv/gramola-bridge.js?v=' + VERSION + '"></script>', name='head')
+    '<script src="/vendor/qrcode.js"></script>\n<script src="/js/keyboard.js"></script>\n<script src="/tv/gramola-bridge.js?v=' + VERSION + '"></script>', name='head')
+
+# --- revisión del 03-nov-2026: récords comprobados en el servidor y casos límite de Pásalo/Preparar/Resultados
+# Cada fila de resultados lleva el id del jugador (el servidor solo guarda récords de jugadores de la sala) y la
+# precisión no es NaN en una canción sin ranuras
+sub("return {name:s.name,color:s.color,shape:s.shape,score:Math.round(this.score[k]),prec:Math.round(100*h/t),",
+    "return {id:s.id,name:s.name,color:s.color,shape:s.shape,score:Math.round(this.score[k]),prec:t?Math.round(100*h/t):0,", name='resultados: id y precisión')
+# Pásalo: un equipo que se queda sin jugadores no deja la pantalla en blanco
+sub("turnPlayer(p){const ids=this.teamIds(p,p.turn);return ids[", "turnPlayer(p){const ids=this.teamIds(p,p.turn);if(!ids.length)return null;return ids[", name='Pásalo: equipo vacío')
+sub("partyGo(){const p=this.state.party,P0=PLAYERS[this.turnPlayer(p)];this.beginCount(",
+    "partyGo(){const p=this.state.party,pi=this.turnPlayer(p);if(pi==null){this.toast('Ese equipo se ha quedado sin jugadores');this.P({step:'teams'});return;}const P0=PLAYERS[pi];this.beginCount(", name='Pásalo: ir sin jugador')
+sub("if(sp==='turn'){const pi=this.turnPlayer(p);V.turnName=PLAYERS[pi][0];", "if(sp==='turn'){const pi=this.turnPlayer(p);V.turnName=pi==null?'—':PLAYERS[pi][0];", name='Pásalo: nombre del turno')
+# Preparar partida: un jugador que se ha ido (fila sin nombre) no se convierte en cantante fantasma
+sub("singersFromSetup(){const m=this.state.mode;return this.state.setup.map((s,i)=>{if(this.isOff(i))return null;",
+    "singersFromSetup(){const m=this.state.mode;return this.state.setup.map((s,i)=>{if(this.isOff(i)||!PLAYERS[i][0])return null;", name='preparar: sin fantasmas')
+# Calibración: cancelar con Atrás también para la toma de arranques de voz en el puente
+sub("calKey(a){const c=this.state.calib;if(c.phase==='measure'||c.phase==='test'){if(a==='back'){clearInterval(this.bTimer);this.setState(",
+    "calKey(a){const c=this.state.calib;if(c.phase==='measure'||c.phase==='test'){if(a==='back'){clearInterval(this.bTimer);if(GR.cal)GR.cal.on=false;this.setState(", name='calibración: cancelar')
+# Transición cancelada: si se sale de la cuenta atrás (o del fundido hacia el canto) antes de que llegue, se para la cuenta
+# y la canción (antes la cuenta seguía viva y arrancaba la canción sola en otra pantalla, o el audio se quedaba sonando)
+sub("if(this.state.tr==='out'){clearTimeout(this.trT);}",
+    "if(this.state.tr==='out'){clearTimeout(this.trT);if(this.trTo==='count'&&screen!=='count'){clearTimeout(this.cWait);clearInterval(this.cTimer);}if(this.trTo==='sing'&&screen!=='sing'){this.chart=null;GR.stopAudio&&GR.stopAudio();}}clearTimeout(this.trI);", name='transición cancelada')
+# Récords «Por canción»: solo las que tienen récord, 8 como mucho (cabían en pantalla; la biblioteca entera se salía)
+sub("return [so.title,sc||'—',nm||'Sin récord todavía',parseInt((sc||'0').replace('.',''))||0];}).sort((a,b)=>b[3]-a[3]);",
+    "return [so.title,sc||'—',nm||'Sin récord todavía',parseInt((sc||'0').replace('.',''))||0];}).sort((a,b)=>b[3]-a[3]).filter(r=>r[3]>0).slice(0,8);", name='récords por canción: 8')
+# Pásalo: tantas rondas como hagan falta para que canten todos (con 3 equipos o equipos desiguales, 4 fijas era injusto)
+sub("this.P({step:'roulette'});}else if(a==='back')this.go('menu');}",
+    "this.P({step:'roulette',rounds:p.nT*Math.max(...[...Array(p.nT).keys()].map(t=>this.teamIds(p,t).length))});}else if(a==='back')this.go('menu');}", name='Pásalo: rondas')
+# Fin de canción con la biblioteca recargada a medias (sala perdida): la canción puede no estar en su índice
+sub("const song=SONGS[this.state.songSel];const recN=", "const song=SONGS[this.state.songSel]||{rec:'—'};const recN=", name='fin: canción desaparecida')
+# El carrusel «covers» del diseño ya no se usa (lo sustituye la rejilla): no se calcula en cada render (un objeto con
+# cierre por canción en cada toast o tic de marcador, también cantando)
+sub("const covers=list.map((so,i)=>{", "const covers=[],_coversNo=((so,i)=>{", name='sin carrusel de portadas')
+# La lista de canciones filtrada y ordenada se calcula solo cuando cambia algo (antes, en cada render, también cantando)
+sub("  songsList(){const s=this.state;let l=SONGS.filter(x=>x.id);",
+    "  songsList(){const s=this.state;const key=[SONGS.length,GR.songsRev||0,s.query||'',s.lng,s.dec,s.gen,s.duoOnly?1:0,s.ord].join('|');if(this._sl&&this._sl.key===key)return this._sl.list;const list=this.songsList0();this._sl={key,list};return list;}\n  songsList0(){const s=this.state;let l=SONGS.filter(x=>x.id);", name='lista de canciones memorizada')
+
+# --- Canciones: dos botones a la derecha de los filtros para pasar página con el ratón (o el puntero de la tele)
+BOTON_PAG = 'style="width:64px;height:64px;box-sizing:border-box;border:2px solid var(--color-text);display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:800;line-height:1;padding-bottom:4px;background:#fff"'
+sub('<div style="display:flex;margin-top:24px;border:2px solid var(--color-text);align-self:flex-start">\n    <sc-for list="{{ filters }}" as="f" hint-placeholder-count="8">',
+    '<div style="display:flex;margin-top:24px;justify-content:space-between;align-items:flex-start;align-self:stretch">\n  <div style="display:flex;border:2px solid var(--color-text)">\n    <sc-for list="{{ filters }}" as="f" hint-placeholder-count="8">', name='canciones: fila de filtros con paginación')
+sub('">{{ f.label }}</div>\n    </sc-for>\n  </div>',
+    '">{{ f.label }}</div>\n    </sc-for>\n  </div>\n  <div style="display:flex;gap:12px"><div onClick="{{ onPagePrev }}" ' + BOTON_PAG + '>‹</div><div onClick="{{ onPageNext }}" ' + BOTON_PAG + '>›</div></div>\n  </div>', name='canciones: botones de página')
 
 if fails:
     print('ERROR: estos enganches ya no encajan con el diseño nuevo:', *fails, sep='\n  - ')
