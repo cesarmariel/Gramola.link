@@ -8,6 +8,7 @@
 <link rel="apple-touch-icon" href="/assets/iconos/favicon-180.png">
 <style>html,body{margin:0;background:#0e0f0f;overflow:hidden;cursor:none}</style>
 <script src="/vendor/qrcode.js"></script>
+<script src="/js/keyboard.js"></script>
 <script src="/tv/gramola-bridge.js?v=1.26.1103.1347"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -802,7 +803,7 @@ class Component extends DCLogic {
   filterAct(i){const s=this.state;if(i===0)return this.setState({search:{open:true,f:0}});const up={songF:0};if(i===1)up.ord=(s.ord+1)%ORDERS.length;else if(i===2)up.lng=(s.lng+1)%LANGS.length;else if(i===3)up.dec=(s.dec+1)%DECS.length;else if(i===4)up.gen=(s.gen+1)%GENS.length;else up.duoOnly=!s.duoOnly;this.setState(up);}
   setupToggle(i){if(this.isOff(i)){this.toast(PLAYERS[i][0]+' no tiene el micro conectado');return;}const m=this.state.mode;this.setState(s=>({setup:s.setup.map((r,j)=>j!==i?r:m==='sing'?{...r,on:!r.on}:{...r,side:r.side===0?2:r.side===2?1:0})}));}
   setupDiff(i,d){this.setState(s=>({setup:s.setup.map((r,j)=>j===i?{...r,diff:Math.max(0,Math.min(2,r.diff+d))}:r)}));}
-  onKey(e){const map={ArrowLeft:'l',ArrowRight:'r',ArrowUp:'u',ArrowDown:'d',Enter:'ok',' ':'ok',Escape:'back',Backspace:'back',p:'menu',P:'menu',m:'menu',M:'menu',v:'v',V:'v',j:'add',J:'add','+':'add','-':'rem',q:'lb',Q:'lb',e:'rb',E:'rb',x:'x',X:'x',y:'y',Y:'y',GamepadA:'ok',GamepadB:'back',GamepadX:'x',GamepadY:'y',GamepadMenu:'menu',GamepadView:'v',GamepadLeftShoulder:'lb',GamepadRightShoulder:'rb',GamepadDPadUp:'u',GamepadDPadDown:'d',GamepadDPadLeft:'l',GamepadDPadRight:'r',GamepadLeftThumbstickUp:'u',GamepadLeftThumbstickDown:'d',GamepadLeftThumbstickLeft:'l',GamepadLeftThumbstickRight:'r'};const a=map[e.key];if(!a)return;e.preventDefault();if(e.key.startsWith('Gamepad'))this.padKeys=true;if(GR.inAct(this,a,'key'))this.act(a);}
+  onKey(e){if(GramolaKeyboard.handle(this,e))return;const map={ArrowLeft:'l',ArrowRight:'r',ArrowUp:'u',ArrowDown:'d',Enter:'ok',' ':'ok',Escape:'back',Backspace:'back',p:'menu',P:'menu',m:'menu',M:'menu',v:'v',V:'v',j:'add',J:'add','+':'add','-':'rem',q:'lb',Q:'lb',e:'rb',E:'rb',x:'x',X:'x',y:'y',Y:'y',GamepadA:'ok',GamepadB:'back',GamepadX:'x',GamepadY:'y',GamepadMenu:'menu',GamepadView:'v',GamepadLeftShoulder:'lb',GamepadRightShoulder:'rb',GamepadDPadUp:'u',GamepadDPadDown:'d',GamepadDPadLeft:'l',GamepadDPadRight:'r',GamepadLeftThumbstickUp:'u',GamepadLeftThumbstickDown:'d',GamepadLeftThumbstickLeft:'l',GamepadLeftThumbstickRight:'r'};const a=map[e.key];if(!a)return;e.preventDefault();if(e.key.startsWith('Gamepad'))this.padKeys=true;if(GR.inAct(this,a,'key'))this.act(a);}
   act(a){const s=this.state;if(!s.err&&(GR.creditsKey(this,a)||GR.megaKey(this,a)))return;GR.navBefore(this,a);
     if(s.err){if(a==='ok'||a==='back')this.errAct();return;}
     if(s.screen==='splash'||s.screen==='boot')return;if(s.screen==='welcome'){if(a==='ok')this.go('lobby');else if(a==='y'||a==='x')GR.creditsOpen(this);return;}
@@ -1040,8 +1041,8 @@ class Component extends DCLogic {
       V.cvBars=M!=='Barras'?[]:cols.map((bg,i)=>{const dl=i*40;const x=ph==='idle'?(d>0?'101%':'-101%'):ph==='in'?(d>0?'-101%':'101%'):'0';return {top:i*BH,h:BH+1,bg,tf:'translateX('+x+')',tr:ph==='out'?'transform '+(T.out-200)+'ms '+EIO+' '+dl+'ms':ph==='in'?'transform '+(T.in-200)+'ms '+EIO+' '+dl+'ms':'none'};});}
     V.searchOpen=s.screen==='songs'&&s.search.open;const sfx=s.search.f,KN=KB.length;
     V.kbKeys=[...KB].map((k,i)=>{const on=sfx===i;return {label:k,bg:on?C.red:'#fff',fg:on?'#fff':ink,t:on?'scale(1.08)':'scale(1)',s:on?SHADOW:'none',z:on?2:1,click:()=>{this.setState({search:{...s.search,f:i}});this.typeQ(k);}};});
-    V.kbAct=['Espacio · Y','Borrar · X','Buscar'].map((label,j)=>{const i=KN+j,on=sfx===i;return {label,br:j<2?'2px solid '+ink:'none',bg:on?C.red:j===2?ink:'#fff',fg:on||j===2?'#fff':ink,click:()=>{this.setState({search:{...s.search,f:i}});if(j===0)this.typeQ(' ');else if(j===1)this.typeQ(null);else this.closeSearch();}};});
-    V.qShow=s.query||'Escribe con el mando…';V.qColor=s.query?ink:C.n5;const nL=this.songsList().length;V.searchCount=nL===1?'1 canción':nL+' canciones';
+    V.kbAct=[GR.gk().ok==='↵'?'Espacio':'Espacio · '+GR.gk().y,GR.gk().ok==='↵'?'Borrar · Retroceso':'Borrar · '+GR.gk().x,'Buscar'].map((label,j)=>{const i=KN+j,on=sfx===i;return {label,br:j<2?'2px solid '+ink:'none',bg:on?C.red:j===2?ink:'#fff',fg:on||j===2?'#fff':ink,click:()=>{this.setState({search:{...s.search,f:i}});if(j===0)this.typeQ(' ');else if(j===1)this.typeQ(null);else this.closeSearch();}};});
+    V.qShow=s.query||(GR.gk().ok==='↵'?'Escribe con el teclado…':'Escribe con el mando…');V.qColor=s.query?ink:C.n5;const nL=this.songsList().length;V.searchCount=nL===1?'1 canción':nL+' canciones';
     V.isPA=!!s.pauseAudio;V.notPA=!s.pauseAudio;V.pauseTitle=s.pauseAudio?'Audio':'Pausa';const stg=s.settings;
     V.paRows=[['Música',stg.music,String(stg.music)],['Efectos',stg.fx,String(stg.fx)],['Retraso del micro',Math.round(stg.delay/40),stg.delay+' ms']].map((r,i)=>{const on=s.paF===i;return {label:r[0],val:r[2],bg:on?C.red:'transparent',fg:on?'#fff':ink,cells:Array.from({length:10},(_,j)=>({c:j<r[1]?(on?'#fff':ink):(on?'rgba(255,255,255,0.35)':C.n3)})),click:()=>this.setState({paF:i})};});
     V.onKeyOk=()=>this.act('ok');V.onKeyBack=()=>this.act('back');V.onKeyX=()=>this.act('x');V.onKeyY=()=>this.act('y');V.onKeyL=()=>this.act('lb');V.onKeyR=()=>this.act('rb');

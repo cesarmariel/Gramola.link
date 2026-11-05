@@ -543,6 +543,7 @@ window.GR = (() => {
   // (rojo=Y, verde=X, amarillo=L, azul=R). Los colores van como marcas de uso privado que se convierten en puntos de
   // color al pintarse (dotsWatch y gkHtml); las letras no servían porque el mando de la tele no las tiene.
   const GLYPHS = {
+    keyboard: { ok: '↵', back: 'Esc', x: 'X', y: 'Y', l: 'Q', r: 'E', lr: 'Q E', menu: 'P' },
     tele: { ok: 'OK', back: '←', x: '', y: '', l: '', r: '', lr: '', menu: '≡' },
     ps: { ok: '✕', back: '○', x: '□', y: '△', l: 'L1', r: 'R1', lr: 'L1 R1', menu: '≡' },
     xbox: { ok: 'A', back: 'B', x: 'X', y: 'Y', l: 'LB', r: 'RB', lr: 'LB RB', menu: '≡' },
@@ -573,7 +574,7 @@ window.GR = (() => {
   };
   // Con mando conectado (PlayStation o Xbox, según se detecte al pulsar un botón), sus símbolos; sin mando, los del
   // mando a distancia de la tele
-  G.gk = () => GLYPHS[padKind] || GLYPHS.tele;
+  G.gk = () => detectPad() === 'tele' && /Windows|Macintosh|Linux/.test(navigator.userAgent) && !/Android|Mobile/.test(navigator.userAgent) ? GLYPHS.keyboard : (GLYPHS[padKind] || GLYPHS.tele);
   // Ratón (escritorio): la página esconde el puntero (en la tele no hay ratón); al moverlo se enseña y a los 2,5 s
   // quieto se vuelve a esconder, como en cualquier app de salón
   // El puntero es propio: la flecha plana del logo de bages.link, en rojo con contorno de tinta, a 72 px (el punto
